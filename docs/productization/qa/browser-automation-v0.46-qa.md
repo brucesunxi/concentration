@@ -18,4 +18,4 @@ npm run test:browser
 
 已有系统 Chrome 时可用 `FOCUS_BROWSER_PATH` 指向浏览器可执行文件；Python 不在默认路径时用 `FOCUS_BROWSER_PYTHON` 指定。脚本在启动测试服务前清除继承来的 `FOCUS_*`、`DATABASE_*` 和 `VERCEL*` 环境变量，避免误连线上资源或使用部署密钥。
 
-GitHub 工作流在 Ubuntu 24.04 镜像上使用预装的 Chrome，还运行类型检查、业务检查和真实本机 HTTP 检查；浏览器失败时上传虚构资料的失败截图。首轮云端尝试停在 Playwright 浏览器下载环节，故改用镜像浏览器；改动后的云端结果需要重新核对。它不证明 iOS/Android 原生交互、语音听感、Safari/Firefox、正式数据库权限或真实家庭适龄性，这些仍按发布门槛单独验收。
+GitHub 工作流在 Ubuntu 24.04 镜像上使用预装的 Chrome，还运行类型检查、业务检查和真实本机 HTTP 检查；浏览器失败时上传虚构资料的失败截图。首轮云端尝试停在 Playwright 浏览器下载环节，故改用镜像浏览器。第二轮进入业务回归，321/324 通过，另 3 项音频素材检查因运行环境缺少 FFmpeg 而失败；现已在工作流中安装 FFmpeg，完整云端结果需重新核对。它不证明 iOS/Android 原生交互、语音听感、Safari/Firefox、正式数据库权限或真实家庭适龄性，这些仍按发布门槛单独验收。
