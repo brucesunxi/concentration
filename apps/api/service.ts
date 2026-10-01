@@ -36,6 +36,7 @@ import type { ReleaseScope, ReleasePlatform } from './release-scope.ts';
 import { checkedGuardianVerification } from './guardian-consent.ts';
 import type { GuardianVerifier } from './guardian-consent.ts';
 import type { FamilyEntitlementReader } from './billing-access.ts';
+import type { FamilyBillingStatus } from '../../packages/contracts/family-billing.ts';
 
 const scrypt = promisify(scryptCallback);
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -192,6 +193,16 @@ export function service(source: Database, now: () => number = Date.now, content?
   const members = familyMembers(db,{now,fail,owner,hashPassword,context,token,releaseScope});
   const operations = {
     familyMembers:members.read, inviteMember:members.invite, cancelInvitation:members.cancel, actMember:members.act, join:members.join,
+    async billingStatus(p: Principal): Promise<FamilyBillingStatus> {
+      parent(p);
+      const checkedAt = new Date(now()).toISOString();
+      if (releaseScope.mode === 'local-development') return { version: 'family-billing-1', familyId: p.family_id, state: 'preview', validUntil: null, autoRenew: null, checkedAt };
+      if (!entitlementReader) fail(503, 'ENTITLEMENT_UNAVAILABLE', '家庭权益暂时无法确认，请稍后重试。');
+      try {
+        const entitlement = await entitlementReader.read(db, p.family_id, checkedAt);
+        return { version: 'family-billing-1', familyId: p.family_id, state: entitlement.state, validUntil: entitlement.validUntil, autoRenew: entitlement.autoRenew, checkedAt };
+      } catch { fail(503, 'ENTITLEMENT_UNAVAILABLE', '家庭权益暂时无法确认，请稍后重试。'); }
+    },
     async ageReviewSpace(p: Principal, childId: string) {
       parent(p);
       return ageReviewSpaceTx(db,p,childId);
@@ -698,7 +709,7 @@ export function service(source: Database, now: () => number = Date.now, content?
   // Public authentication methods establish their narrower context above. Every
   // other operation receives a server-authenticated Principal, never body fields.
   const selfScopedMethods = new Set(['setup', 'login', 'join', 'authenticate', 'sessionAuthorities', 'changePassword', 'logoutAll', 'deleteFamily', 'grantGuardianConsent']);
-  const ownerMethods = new Set(['addChild','withdraw','deleteChild','exportChild','setPracticeLimit','handover','lifeSpace','lifeHistory','createLifeGoal','actLifeGoal','inviteMember','cancelInvitation','actMember','requestAgeReview','applyAgeReview']);
+  const ownerMethods = new Set(['billingStatus','addChild','withdraw','deleteChild','exportChild','setPracticeLimit','handover','lifeSpace','lifeHistory','createLifeGoal','actLifeGoal','inviteMember','cancelInvitation','actMember','requestAgeReview','applyAgeReview']);
   const pendingMethods = new Set(['me','logout','accountSecurity','familyMembers']);
   return Object.fromEntries(Object.entries(operations).map(([name, action]) => [name,
     selfScopedMethods.has(name) ? action : (p: Principal, ...args: unknown[]) => authenticated(p, current => {

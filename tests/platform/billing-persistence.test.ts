@@ -64,12 +64,18 @@ test('a paid release starts from persisted entitlement and a refund blocks only 
     const second = await api.addChild(parent, { alias: 'Synthetic second child', ageBand: '9-11', locale: 'en' });
     proof = { ...proof, reference: randomUUID(), childId: second.id };
     await api.grantGuardianConsent(parent, second.id, randomUUID());
+    assert.equal((await api.billingStatus(parent)).state, 'free');
     const input = { task: 'search' as const, deviceId: randomUUID(), environment: TEST_ENVIRONMENT }, key = randomUUID();
     await assert.rejects(api.start(parent, child.id, input, key), (error: unknown) => error instanceof ApiError && error.code === 'ENTITLEMENT_REQUIRED');
     await recordVerifiedBillingFact(db, parent.family_id, period('paid-event'));
+    const paidStatus = await api.billingStatus(parent);
+    assert.equal(paidStatus.state, 'active');
+    assert.equal(paidStatus.validUntil, end);
+    assert.equal(JSON.stringify(paidStatus).includes(source.originalTransactionId), false);
     const started = await api.start(parent, child.id, input, key);
     await recordVerifiedBillingFact(db, parent.family_id, { kind: 'refund', eventId: 'paid-refund', source, transactionId: 'synthetic-transaction-1' });
     const renewedParent = (await api.authenticate((await api.login({ name: login.name, password: login.password })).value))!;
+    assert.equal((await api.billingStatus(renewedParent)).state, 'refunded');
     assert.equal((await api.start(renewedParent, child.id, input, key)).session.id, started.session.id);
     const anotherParent = (await api.authenticate((await api.login({ name: login.name, password: login.password })).value))!;
     await assert.rejects(api.start(anotherParent, second.id, { ...input, deviceId: randomUUID() }, randomUUID()),

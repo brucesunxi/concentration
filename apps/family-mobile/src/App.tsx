@@ -13,6 +13,7 @@ import { Recovery } from './Recovery';
 import type { GoalInput } from '../../../packages/family-support/model.ts';
 import { ParentGuide } from './ParentGuide';
 import { AccountSecurity } from './AccountSecurity';
+import { FamilyBilling } from './FamilyBilling';
 import { PracticeLimits } from './PracticeLimits';
 import { LifeGoals } from './LifeGoals';
 import { TeenStrategyHistory } from './TeenStrategyHistory';
@@ -34,7 +35,7 @@ function FamilyApp() {
   const [me, setMe] = useState<Me | null>(null), [session, setSession] = useState<Session | null>(null);
   const [offlineOffer,setOfflineOffer]=useState<NonNullable<Awaited<ReturnType<typeof readOfflineSession>>>|null>(null);
   const [locale, setLocale] = useState<Locale>('zh-CN'), [familyName, setFamilyName] = useState('');
-  const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy'>('home');
+  const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'billing' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy'>('home');
   const [lifeSuggestion, setLifeSuggestion] = useState<GoalInput['templateId'] | undefined>();
   const [selected, setSelected] = useState<Child | null>(null), [covered, setCovered] = useState(false);
   const [practiceInvitation, setPracticeInvitation] = useState<{childId:string;task:TaskId;identity:number}|null>(null);
@@ -161,6 +162,7 @@ function FamilyApp() {
   if(me.role==='parent' && me.member?.state==='pending')return <Page title={t('等待家庭创建者确认','Waiting for the family creator')}><Text style={s.heading}>{me.family.name} · {me.member.displayName}</Text><Text style={s.body}>{me.member.loginName}</Text><Text style={s.body}>{t('请与创建者核对登录名。确认之前，这里不会显示孩子资料。','Check your username with the creator. Child records stay hidden until they confirm.')}</Text><Notice>{error}</Notice><Button title={t('重新读取','Reload')} disabled={busy} onPress={()=>void refresh(false)}/><Button quiet title={t('退出登录','Sign out')} onPress={()=>void action(async()=>{await client.logout();setMe(null);})}/></Page>;
   if(view==='members' && me.role==='parent' && me.member)return <FamilyMembers familyId={me.family.id} viewerId={me.member.id} children={me.children} locale={locale} client={client} onBack={()=>setView('home')} onLogin={()=>{identityVersion.current++;client.lockParent();setMe(null);setView('home');}}/>;
   if (view === 'security' && me.role === 'parent') return <AccountSecurity key={me.family.id} familyId={me.family.id} familyName={me.family.name} locale={locale} client={client} onBack={() => setView('home')} onSignIn={message => { identityVersion.current++; client.lockParent(); setMe(null); setSession(null); setSelected(null); setView('home'); setError(message); }} />;
+  if (view === 'billing' && owner) return <FamilyBilling key={me.family.id} familyId={me.family.id} locale={locale} client={client} onBack={() => setView('home')} onLogin={() => { identityVersion.current++; client.lockParent(); setMe(null); setView('home'); }} />;
   if (view === 'add' && owner) return <AddChild mode={me.mode} locale={locale} busy={busy} error={error} onBack={() => setView('home')} onSave={(alias, ageBand, childLocale) => void action(async () => { const version = ++identityVersion.current; await client.request('/children', 'POST', { alias, ageBand, locale: childLocale, ...(me.mode==='local-development'?{localConfirmation:true}:{}) }); if (!mounted.current || version !== identityVersion.current) return; setView('home'); await refresh(); })} />;
   if (view === 'limits' && selected) return <PracticeLimits support={support} allowLife={!support} key={`${me.family.id}:${selected.id}:${me.role}`} childId={selected.id} parent={owner} locale={locale} client={client} onBack={() => { setView('home'); setSelected(null); }} onParent={() => { identityVersion.current++; client.lockParent(); setMe(null); setSelected(null); setView('home'); }} onLife={() => { setLifeSuggestion(undefined); setView('life'); }} onRecovery={() => setView('recovery')} />;
   if (view === 'guide' && selected && me.role === 'parent') return <ParentGuide canChooseGoal={!support} key={`${me.family.id}:${selected.id}`} childId={selected.id} locale={locale} client={client} onBack={() => { setSelected(null); setView('home'); }} onLogin={() => { identityVersion.current++; client.lockParent(); setMe(null); setSelected(null); setView('home'); }} onLife={templateId => { setLifeSuggestion(templateId); setView('life'); }} />;
@@ -202,6 +204,7 @@ function FamilyApp() {
     {owner && me.children.length < 3 && <Button quiet title={t('添加测试档案', 'Add a test profile')} disabled={busy} onPress={() => setView('add')} />}
     {me.role === 'parent' && <Button quiet title={t('家长协作','Parents together')} disabled={busy} onPress={()=>setView('members')}/>}
     {me.role === 'parent' && <Button quiet title={t('账号与登录', 'Account & sign-ins')} disabled={busy} onPress={() => setView('security')} />}
+    {owner && <Button quiet title={t('家庭使用状态', 'Family access')} disabled={busy} onPress={() => setView('billing')} />}
     {me.role === 'child' && <Button quiet title={t('进入家长空间', 'Open parent space')} onPress={() => { setMe(null); setSession(null); }} />}
     <Button quiet title={t('退出家庭空间', 'Sign out')} disabled={busy} onPress={() => void action(async () => { const version = ++identityVersion.current; try { await client.logout(); } finally { if (mounted.current && version === identityVersion.current) { setMe(null); setSession(null); } } })} />
     {busy && <ActivityIndicator color={colors.accent} />}

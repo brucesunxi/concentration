@@ -54,6 +54,8 @@ test('a support account sees only selected practice records and cannot expand ac
   const f=await fixture(),{p}=await joined(f);
   assert.equal((await api.me(p)).children[0].consentActive,true);
   assert.equal((await api.report(p,f.a.id)).child.id,f.a.id);assert.equal((await api.practiceLimits(p,f.a.id)).canEdit,false);
+  assert.equal((await api.billingStatus(f.owner)).state,'preview');
+  await assert.rejects(api.billingStatus(p),denied('OWNER_REQUIRED'));
   for(const action of [()=>api.report(p,f.b.id),()=>api.enterChild(p,f.b.id),()=>api.parentGuide(p,f.b.id)])await assert.rejects(action(),denied('NOT_FOUND'));
   for(const action of [()=>api.addChild(p,{}),()=>api.inviteMember(p,{childIds:[f.a.id],acknowledged:true},randomUUID()),()=>api.exportChild(p,f.a.id),()=>api.deleteChild(p,f.a.id),()=>api.withdraw(p,f.a.id),()=>api.lifeSpace(p,f.a.id),()=>api.setPracticeLimit(p,f.a.id,{},'"1"')])await assert.rejects(action(),denied('OWNER_REQUIRED'));
   const other=await fixture();await assert.rejects(api.actMember(other.owner,p.member_id,{action:'revoke',acknowledged:true},'"2"'),denied('NOT_FOUND'));

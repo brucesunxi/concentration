@@ -99,6 +99,7 @@ const server = http.createServer(async (req, res) => {
     if (!principal) throw new ApiError(401, 'UNAUTHENTICATED', '请登录家庭空间。');
     if (method !== 'GET' && !native && !equal(String(req.headers['x-csrf-token'] || ''), principal.csrf)) throw new ApiError(403, 'CSRF_REJECTED', '验证已过期，请刷新后再试。');
     if (url.pathname === '/api/me' && method === 'GET') { json(await api.me(principal)); return; }
+    if (url.pathname === '/api/family/billing' && method === 'GET') { json(await api.billingStatus(principal)); return; }
     if (url.pathname === '/api/family/members' && method === 'GET') { json(await api.familyMembers(principal)); return; }
     if (url.pathname === '/api/family/invitations' && method === 'POST') { json(await api.inviteMember(principal, await body(req), String(req.headers['idempotency-key'] || '')),201); return; }
     const memberRoute=url.pathname.match(/^\/api\/family\/(members|invitations)\/([a-f0-9-]{36})$/);

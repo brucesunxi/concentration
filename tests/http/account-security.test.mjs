@@ -31,10 +31,15 @@ test('account password and all-session signout enforce HTTP boundaries and persi
     await boot();
     const p = web(await call('/auth/setup', {}, 'POST', { ...credentials, timezone: 'UTC', locale: 'en', acknowledgedLocalUse: true }));
     const c = (await call('/children', p, 'POST', { alias: 'Synthetic child', ageBand: '6-8', locale: 'en', localConfirmation: true })).body;
+    const billing = await call('/family/billing', p);
+    assert.equal(billing.response.status, 200); assert.equal(billing.body.state, 'preview');
+    assert.equal(billing.body.familyId, (await call('/me', p)).body.family.id);
+    assert.equal('productId' in billing.body, false);
     const other = web(await call('/auth/setup', {}, 'POST', { ...credentials, name: 'Other synthetic account', timezone: 'UTC', locale: 'en', acknowledgedLocalUse: true }));
     const native = { native: true, token: (await call('/auth/login', { native: true }, 'POST', credentials)).body.accessToken };
     assert.equal((await call('/account/security', p)).body.active.parent.native, 1);
     const child = web(await call(`/children/${c.id}/enter`, p, 'POST', {}));
+    assert.equal((await call('/family/billing', child)).body.code, 'PARENT_REQUIRED');
     assert.equal((await call('/account/security', child)).body.code, 'PARENT_REQUIRED');
     const change = { currentPassword: credentials.password, newPassword: next, acknowledged: true };
     assert.equal((await call('/auth/change-password', child, 'POST', change)).body.code, 'PARENT_REQUIRED');

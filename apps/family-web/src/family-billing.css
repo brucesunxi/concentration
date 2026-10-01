@@ -1,0 +1,6 @@
+.family-billing { margin-top: 24px; }
+.family-billing h2 { display: flex; align-items: center; gap: 10px; }
+.family-billing h3 { margin: 8px 0; }
+.family-billing p { max-width: 72ch; }
+.family-billing .quiet { min-height: 48px; }
+.family-billing :focus-visible { outline: 3px solid #286650; outline-offset: 3px; }
