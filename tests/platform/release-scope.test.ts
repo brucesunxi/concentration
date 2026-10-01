@@ -8,10 +8,11 @@ import type { ReleaseManifest } from '../../apps/api/release-scope.ts';
 import type { GuardianVerification } from '../../apps/api/guardian-consent.ts';
 import { collectionStatusAllowsPractice, collectionStatusCopy } from '../../packages/contracts/collection-status.ts';
 import { TEST_ENVIRONMENT } from '../../packages/task-engine/index.ts';
+import type { Entitlement } from '../../packages/billing/index.ts';
 
 const approvals = { product: 'product/ticket-1234', legal: 'legal/ticket-1234', security: 'security/ticket-1234' };
 const consentNotice = { version: 'family-practice-1', sha256: 'a'.repeat(64) };
-const approved: ReleaseManifest = { version: '2026-10-01.us-pilot', rules: [{ country: 'US', ageBand: '9-11', locale: 'en', platform: 'web', purpose: 'family-practice', consentNotice, approvals }] };
+const approved: ReleaseManifest = { version: '2026-10-01.us-pilot', rules: [{ country: 'US', ageBand: '9-11', locale: 'en', platform: 'web', purpose: 'family-practice', access: 'open-pilot', consentNotice, approvals }] };
 const setup = (country: string, locale: 'en' | 'zh-CN' = 'en') => ({ name: 'Synthetic-' + randomUUID().slice(0, 8), password: 'Synthetic-release-2026!', timezone: 'UTC', locale, residenceCountry: country, acknowledgedLocalUse: true });
 const denied = (error: unknown) => error instanceof ApiError && error.code === 'MARKET_NOT_OPEN';
 
@@ -30,6 +31,7 @@ test('release matrix defaults closed and requires three independent approval ref
   assert.equal(scope.permitsChild('US', '9-11', 'en'), false);
   assert.equal(scope.permits('US', '9-11', 'en', 'web'), false);
   assert.throws(() => createReleaseScope({ ...approved, rules: [{ ...approved.rules[0], country: 'ZZ' }] }), /RELEASE_RULE_INVALID/);
+  assert.throws(() => createReleaseScope({ ...approved, rules: [{ ...approved.rules[0], access: undefined as never }] }), /RELEASE_RULE_INVALID/);
   assert.throws(() => createReleaseScope({ ...approved, rules: [{ ...approved.rules[0], approvals: { ...approvals, security: approvals.legal } }] }), /RELEASE_APPROVALS_REQUIRED/);
   assert.throws(() => createReleaseScope({ ...approved, rules: [{ ...approved.rules[0], consentNotice: { version: 'test', sha256: 'bad' } }] }), /CONSENT_NOTICE_REQUIRED/);
   assert.throws(() => createReleaseScope({ ...approved, rules: [approved.rules[0], { ...approved.rules[0], platform: 'ios', consentNotice: { ...consentNotice, sha256: 'b'.repeat(64) } }] }), /CONSENT_NOTICE_CONFLICT/);
@@ -38,8 +40,12 @@ test('release matrix defaults closed and requires three independent approval ref
   const twoRows: ReleaseManifest = { ...approved, rules: [approved.rules[0], { ...approved.rules[0], country: 'CA' }] };
   const sameRows = createReleaseScope({ ...twoRows, rules: [...twoRows.rules].reverse() });
   const altered = createReleaseScope({ ...approved, rules: [{ ...approved.rules[0], approvals: { ...approvals, legal: 'legal/ticket-5678' } }] });
+  const paid = createReleaseScope({ ...approved, rules: [{ ...approved.rules[0], access: 'family-entitlement' }] });
   assert.equal(createReleaseScope(twoRows).identity, sameRows.identity);
   assert.notEqual(open.identity, altered.identity);
+  assert.notEqual(open.identity, paid.identity);
+  assert.equal(open.requiresEntitlement('US', '9-11', 'en', 'web'), false);
+  assert.equal(paid.requiresEntitlement('US', '9-11', 'en', 'web'), true);
   assert.equal(open.permitsRegistration('US', 'en', ['web']), true);
   assert.equal(open.permitsRegistration('US', 'zh-CN', ['web']), false);
   assert.equal(open.permits('US', '9-11', 'en', 'web'), true);
@@ -98,6 +104,65 @@ test('registration, child creation and new practice enforce the same server matr
     await assert.rejects(sameMarketDifferentApproval.start(newParent, child.id, { task: 'search', deviceId: randomUUID(), environment: TEST_ENVIRONMENT }, randomUUID()), changed);
     const legacy = await db.query<{ residence_country: string }>('SELECT residence_country FROM families WHERE id=$1', [parent.family_id]);
     assert.equal(legacy.rows[0].residence_country, 'US');
+  } finally { await db.close(); }
+});
+
+test('a paid release requires a verified family entitlement only when issuing a new session', async () => {
+  const db = await openDatabase('memory://');
+  const clock = Date.now();
+  try {
+    await migrate(db);
+    const scope = createReleaseScope({ ...approved, rules: [{ ...approved.rules[0], access: 'family-entitlement' }] });
+    let proof: GuardianVerification | null = null;
+    let state: Entitlement['state'] = 'free', failRead = false, invalidExpiry = false, reads = 0;
+    const verifier = { verify: async () => proof };
+    const reader = { read: async (_tx: unknown, familyId: string, at: string): Promise<Entitlement> => {
+      reads++;
+      assert.equal(familyId, owner.family_id);
+      assert.equal(at, new Date(clock).toISOString());
+      if (failRead) throw new Error('synthetic billing outage');
+      return { state, productId: state === 'active' || state === 'grace' ? 'family-monthly' : null,
+        validUntil: state === 'active' || state === 'grace' ? new Date(clock + (invalidExpiry ? -1 : 86400000)).toISOString() : null, autoRenew: null };
+    } };
+    const api = service(db, () => clock, undefined, undefined, scope, verifier, reader);
+    const noReader = service(db, () => clock, undefined, undefined, scope, verifier);
+    const credentials = setup('US');
+    const issued = await api.setup(credentials);
+    const owner = (await api.authenticate(issued.value))!;
+    const makeChild = async (alias: string) => {
+      const child = await api.addChild(owner, { alias, ageBand: '9-11', locale: 'en' });
+      proof = { provider: 'synthetic-verifier', reference: randomUUID(), familyId: owner.family_id, childId: child.id, ownerMemberId: owner.member_id,
+        country: 'US', ageBand: '9-11', locale: 'en', purpose: 'family-practice', noticeVersion: consentNotice.version, noticeSha256: consentNotice.sha256,
+        releaseScopeIdentity: scope.identity, adultGuardianVerified: true, purposeGranted: true, verifiedAt: clock, expiresAt: clock + 86400000 };
+      await api.grantGuardianConsent(owner, child.id, randomUUID());
+      return child;
+    };
+    const child = await makeChild('Synthetic paid release');
+    const second = await makeChild('Synthetic grace release');
+    const input = { task: 'search' as const, deviceId: randomUUID(), environment: TEST_ENVIRONMENT };
+    const key = randomUUID();
+    const code = (name: string) => (error: unknown) => error instanceof ApiError && error.code === name;
+    await assert.rejects(noReader.start(owner, child.id, input, key), code('ENTITLEMENT_UNAVAILABLE'));
+    for (state of ['free', 'expired', 'refunded'] as const) await assert.rejects(api.start(owner, child.id, input, key), code('ENTITLEMENT_REQUIRED'));
+    failRead = true;
+    await assert.rejects(api.start(owner, child.id, input, key), code('ENTITLEMENT_UNAVAILABLE'));
+    failRead = false;
+    state = 'active';
+    invalidExpiry = true;
+    await assert.rejects(api.start(owner, child.id, input, key), code('ENTITLEMENT_UNAVAILABLE'));
+    invalidExpiry = false;
+    const started = await api.start(owner, child.id, input, key);
+    assert.equal(started.session.state, 'active');
+    const readsAtIssue = reads;
+    state = 'refunded';
+    const later = (await api.authenticate((await api.login({ name: credentials.name, password: credentials.password })).value))!;
+    const replay = await api.start(later, child.id, input, key);
+    assert.equal(replay.session.id, started.session.id);
+    assert.equal(reads, readsAtIssue);
+    state = 'grace';
+    const fresh = (await api.authenticate((await api.login({ name: credentials.name, password: credentials.password })).value))!;
+    const grace = await api.start(fresh, second.id, { ...input, deviceId: randomUUID() }, randomUUID());
+    assert.equal(grace.session.state, 'active');
   } finally { await db.close(); }
 });
 

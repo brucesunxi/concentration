@@ -35,6 +35,7 @@ import { localReleaseScope } from './release-scope.ts';
 import type { ReleaseScope, ReleasePlatform } from './release-scope.ts';
 import { checkedGuardianVerification } from './guardian-consent.ts';
 import type { GuardianVerifier } from './guardian-consent.ts';
+import type { FamilyEntitlementReader } from './billing-access.ts';
 
 const scrypt = promisify(scryptCallback);
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -52,7 +53,7 @@ function fail(status: number, code: string, message: string): never { throw new 
 function parent(p: Principal) { if (p.scope !== 'parent') fail(403, 'PARENT_REQUIRED', '请先验证家长密码。'); }
 function recentParent(p: Principal, now: number) { parent(p); if (now - (new Date(p.expires_at).getTime() - 8 * 3600000) > 10 * 60000) fail(403, 'REAUTH_REQUIRED', '请重新验证家长密码后操作。'); }
 async function one<T>(db: Queryable, sql: string, params: unknown[] = []): Promise<T | undefined> { return (await db.query<T>(sql, params)).rows[0]; }
-export function service(source: Database, now: () => number = Date.now, content?: LocalContent, authority?: LocalSessionAuthority, releaseScope: ReleaseScope = localReleaseScope, guardianVerifier?: GuardianVerifier) {
+export function service(source: Database, now: () => number = Date.now, content?: LocalContent, authority?: LocalSessionAuthority, releaseScope: ReleaseScope = localReleaseScope, guardianVerifier?: GuardianVerifier, entitlementReader?: FamilyEntitlementReader) {
   const collecting = (c: Child) => c.consent_active && (releaseScope.mode === 'approved'
     ? c.verified_guardian_consent_active : localCollectionActive(c.consent_active, c.local_confirmation_active));
   const collectionStatus = (c: Child) => !c.consent_active ? 'collection-withdrawn' as const : releaseScope.mode === 'approved'
@@ -508,6 +509,14 @@ export function service(source: Database, now: () => number = Date.now, content?
         if (!result) {
           const f = await one<Family>(tx, 'SELECT timezone FROM families WHERE id=$1', [p.family_id]);
           const issued = now(), budgetDay = day(f!.timezone, issued);
+          if (releaseScope.requiresEntitlement(family.residence_country, c.age_band, c.locale, input.environment.platform)) {
+            if (!entitlementReader) fail(503, 'ENTITLEMENT_UNAVAILABLE', '家庭权益暂时无法确认，请稍后重试。');
+            let entitlement;
+            try { entitlement = await entitlementReader.read(tx, p.family_id, new Date(issued).toISOString()); }
+            catch { fail(503, 'ENTITLEMENT_UNAVAILABLE', '家庭权益暂时无法确认，请稍后重试。'); }
+            if (entitlement.state !== 'active' && entitlement.state !== 'grace') fail(403, 'ENTITLEMENT_REQUIRED', '这项练习需要有效的家庭权益，请家长查看家庭空间。');
+            if (!entitlement.productId || !entitlement.validUntil || Date.parse(entitlement.validUntil) <= issued || !Number.isFinite(Date.parse(entitlement.validUntil))) fail(503, 'ENTITLEMENT_UNAVAILABLE', '家庭权益暂时无法确认，请稍后重试。');
+          }
           const spent = await usageTotals(tx, childId, budgetDay), minutes = effectiveMinutes(c, budgetDay);
           const available = Math.max(0, minutes * 60000 - spent.confirmed - spent.reserved);
           if (minutes === 0) fail(409, 'PRACTICE_PAUSED', '家庭已暂停新练习，可以先休息或尝试生活中的小策略。');
