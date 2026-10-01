@@ -10,6 +10,7 @@ import { migrateFamilyIsolation } from './family-isolation.ts';
 import { migrateAccountSecurity } from './account-schema.ts';
 import { migratePracticeLimits } from './practice-limits.ts';
 import { migrateMembers, migrateMemberAudit, migrateMemberAuthGuard, migrateMemberWriteGuard, migrateMemberLifeGuard, migrateLocalConfirmationRead } from './member-schema.ts';
+import { migrateAuthRateLimit } from './auth-rate-limit.ts';
 
 export interface Queryable { query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> }
 export interface Database extends Queryable { transaction<T>(fn: (tx: Queryable) => Promise<T>): Promise<T>; close(): Promise<void>; context?<T>(context: DatabaseContext, action: () => Promise<T>): Promise<T> }
@@ -127,6 +128,7 @@ export async function migrate(db: Database) {
       await tx.query("UPDATE children SET age_reviewed_at=created_at,age_review_due_at=created_at+interval '365 days'");
       await tx.query('INSERT INTO schema_migrations(version) VALUES(30)');
     }
+    await migrateAuthRateLimit(tx);
   });
 }
 

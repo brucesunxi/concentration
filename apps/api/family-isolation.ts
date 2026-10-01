@@ -1,5 +1,5 @@
 import type { Database, Queryable } from './database.ts';
-export const REQUIRED_SCHEMA_VERSION = 30;
+export const REQUIRED_SCHEMA_VERSION = 31;
 
 const LEGACY_FAMILY_TABLES = ['families', 'children', 'auth_sessions', 'local_confirmations', 'sessions', 'events', 'observations', 'life_goals', 'life_goal_actions', 'session_handovers'] as const;
 export const FAMILY_TABLES = [...LEGACY_FAMILY_TABLES, 'family_members', 'family_invitations', 'family_member_audit', 'guardian_consents'] as const;
@@ -77,7 +77,7 @@ export async function grantRuntimeRoles(db: Database, familyRole: string, studio
     await tx.query(`GRANT SELECT ON public.schema_migrations TO ${familyName}`);
     await tx.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON ${FAMILY_TABLES.map(x => 'public.' + x).join(',')} TO ${familyName}`);
     await tx.query(`GRANT SELECT ON ${CONTENT_READ_TABLES.map(x => 'public.' + x).join(',')} TO ${familyName}`);
-    await tx.query(`GRANT EXECUTE ON FUNCTION public.focus_locked_release(text), public.focus_locked_family_content(text) TO ${familyName}`);
+    await tx.query(`GRANT EXECUTE ON FUNCTION public.focus_locked_release(text), public.focus_locked_family_content(text), public.focus_auth_take_slot(text,text,timestamptz) TO ${familyName}`);
     if (studioName) {
       await tx.query(`GRANT USAGE ON SCHEMA public TO ${studioName}`);
       await tx.query(`GRANT SELECT ON public.schema_migrations TO ${studioName}`);
@@ -94,9 +94,7 @@ export async function verifyRuntimeRole(db: Database, kind: 'family' | 'studio')
   if (!role || role.unsafe) throw new Error('DATABASE_RUNTIME_ROLE_UNSAFE');
   if (!(await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.schema_migrations','SELECT') AS yes")).rows[0].yes) throw new Error('DATABASE_SCHEMA_UPGRADE_REQUIRED');
   const version = (await db.query<{ version: number }>('SELECT max(version) AS version FROM schema_migrations')).rows[0].version;
-  // Permit the next additive schema during a rolling Vercel deployment. The
-  // application still verifies every table and privilege it currently uses.
-  if (version < REQUIRED_SCHEMA_VERSION || version > REQUIRED_SCHEMA_VERSION + 1) throw new Error('DATABASE_SCHEMA_UPGRADE_REQUIRED');
+  if (version !== REQUIRED_SCHEMA_VERSION) throw new Error('DATABASE_SCHEMA_UPGRADE_REQUIRED');
   const tables = (await db.query<{ name: string; protected: boolean; owner_access: boolean; policies: number; expected: boolean; confirmation_read: boolean }>(`SELECT c.relname AS name,c.relrowsecurity AS protected,pg_has_role(current_user,c.relowner,'MEMBER') AS owner_access,
     (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policies,
     EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_isolation_v1') AS expected,
@@ -113,9 +111,10 @@ export async function verifyRuntimeRole(db: Database, kind: 'family' | 'studio')
   const required = kind === 'family' ? FAMILY_TABLES : STUDIO_TABLES;
   if ((await db.query<{ yes: boolean }>("SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'TRUNCATE,REFERENCES,TRIGGER')),false) AS yes FROM unnest($1::text[]) t", [required])).rows[0].yes) throw new Error('DATABASE_RUNTIME_PRIVILEGE_UNSAFE');
   if ((await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.schema_migrations','INSERT,UPDATE,DELETE,TRUNCATE') AS yes")).rows[0].yes) throw new Error('DATABASE_MIGRATION_WRITE_FORBIDDEN');
-  const functions = ['focus_locked_release(text)', 'focus_locked_family_content(text)', ...(kind === 'studio' ? ['focus_revoke_recalled_sessions(text)'] : [])];
+  const functions = ['focus_locked_release(text)', 'focus_locked_family_content(text)', ...(kind === 'family' ? ['focus_auth_take_slot(text,text,timestamptz)'] : ['focus_revoke_recalled_sessions(text)'])];
   if (!(await db.query<{ yes: boolean }>("SELECT bool_and(has_function_privilege(current_user,'public.' || f,'EXECUTE')) AS yes FROM unnest($1::text[]) f", [functions])).rows[0].yes) throw new Error('DATABASE_RUNTIME_GRANT_MISSING');
   if (kind === 'family' && (await db.query<{ yes: boolean }>("SELECT has_function_privilege(current_user,'public.focus_revoke_recalled_sessions(text)','EXECUTE') AS yes")).rows[0].yes) throw new Error('DATABASE_CROSS_ROLE_PRIVILEGE');
+  if (kind === 'family' && (await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.auth_rate_limits','SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AS yes")).rows[0].yes) throw new Error('DATABASE_RATE_LIMIT_PRIVILEGE_UNSAFE');
   const privileges = (await db.query<{ yes: boolean }>(`SELECT bool_and(has_table_privilege(current_user,t,p)) AS yes
     FROM unnest($1::text[]) t CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) p`, [required.map(x => 'public.' + x)])).rows[0];
   if (!privileges.yes) throw new Error('DATABASE_RUNTIME_GRANT_MISSING');

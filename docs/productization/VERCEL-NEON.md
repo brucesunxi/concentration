@@ -5,11 +5,12 @@
 ## 架构
 
 - Vercel CDN 提供 `dist/web` 页面、内置图片和预录语音；`api/index.ts` 承接 `/api/*` 及非内置的动态素材。内置素材在构建时以内容哈希复制到静态目录。
-- Neon 托管 PostgreSQL，schema 版本 30。准备过程使用数据库所有者身份；Vercel 只使用 `focus_family_runtime` 限权身份。
+- Neon 托管 PostgreSQL，schema 版本 31。准备过程使用数据库所有者身份；Vercel 只使用 `focus_family_runtime` 限权身份。
 - 会话签名私钥仅放在 Vercel Preview 与 Production 的 Sensitive 环境变量 `FOCUS_SESSION_SIGNING_JWK`；本地准备副本保存在被忽略的 `.focus-data/neon/`，不可提交。
 - Preview 与受保护的 Production 域名共用内部预览数据库。`DATABASE_URL` 是带连接池的应用运行账号 URL。所有者 URL 不进入 Vercel。公开商用前须拆分环境。
 - Vercel 项目 `concentration` 的 `ssoProtection.deploymentType` 必须保持 `all`。
 - 项目与 `brucesunxi/concentration` 的 `main` 分支相连。当前访问域名是 `https://concentration-two.vercel.app/`，属于受保护的内部预览，不代表产品获准公开。
+- 注册、登录与接受邀请分别按客户端来源共享 10 分钟窗口，每类最多 12 次请求；计数保存在 Neon，跨无服务器实例与重启生效。只保存使用会话密钥派生的来源摘要，不保存原始 IP。已存在的家长账号还受数据库中的密码错误锁定保护。
 
 ## 复建步骤
 
@@ -19,7 +20,7 @@
 4. 确认 Vercel Authentication 保护所有部署后，执行 `vercel deploy --prod --archive=tgz`，或显式使用 `--target preview` 建立预览部署。运行 `npm run check`、`npm test`、`npm run test:http` 与 `npm run build:vercel`。
 5. 使用登录后的预览页检查家长注册、儿童空间、一次完整练习、静态图像和引导语音，确认不同家庭的数据隔离。
 
-部署与运行都不需要 Docker。Neon 所有者账号只参与受控迁移，不能作为应用运行账号。Vercel Preview 同时保留静态资源缓存，但 API、会话和家庭记录不得缓存。每次迁移先在隔离的 Neon 分支验证，再对目标库执行。
+部署与运行都不需要 Docker。Neon 所有者账号只参与受控迁移，不能作为应用运行账号。Vercel Preview 同时保留静态资源缓存，但 API、会话和家庭记录不得缓存。后续每次迁移先在隔离的 Neon 分支验证，再对目标库执行。正式公开前还需评估平台边缘防护和实际攻击流量，数据库限流不是完整的防滥用方案。
 
 ## 正式开放前
 

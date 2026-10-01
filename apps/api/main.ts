@@ -14,6 +14,7 @@ import { startStudioServer } from './studio-http.ts';
 import { createWebReleaseReader } from '../../packages/web-release/index.ts';
 import { verifyRuntimeRole } from './family-isolation.ts';
 import { localReleaseScope } from './release-scope.ts';
+import { authClientFingerprint, authClientIp, authRateKind, takeAuthSlot } from './auth-rate-limit.ts';
 
 export async function createFamilyServer(options: { serverless?: boolean } = {}) {
 if (process.env.APP_MODE === 'production') throw new Error('Production release remains gated: verified guardian consent, OIDC, regional review, and operational validation are not yet complete.');
@@ -27,13 +28,13 @@ const db = await openDatabase(resolve(dataDir, 'postgres'), process.env.DATABASE
 if (postgres) await verifyRuntimeRole(db, 'family'); else await migrate(db);
 const content = await createLocalContent(db, { dataDir, readOnly: postgres });
 const authority = await createSessionAuthority(db, { dataDir: options.serverless ? undefined : dataDir, readOnly: postgres });
+const authRateSecret = process.env.FOCUS_SESSION_SIGNING_JWK || await readFile(resolve(dataDir, 'session-signing.jwk.json'), 'utf8');
 const api = service(db, Date.now, content, authority, localReleaseScope);
 const port = Number(process.env.API_PORT || 4181);
 const allowedOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`, 'http://127.0.0.1:4180', 'http://localhost:4180']);
 const vercelHosts = options.serverless ? [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL].filter((host): host is string => !!host) : [];
 for (const host of vercelHosts) allowedOrigins.add(`https://${host}`);
 const allowedHosts = options.serverless ? vercelHosts : ['127.0.0.1', 'localhost'];
-const failures = new Map<string, { count: number; until: number }>();
 async function body(req: http.IncomingMessage) {
   const chunks: Buffer[] = []; let length = 0;
   if (!req.headers['content-type']?.startsWith('application/json')) throw new ApiError(415, 'JSON_REQUIRED', '请使用 JSON 请求。');
@@ -76,11 +77,10 @@ const server = http.createServer(async (req, res) => {
       const origin = req.headers.origin;
       if (!origin || !allowedOrigins.has(origin)) throw new ApiError(403, 'ORIGIN_REJECTED', '请求来源未获允许。');
     }
-    if (['/api/auth/setup', '/api/auth/login', '/api/auth/join'].includes(url.pathname) && method === 'POST') {
-      const key = req.socket.remoteAddress || 'local', prior = failures.get(key);
-      if (prior && prior.until > Date.now() && prior.count >= 12) throw new ApiError(429, 'RATE_LIMITED', '尝试过于频繁，请稍后再试。');
-      const slot = !prior || prior.until < Date.now() ? { count: 0, until: Date.now() + 600000 } : prior;
-      slot.count++; failures.set(key, slot);
+    const authKind = authRateKind(url.pathname);
+    if (authKind && method === 'POST') {
+      const fingerprint = authClientFingerprint(authRateSecret, authClientIp(req, !!options.serverless));
+      if (!await takeAuthSlot(db, authKind, fingerprint)) throw new ApiError(429, 'RATE_LIMITED', '尝试过于频繁，请稍后再试。');
       const raw = await body(req), transport = native ? 'native' : 'web';
       const auth = url.pathname.endsWith('setup') ? await api.setup(raw, transport) : url.pathname.endsWith('join') ? await api.join(raw, transport) : await api.login(raw, transport);
       if (native) json({ accessToken: auth.value, tokenType: 'Bearer', mode: 'local-development' });
