@@ -1,0 +1,10 @@
+.practice-limits {max-width: 850px;}
+.practice-day {background:var(--soft,#edf3eb);border-radius:20px;padding:22px;margin:20px 0;}
+.practice-day strong {font-size:24px;line-height:1.5;}
+.practice-totals {display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:16px;margin:24px 0;}
+.practice-totals div {border:1px solid var(--line,#dce4da);border-radius:16px;padding:16px;}
+.practice-totals dt {font-size:13px;line-height:1.6;}
+.practice-totals dd {margin:8px 0 0;font-weight:650;}
+.practice-links {display:flex;flex-wrap:wrap;gap:12px;margin-top:24px;}
+.practice-limits .stack-form {max-width:560px;margin-top:28px;}
+@media(max-width:600px){.practice-totals{grid-template-columns:1fr;}.practice-links{flex-direction:column;}.practice-day strong{font-size:21px;}}

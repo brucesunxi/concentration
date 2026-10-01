@@ -1,0 +1,61 @@
+/* Visible labels and one-handed navigation for the family pages. Task layouts
+   remain separate: resizing a family page must not alter a measured stimulus. */
+.mobile-navigation { display: none; }
+.skip-link { position: fixed; top: 8px; left: 12px; z-index: 20; transform: translateY(-180%); background: var(--forest); color: white; border-radius: 10px; padding: 14px 20px; }
+.skip-link:focus { transform: none; }
+.navigation-menu { display: grid; gap: 8px; margin-top: 20px; }
+.navigation-menu button { display: flex; align-items: center; gap: 14px; padding: 14px; min-height: 56px; border-radius: 12px; text-align: start; font-size: 15px; }
+.navigation-menu button:hover, .navigation-menu button[aria-current="page"] { background: var(--sage); }
+.navigation-menu button > span:first-of-type { flex: 1; min-width: 0; }
+.navigation-menu svg { flex: none; }
+.navigation-access { display: flex; align-items: center; gap: 5px; font-size: 12px; color: var(--muted); }
+.profile-switcher > button, .family-row > div, .member-list > li > div { min-width: 0; overflow-wrap: anywhere; }
+.profile-switcher > button > span:last-child { overflow-wrap: anywhere; }
+dialog .icon-button { width: 48px; height: 48px; }
+
+@media (max-width: 900px) {
+  .app-layout { padding-bottom: calc(96px + env(safe-area-inset-bottom, 0px)); }
+  .app-layout .sidebar { position: static; padding: 16px 18px; }
+  .app-layout .sidebar nav { display: none; }
+  .app-layout .sidebar .logo-mark { width: 34px; height: 34px; }
+  .mobile-navigation { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 4px; position: fixed; inset: auto 0 0; z-index: 8; padding: 8px max(8px, env(safe-area-inset-right, 0px)) max(8px, env(safe-area-inset-bottom, 0px)) max(8px, env(safe-area-inset-left, 0px)); border-top: 1px solid var(--line); background: #fbfcf7; box-shadow: 0 -5px 24px #253c3508; }
+  .mobile-navigation button { display: flex; flex-direction: column; align-items: center; justify-content: center; gap: 5px; min-width: 0; min-height: 60px; padding: 6px 2px; border-radius: 12px; font-size: 12px; line-height: 1.4; overflow-wrap: anywhere; }
+  .mobile-navigation button[aria-current="page"], .mobile-navigation button.active, .mobile-navigation button[aria-expanded="true"] { background: var(--sage); color: var(--forest); font-weight: 650; }
+  .navigation-dialog { position: fixed; inset: auto 0 0; margin: 0 auto; width: 100%; max-width: 600px; max-height: calc(100dvh - 20px); padding: 22px 18px max(24px, env(safe-area-inset-bottom, 0px)); border-radius: 24px 24px 0 0; }
+  .navigation-dialog .dialog-heading h2 { font-size: 24px; }
+  .navigation-dialog .navigation-menu { margin-top: 12px; }
+}
+
+@media (max-width: 600px) {
+  .topbar { height: auto; min-height: 60px; gap: 10px; }
+  .topbar .breadcrumb { min-width: 0; max-width: none; flex: 1; white-space: normal; overflow-wrap: anywhere; gap: 6px; }
+  .breadcrumb-root, .breadcrumb-separator { display: none; }
+  .topbar-actions { flex: none; gap: 5px; }
+  .topbar-actions .preview-chip { display: none; }
+  .topbar .quiet, .topbar button.avatar { min-height: 48px; min-width: 48px; }
+  .topbar button.avatar { height: 48px; width: 48px; }
+  .profile-switcher { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); align-items: stretch; }
+  .profile-switcher > button { width: 100%; min-height: 60px; padding: 10px; gap: 8px; }
+  .profile-switcher > button > span:not(.avatar) { max-width: none; font-size: 13px; }
+  .profile-switcher .add-profile { width: 48px; height: 48px; min-height: 48px; justify-self: start; }
+  :is(.app-layout, .welcome-page, .offline-recovery) .primary { min-height: 56px; font-size: 15px; line-height: 1.5; white-space: normal; }
+  :is(.app-layout, .welcome-page, .offline-recovery) :is(.quiet, .text-button, .danger-button) { min-height: 48px; }
+  .stack-form input:not([type=checkbox]), .stack-form select, .stack-form textarea { min-height: 48px; font-size: 16px; }
+  .stack-form label, .stack-form label.check-label { font-size: 14px; }
+  .stack-form label.check-label { min-height: 48px; align-items: flex-start; padding-block: 8px; }
+  .check-label input { margin: 4px 0 0; }
+  .segmented button { min-width: 0; min-height: 48px; padding: 9px 5px; font-size: 13px; line-height: 1.5; }
+  .family-row { align-items: flex-start; }
+  .family-row > div { flex-basis: calc(100% - 56px); }
+  .family-row .quiet { margin-left: 0; flex-basis: 100%; justify-content: flex-start; text-align: start; font-size: 14px; }
+  .family-card .section-title { flex-wrap: wrap; gap: 12px; }
+  .security-counts dt, .member-list h3 { overflow-wrap: anywhere; }
+  .welcome-layout { padding-top: 26px; }
+  .welcome-story h1 { font-size: 30px; }
+  .welcome-story img { float: none; width: 100%; max-height: 150px; margin: 8px auto; }
+  .welcome-values { max-width: none; min-height: 0; flex-direction: row; flex-wrap: wrap; margin-top: 10px; }
+  .auth-card { padding: 24px 18px; }
+  dialog:not(.navigation-dialog) { padding: 22px 18px; max-height: calc(100dvh - 24px); }
+  .dialog-heading { align-items: flex-start; }
+  .dialog-heading h2 { overflow-wrap: anywhere; }
+}

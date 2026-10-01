@@ -1,0 +1,27 @@
+.parent-guide { max-width: 1160px; }
+.parent-guide > header p { color: var(--muted, #536b63); }
+.guide-progress { margin: 24px 0; font-weight: 650; }
+.guide-layout { display: grid; grid-template-columns: minmax(210px, 280px) minmax(0, 1fr); align-items: start; gap: 24px; }
+.guide-topic-toggle { display: none; }
+.guide-chapters { display: grid; gap: 8px; }
+.guide-chapters h3 { margin: 0 0 8px; }
+.guide-chapters button { display: grid; grid-template-columns: 40px minmax(0, 1fr); gap: 6px 10px; text-align: start; align-items: center; padding: 15px; border: 1px solid #d6dfd7; border-radius: 14px; background: #fff; color: #243d37; min-height: 60px; }
+.guide-chapters button.selected { background: #e8f0e7; border-color: #286650; box-shadow: inset 3px 0 #286650; }
+.guide-chapters button > span { color: #536b63; font-size: 13px; }
+.guide-chapters button > strong { font-size: 14px; line-height: 1.5; }
+.guide-chapters button > small { grid-column: 2; color: #286650; font-size: 12px; }
+.guide-lesson { min-width: 0; background: white; border: 1px solid #d6dfd7; border-radius: 24px; padding: 32px; }
+.guide-lesson-label { display: flex; flex-wrap: wrap; align-items: center; gap: 12px; }
+.guide-lesson h2 { margin: 22px 0 28px; font-size: 26px; line-height: 1.4; }
+.guide-lesson h3 { font-size: 16px; margin: 26px 0 10px; }
+.guide-lesson p, .guide-lesson li { line-height: 1.85; overflow-wrap: anywhere; }
+.guide-lesson ol { padding-inline-start: 24px; }
+.guide-lesson li { padding-inline-start: 5px; margin: 8px 0; }
+.guide-invitation { background: #f2f5ef; border-inline-start: 3px solid #729281; padding: 5px 20px 12px; border-radius: 0 12px 12px 0; }
+.guide-invitation h3 { margin-top: 16px; }
+.guide-next { border-top: 1px solid #d6dfd7; margin-top: 26px; padding-top: 16px; }
+.guide-next p { font-size: 14px; color: #536b63; }
+.guide-next button { max-width: 100%; white-space: normal; }
+.parent-guide :focus-visible { outline: 3px solid #286650; outline-offset: 4px; }
+@media (max-width: 900px) { .guide-layout { grid-template-columns: 1fr; } .guide-topic-toggle { display: block; justify-self: start; } .guide-chapters { display: none; grid-template-columns: repeat(2, minmax(0, 1fr)); } .guide-chapters.topics-open { display: grid; } .guide-chapters h3 { grid-column: 1 / -1; } }
+@media (max-width: 520px) { .guide-chapters { grid-template-columns: 1fr; } .guide-lesson { padding: 22px 18px; border-radius: 18px; } .guide-lesson h2 { font-size: 23px; } }

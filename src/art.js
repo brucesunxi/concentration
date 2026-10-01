@@ -1,0 +1,7 @@
+const cropMap = { rabbit: 'character-rabbit', fox: 'character-fox', bear: 'character-bear', cat: 'character-cat', apple: 'object-apple', leaf: 'object-leaf', flower: 'object-flower', berry: 'object-berry' };
+export function animal(kind, cls = '') {
+  return `<span class="asset-sprite ${cropMap[kind] || ''} ${cls}" role="img" aria-label="${names[kind] || kind}"></span>`;
+}
+export const names = { rabbit: '小兔', fox: '狐狸', bear: '小熊', cat: '小猫', apple: '苹果', leaf: '叶子', flower: '花朵', berry: '蓝莓' };
+export function island() { return '<img class="island" src="/src/assets/hero-island.png" alt="森林小岛、房子和小兔" decoding="async">'; }
+export function icon(name) { const paths = { leaf: '<path d="M20 4C8 2 3 8 6 15s15 5 14-11Z"/><path d="m4 21 10-11"/>', play: '<path d="m9 5 11 7-11 7Z"/>', arrow: '<path d="M5 12h14m-5-5 5 5-5 5"/>', sound: '<path d="m11 4-6 5H2v6h3l6 5Zm4 4q4 4 0 8m3-11q7 7 0 14"/>', pause: '<path d="M8 5v14M16 5v14"/>', home: '<path d="m3 11 9-8 9 8M6 9v12h12V9m-8 12v-7h4v7"/>', check: '<path d="m5 12 4 4L19 6"/>', clock: '<circle cx="12" cy="12" r="9"/><path d="M12 6v6l4 2"/>', lock: '<rect x="5" y="10" width="14" height="11" rx="3"/><path d="M8 10V7a4 4 0 0 1 8 0v3m-4 5v2"/>', close: '<path d="m6 6 12 12M6 18 18 6"/>' }; return `<svg viewBox="0 0 24 24" class="icon" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${paths[name] || paths.leaf}</svg>`; }

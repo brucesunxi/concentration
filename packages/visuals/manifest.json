@@ -1,0 +1,197 @@
+{
+  "schemaVersion": 1,
+  "version": "visual-2026-10-01-v4",
+  "encoder": {
+    "sharp": "0.35.4",
+    "vips": "8.18.6"
+  },
+  "webImageBytes": 1014744,
+  "retainedAssets": [
+    {
+      "path": "../../src/assets/characters-sheet.png",
+      "version": "0.3.0-preview",
+      "bytes": 1666816,
+      "sha256": "8f49dfa9dd87ed89cf0808d89f5969b8980a08b7c35d40e9166615090dd0caf8"
+    },
+    {
+      "path": "../../src/assets/objects-sheet.png",
+      "version": "0.3.0-preview",
+      "bytes": 1894620,
+      "sha256": "973f7f0e93978013b90c8800a8ca7947790101757149528a7f37dcbca6423dd3"
+    },
+    {
+      "path": "archive/objects-sheet-640-preview.png",
+      "version": "0.7.0-preview",
+      "bytes": 506308,
+      "sha256": "156c8d8e0b9b8220ee05600699976497ecbc8e470d80b6176efbe0895f7d71d2"
+    },
+    {
+      "path": "archive/objects-sheet-512-preview.png",
+      "version": "0.7.1-preview",
+      "bytes": 328695,
+      "sha256": "dbf75ac228a8cd4a002fb8793efcda75636405305984c196daeb8d4c4f004021"
+    }
+  ],
+  "assets": [
+    {
+      "id": "hero-island",
+      "path": "runtime/hero-island.png",
+      "format": "png",
+      "width": 512,
+      "height": 512,
+      "bytes": 512774,
+      "sha256": "0cac180ee3360167865c7e733e304fcae11adddf5eabea3e47b07ff44a75fe44",
+      "sourceSha256": "13317e4e172a25ce19db656183fc40afb5a03e643c1069a7e434b4f0f3c7df02",
+      "review": "unreviewed"
+    },
+    {
+      "id": "hero-island",
+      "path": "runtime/hero-island.webp",
+      "format": "webp",
+      "width": 896,
+      "height": 896,
+      "bytes": 232500,
+      "sha256": "840ee30e2c183c823014bfd0b20881567026df28f59b734bed828ac32ad1e318",
+      "sourceSha256": "13317e4e172a25ce19db656183fc40afb5a03e643c1069a7e434b4f0f3c7df02",
+      "review": "unreviewed",
+      "quality": 84
+    },
+    {
+      "id": "bridge-scene",
+      "path": "runtime/bridge-scene.png",
+      "format": "png",
+      "width": 640,
+      "height": 320,
+      "bytes": 331833,
+      "sha256": "789fe81624d95ac3f077527bb2c6e5d459c5a2aa4ef36fd25abc593fe4e2ba79",
+      "sourceSha256": "34e9c3483e0d84775d9046734f1eb14807f0d535e82fa9e5797ddf38db460046",
+      "review": "unreviewed"
+    },
+    {
+      "id": "bridge-scene",
+      "path": "runtime/bridge-scene.webp",
+      "format": "webp",
+      "width": 960,
+      "height": 480,
+      "bytes": 136806,
+      "sha256": "cf4c7a8e80ccd180723bf82526869523b3f25f10e459533194571b9508d418df",
+      "sourceSha256": "34e9c3483e0d84775d9046734f1eb14807f0d535e82fa9e5797ddf38db460046",
+      "review": "unreviewed",
+      "quality": 84
+    },
+    {
+      "id": "characters-sheet",
+      "path": "runtime/characters-sheet.png",
+      "format": "png",
+      "width": 640,
+      "height": 640,
+      "bytes": 315312,
+      "sha256": "afad22506b3e2cd53f00dd74ac97129a7a4a17d4d439cbaa72514dad18fd9e67",
+      "sourceSha256": "1eadc000300172779dad4ec8204f1fb3eb4f7197c97c7edccd24c998f6ab3409",
+      "review": "unreviewed",
+      "cells": [
+        {
+          "item": "rabbit",
+          "index": 0,
+          "bounds": {
+            "left": 107,
+            "top": 59,
+            "right": 219,
+            "bottom": 287
+          },
+          "cellPixels": 320
+        },
+        {
+          "item": "fox",
+          "index": 1,
+          "bounds": {
+            "left": 81,
+            "top": 69,
+            "right": 259,
+            "bottom": 284
+          },
+          "cellPixels": 320
+        },
+        {
+          "item": "bear",
+          "index": 2,
+          "bounds": {
+            "left": 76,
+            "top": 56,
+            "right": 260,
+            "bottom": 267
+          },
+          "cellPixels": 320
+        },
+        {
+          "item": "cat",
+          "index": 3,
+          "bounds": {
+            "left": 96,
+            "top": 60,
+            "right": 249,
+            "bottom": 266
+          },
+          "cellPixels": 320
+        }
+      ]
+    },
+    {
+      "id": "objects-sheet",
+      "path": "runtime/objects-sheet.png",
+      "format": "png",
+      "width": 512,
+      "height": 512,
+      "bytes": 330126,
+      "sha256": "4de5b743ff2ceec1720bd1bc340bbb83fae145d46d866e0f361f60a1d588ec57",
+      "sourceSha256": "404abe8fe6751876f156b75e318367d53a6de8aff2de43de7ef8859d070e12b5",
+      "review": "unreviewed",
+      "cells": [
+        {
+          "item": "apple",
+          "index": 0,
+          "bounds": {
+            "left": 42,
+            "top": 36,
+            "right": 237,
+            "bottom": 232
+          },
+          "cellPixels": 256
+        },
+        {
+          "item": "leaf",
+          "index": 1,
+          "bounds": {
+            "left": 38,
+            "top": 37,
+            "right": 210,
+            "bottom": 236
+          },
+          "cellPixels": 256
+        },
+        {
+          "item": "flower",
+          "index": 2,
+          "bounds": {
+            "left": 38,
+            "top": 12,
+            "right": 241,
+            "bottom": 219
+          },
+          "cellPixels": 256
+        },
+        {
+          "item": "berry",
+          "index": 3,
+          "bounds": {
+            "left": 31,
+            "top": 39,
+            "right": 222,
+            "bottom": 203
+          },
+          "cellPixels": 256
+        }
+      ]
+    }
+  ]
+}

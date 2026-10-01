@@ -1,0 +1,5 @@
+{
+  "extends": "expo/tsconfig.base",
+  "compilerOptions": { "strict": true, "noEmit": true, "allowImportingTsExtensions": true, "lib": ["ES2023", "DOM"], "types": ["react"] },
+  "include": ["**/*.ts", "**/*.tsx", "../../packages/task-engine/**/*.ts", "../../packages/content/**/*.ts", "../../packages/contracts/**/*.ts"]
+}

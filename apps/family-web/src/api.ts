@@ -1,0 +1,52 @@
+import type { Environment } from '../../../packages/task-engine/index.ts';
+import { NetworkUnavailable } from '../../../packages/session-runtime/offline-session.ts';
+import { journal } from './journal.ts';
+export type { Child, Me, Session, Result, Report } from '../../../packages/contracts/models.ts';
+let csrf = '';
+export const accessSender=crypto.randomUUID();
+export function setCsrf(value: string) { csrf = value; }
+function accountAccessEnded(outcome: 'password' | 'signout' | 'uncertain' | 'signin') {
+  csrf = '';
+  window.dispatchEvent(new CustomEvent('focus-account-access', { detail: outcome }));
+  if (typeof BroadcastChannel !== 'undefined') {
+    const channel = new BroadcastChannel('focus-family-access'); channel.postMessage({ source: accessSender, reason: 'account-security', outcome }); channel.close();
+  }
+}
+export class RequestError extends Error { code: string; status: number; constructor(message: string, code: string, status: number) { super(message); this.code = code; this.status = status; } }
+export async function request<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}): Promise<T> {
+  const accountChange=method==='POST' && /^\/auth\/(change-password|logout-all)$/.test(path);
+  const identityChange=accountChange||(method==='POST'&&(/^\/auth\/(login|setup|join|logout)$/.test(path)||/^\/children\/[^/]+\/(enter|sessions|withdraw)$/.test(path)||/^\/children\/[^/]+\/recovery\/[^/]+\/(resume|handover)$/.test(path)))||(method==='DELETE'&&/^\/children\/[^/]+$/.test(path));
+  if(identityChange)await journal().invalidate();
+  if(method!=='GET'&&!csrf&&!/^\/auth\/(login|setup|join)$/.test(path))await request('/me');
+  const res = await fetch('/api' + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal: AbortSignal.timeout(12000) }).catch(()=>{if(accountChange)accountAccessEnded('uncertain');throw new NetworkUnavailable();});
+  const value = await res.json().catch(error=>{if(accountChange)accountAccessEnded('uncertain');throw error;});
+  if(accountChange && (res.status>=500 || res.ok)) accountAccessEnded(res.ok && value?.ok && value?.signInRequired ? path.endsWith('change-password') ? 'password' : 'signout' : 'uncertain');
+  if (res.status === 401 && path !== '/me' && !/^\/auth\/(login|setup|join)$/.test(path)) accountAccessEnded('signin');
+  if (!res.ok) throw new RequestError(value.message || 'Unable to complete request', value.code, res.status);
+  if (value?.csrf) csrf = value.csrf;
+  if (identityChange && !accountChange) {
+    // Cookies are shared between tabs. Invalidate cached parent screens too.
+    if (typeof BroadcastChannel !== 'undefined') {
+      const channel = new BroadcastChannel('focus-family-access'); channel.postMessage({source:accessSender}); channel.close();
+    }
+  }
+  return value as T;
+}
+export function deviceId() {
+  const key = 'focus-device-id'; const old = localStorage.getItem(key);
+  if (old && /^[a-f0-9-]{36}$/.test(old)) return old;
+  const id = crypto.randomUUID(); localStorage.setItem(key, id); return id;
+}
+export async function prepareBrowserIdentity(){
+  if(navigator.locks)await navigator.locks.request('focus-browser-identity',()=>deviceId());
+  else deviceId();
+}
+
+export function environmentFor(input: Environment['input']): Environment {
+  const coarse = matchMedia('(pointer: coarse)').matches;
+  return { platform: 'web', modality: 'visual', deviceClass: coarse ? matchMedia('(min-width: 768px)').matches ? 'tablet' : 'phone' : 'desktop', input };
+}
+export function inputForClick(event: { detail: number; nativeEvent: unknown }): Environment['input'] {
+  if (event.detail === 0) return 'keyboard';
+  return (event.nativeEvent as PointerEvent).pointerType === 'touch' ? 'touch' : 'pointer';
+}

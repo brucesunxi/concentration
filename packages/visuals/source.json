@@ -1,0 +1,128 @@
+{
+  "schemaVersion": 1,
+  "version": "visual-2026-10-01-v4",
+  "generator": "Codex built-in image_gen",
+  "createdOn": "2026-09-30",
+  "review": "unreviewed",
+  "scope": "Original raster artwork and deterministic PNG/WebP delivery exports. Professional method, language and small-size identification review pending.",
+  "assets": [
+    {
+      "id": "hero-island",
+      "use": "Decorative family welcome and child home; never a scored stimulus",
+      "master": "masters/hero-island.png",
+      "prompts": [
+        "Use case: illustration-story\nAsset type: decorative welcome illustration for the Focus Island family app.\nPrimary request: create an exquisite calm woodland island, an original premium illustrated home for a family practice app. One small mossy island with a warm cream cottage, soft terracotta roof, a gently curving stone path, three layered rounded trees, ferns, and a tiny resting white rabbit beside the path. Refined gouache with subtle paper texture within the artwork, softly modelled volumes, carefully composed clusters, muted sage, olive, warm cream and terracotta colours. Peaceful daylight. No flashy reward symbols.\nComposition: one cohesive isometric miniature, square canvas, the complete island occupies the central 76% of the canvas with generous transparent air all around; all trees and the island base fully inside the frame. Clear silhouette, quiet uncluttered detail. It will be shown beside HTML text and at 260px width in a mobile app.\nConstraints: genuine transparent background, no painted checkerboard, no sky rectangle or full-canvas background, no text, letters, numerals, signage, UI, border or watermark. No characters except the one tiny rabbit. The image is decoration, never a timed task stimulus."
+      ],
+      "exports": [
+        {
+          "path": "runtime/hero-island.png",
+          "width": 512,
+          "format": "png",
+          "maxBytes": 600000
+        },
+        {
+          "path": "runtime/hero-island.webp",
+          "width": 896,
+          "format": "webp",
+          "quality": 84,
+          "maxBytes": 300000
+        }
+      ]
+    },
+    {
+      "id": "bridge-scene",
+      "use": "Decorative everyday-practice card; never a scored stimulus",
+      "master": "masters/bridge-scene.png",
+      "prompts": [
+        "Use case: illustration-story\nAsset type: decorative bridge vignette for the Focus Island family app, connecting short practice to everyday life.\nPrimary request: one beautiful little arched wooden footbridge across a calm shallow stream, grassy banks with ferns, a white rabbit seated calmly on the left bank and an orange fox seated calmly on the right bank. They both wear small sage neckerchiefs. The animals look friendly and attentive, not competing or racing. A modest warm woodland composition in refined hand-painted gouache, subtle brush texture, dimensional shading, clean silhouettes, muted sage and terracotta palette.\nComposition: horizontal 2:1 canvas, one complete isolated vignette with generous transparent margins on all sides, bridge centered, the two different animals clearly separated and fully visible. Soft daylight. Small decorative use, not a task stimulus.\nConstraints: true alpha transparency outside the vignette, no text, labels, signs, arrows, reward symbols, UI, watermark, enclosing frame, full background, or checkerboard. No additional animals. Do not crop either bank, ears or tails at the canvas edges."
+      ],
+      "exports": [
+        {
+          "path": "runtime/bridge-scene.png",
+          "width": 640,
+          "format": "png",
+          "maxBytes": 600000
+        },
+        {
+          "path": "runtime/bridge-scene.webp",
+          "width": 960,
+          "format": "webp",
+          "quality": 84,
+          "maxBytes": 200000
+        }
+      ]
+    },
+    {
+      "id": "characters-sheet",
+      "use": "2x2 child search/stop stimuli",
+      "master": "masters/characters-sheet.png",
+      "cells": [
+        "rabbit",
+        "fox",
+        "bear",
+        "cat"
+      ],
+      "prompts": [
+        "Use case: illustration-story\nAsset type: production raster sprite sheet for the Focus Island family attention practice app, four child-friendly animal stimuli.\nPrimary request: create an entirely new, refined 2 by 2 character sheet. Square canvas, actual transparent background.\nLayout is exact: upper left a white rabbit with two long upright ears; upper right an orange fox with pointed ears and one broad white-tipped tail; lower left a brown bear with round ears; lower right a grey cat with short triangular ears and a slim curved tail. Exactly one complete seated animal in each cell. Each animal centered at its quadrant's center with a uniform 14% inset from every cell edge. Nothing crosses the horizontal or vertical center lines. No grid lines.\nStyle: premium hand-painted storybook gouache with restrained soft texture, gentle dimensional shading, strong clean silhouettes, warm and composed expressions, equal visual weight. More refined than generic clip art; details still legible at 56-pixel display size. Rabbit has a muted sage neckerchief, fox the same muted sage neckerchief, bear and cat muted terracotta neckerchiefs, consistent small accessory size. All eyes open, all paws at rest; no waving or action.\nConstraints: no setting, ground patch, separate shadow, text, label, border, extra object or character. Real alpha transparency, no checkerboard painted into the image. Avoid sparkles, exaggerated baby proportions, saturated neon and any cropped ears, paws or tails. Native square output around 1024 by 1024 pixels.",
+        "Use case: precise-object-edit\nEdit target: the attached newly generated 2x2 character sheet.\nChange only the layout spacing. Preserve exactly the four illustrated characters, their faces, colours, textures, sitting poses, neckerchiefs and transparent background.\nShrink EACH of the four animals inside its OWN quadrant to 75 percent of its current size, keeping it centered in that same quadrant. There must be a clearly empty transparent gutter around every animal. On a 1024 square layout, all visible parts of the top-left rabbit must lie between x64 and448, y64 and448; top-right fox x576–960,y64–448; bottom-left bear x64–448,y576–960; bottom-right cat x576–960,y576–960. Relative layout remains rabbit/fox on top and bear/cat on bottom.\nDo not crop, move between cells, redraw details, add content, paint a background, or add lines/text. The purpose is to stop ears and tails touching cell edges in the app."
+      ],
+      "exports": [
+        {
+          "path": "runtime/characters-sheet.png",
+          "width": 640,
+          "format": "png",
+          "maxBytes": 600000
+        }
+      ]
+    },
+    {
+      "id": "objects-sheet",
+      "use": "2x2 sequence memory stimuli, all four age bands",
+      "master": "masters/objects-sheet.png",
+      "cells": [
+        "apple",
+        "leaf",
+        "flower",
+        "berry"
+      ],
+      "prompts": [
+        "Use case: illustration-story\nAsset type: precise four-cell sprite sheet for the Focus Island sequence memory practice, for ages 6–17.\nPrimary request: an elegant, very clear set of four everyday nature objects in premium softly shaded gouache with restrained fine paper texture. Square canvas, genuine alpha transparency.\nExact 2 by 2 equal quadrant layout. Top left ONE red apple with short brown stem and a single small green leaf. Top right ONE broad green leaf on a short stem, unmistakable leaf silhouette. Bottom left ONE simple golden yellow five-petal flower with a dark circular center and short straight green stem. Bottom right ONE purple blackberry made of a compact cluster of visible rounded drupelets and a small dark green cap; it is a single berry, not a bunch of grapes. Nothing else.\nEach object centered in its own quadrant with equal apparent size; every object fits inside the central 65 percent of its cell. Use generous clear transparent margins around each object, especially at the center dividing lines. The silhouettes must be distinguishable without relying solely on colour, and legible at 44–64 pixels.\nConstraints: no faces, containers, scenery, ground shadow, frame, grid lines, cell backgrounds, text, numbers or labels. No cropped edges, no touching between objects, no separate loose elements. All fine details subordinate to the clear object shape. Do not draw a checkerboard.",
+        "Use case: precise-object-edit\nEdit target: this 2x2 four-object sprite sheet.\nChange ONLY the lower-right cell: replace the blackberry with THREE ROUND BLUEBERRIES, small blue-purple spherical fruits in a compact triangular cluster, each with its characteristic small five-pointed star-shaped calyx indentation. Individual blueberries are smooth round berries with subtle powdery blue bloom, not a blackberry with many lobes, not grapes, not a raspberry. A tiny leaf may sit behind the cluster but no stem above it.\nKeep the apple in the top-left, green leaf top-right and five-petal yellow flower bottom-left EXACTLY unchanged. Preserve the original 2x2 cell arrangement, square canvas size, transparent background, painterly texture, clean silhouettes, and current generous margins. Center the blueberry cluster in the lower-right quadrant at the same apparent footprint as the previous berry. All fruit must stay inside the quadrant with transparent margins. No text, grid, frame, labels or new objects elsewhere.\nThis correction is required because the app instruction and accessible label say blueberries."
+      ],
+      "exports": [
+        {
+          "path": "runtime/objects-sheet.png",
+          "width": 512,
+          "format": "png",
+          "maxBytes": 600000
+        }
+      ]
+    }
+  ],
+  "retainedPreviewAssets": [
+    {
+      "path": "../../src/assets/characters-sheet.png",
+      "version": "0.3.0-preview",
+      "bytes": 1666816,
+      "sha256": "8f49dfa9dd87ed89cf0808d89f5969b8980a08b7c35d40e9166615090dd0caf8"
+    },
+    {
+      "path": "../../src/assets/objects-sheet.png",
+      "version": "0.3.0-preview",
+      "bytes": 1894620,
+      "sha256": "973f7f0e93978013b90c8800a8ca7947790101757149528a7f37dcbca6423dd3"
+    },
+    {
+      "path": "archive/objects-sheet-640-preview.png",
+      "version": "0.7.0-preview",
+      "bytes": 506308,
+      "sha256": "156c8d8e0b9b8220ee05600699976497ecbc8e470d80b6176efbe0895f7d71d2"
+    },
+    {
+      "path": "archive/objects-sheet-512-preview.png",
+      "version": "0.7.1-preview",
+      "bytes": 328695,
+      "sha256": "dbf75ac228a8cd4a002fb8793efcda75636405305984c196daeb8d4c4f004021"
+    }
+  ]
+}

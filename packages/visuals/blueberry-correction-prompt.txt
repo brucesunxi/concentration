@@ -1,0 +1,5 @@
+Use case: precise-object-edit
+Edit target: this 2x2 four-object sprite sheet.
+Change ONLY the lower-right cell: replace the blackberry with THREE ROUND BLUEBERRIES, small blue-purple spherical fruits in a compact triangular cluster, each with its characteristic small five-pointed star-shaped calyx indentation. Individual blueberries are smooth round berries with subtle powdery blue bloom, not a blackberry with many lobes, not grapes, not a raspberry. A tiny leaf may sit behind the cluster but no stem above it.
+Keep the apple in the top-left, green leaf top-right and five-petal yellow flower bottom-left EXACTLY unchanged. Preserve the original 2x2 cell arrangement, square canvas size, transparent background, painterly texture, clean silhouettes, and current generous margins. Center the blueberry cluster in the lower-right quadrant at the same apparent footprint as the previous berry. All fruit must stay inside the quadrant with transparent margins. No text, grid, frame, labels or new objects elsewhere.
+This correction is required because the app instruction and accessible label say blueberries.

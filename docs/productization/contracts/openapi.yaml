@@ -1,0 +1,1248 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "Focus Family 核心训练接口草案",
+    "version": "0.1.0-design",
+    "description": "设计评审契约，尚未实现。只覆盖已完成身份与监护同意后的会话和事件；开户、同意、支付、删除由技术设计另行规定。批次原子接受或拒绝；身份/撤销/删除检查先于幂等回放。不得凭此文件宣称已有生产后端。"
+  },
+  "servers": [
+    {
+      "url": "https://api.example.invalid",
+      "description": "占位域名，不提供服务"
+    }
+  ],
+  "security": [
+    {
+      "ChildSessionToken": []
+    }
+  ],
+  "paths": {
+    "/v1/children/{child_id}/sessions": {
+      "post": {
+        "operationId": "createSession",
+        "summary": "创建一个版本固定的训练或批准的测量会话",
+        "description": "验证儿童作用域令牌、地区、年龄、同意、内容许可和课程版本；measurement 还需服务端已有测量安排。设备存在有效租约时返回 SESSION_CONFLICT。",
+        "parameters": [
+          {
+            "name": "child_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128
+            },
+            "description": "绑定主体、路径与规范化请求内容；同键不同内容返回 409。会话保留期间维持结果去重；每次重放先检查撤销/删除。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/CreateSession"
+              }
+            }
+          }
+        },
+        "responses": {
+          "201": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Session"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/events": {
+      "post": {
+        "operationId": "appendEvents",
+        "summary": "提交至多 100 个事件；请求正文至多 256 KiB",
+        "description": "原子校验整个批次；任何冲突或非法事件均拒绝整批。允许乱序到达，返回连续接收水位。event_id、seq 均须在会话内唯一；完全一致的重传进入 duplicate_ids。服务端校验计划刺激、有效状态机、时间单调和版本，禁止把客户端分数作为事实。",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128
+            },
+            "description": "绑定主体、路径与规范化请求内容；同键不同内容返回 409。会话保留期间维持结果去重；每次重放先检查撤销/删除。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/EventBatch"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/EventReceipt"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/v1/sessions/{session_id}/finalize": {
+      "post": {
+        "operationId": "finalizeSession",
+        "summary": "确认完整事件后服务端判分并结束会话",
+        "description": "last_seq 必须为 session_ended，原因须与末事件一致。序号 1..last_seq 缺失返回 MISSING_EVENTS 及范围；超出 last_seq 的已存在事件返回 EVENT_CONFLICT。成功后不再接受新事件，只接受内容一致的重复请求。零事件放弃使用未来的 abandon 接口，此接口至少一个结束事件。结果计数与每个指标分母由服务端重算。",
+        "parameters": [
+          {
+            "name": "session_id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          {
+            "name": "Idempotency-Key",
+            "in": "header",
+            "required": true,
+            "schema": {
+              "type": "string",
+              "minLength": 16,
+              "maxLength": 128
+            },
+            "description": "绑定主体、路径与规范化请求内容；同键不同内容返回 409。会话保留期间维持结果去重；每次重放先检查撤销/删除。"
+          }
+        ],
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/FinalizeSession"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "成功",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Result"
+                }
+              }
+            }
+          },
+          "400": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "401": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "403": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "409": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "410": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "413": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "422": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "429": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          },
+          "503": {
+            "description": "请求被拒；按错误码处理，不重试权限撤回或数据删除。",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/Problem"
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "components": {
+    "securitySchemes": {
+      "ChildSessionToken": {
+        "type": "http",
+        "scheme": "bearer",
+        "description": "由成人授权的儿童作用域凭据；服务端仍校验家庭关系、撤销状态和会话归属。不能使用父母高权限令牌在儿童模式常驻。"
+      }
+    },
+    "schemas": {
+      "CreateSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "pack_id",
+          "pack_version",
+          "mode",
+          "device_install_id",
+          "client_version",
+          "expected_enrollment_revision"
+        ],
+        "properties": {
+          "pack_id": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 100
+          },
+          "pack_version": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 40
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "training",
+              "measurement"
+            ]
+          },
+          "device_install_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "client_version": {
+            "type": "string",
+            "maxLength": 40
+          },
+          "expected_enrollment_revision": {
+            "type": "integer",
+            "minimum": 0
+          }
+        }
+      },
+      "Session": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "child_id",
+          "pack_id",
+          "pack_version",
+          "policy_version",
+          "seed",
+          "seed_algorithm",
+          "server_time",
+          "lease_expires_at",
+          "offline_lease",
+          "enrollment_revision",
+          "max_batch_events",
+          "max_batch_bytes",
+          "budget_reservation_id",
+          "budget_day",
+          "budget_timezone",
+          "daily_budget_remaining_ms",
+          "max_session_active_ms"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "child_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "pack_id": {
+            "type": "string"
+          },
+          "pack_version": {
+            "type": "string"
+          },
+          "policy_version": {
+            "type": "string"
+          },
+          "seed": {
+            "type": "string"
+          },
+          "seed_algorithm": {
+            "type": "string",
+            "const": "seed-v1"
+          },
+          "server_time": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "lease_expires_at": {
+            "type": "string",
+            "format": "date-time"
+          },
+          "offline_lease": {
+            "type": "string",
+            "description": "服务端签名授权，绑定主体、设备、版本、目的和有效期。不得作为成人令牌使用。"
+          },
+          "enrollment_revision": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "max_batch_events": {
+            "type": "integer",
+            "const": 100
+          },
+          "max_batch_bytes": {
+            "type": "integer",
+            "const": 262144
+          },
+          "budget_reservation_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "budget_day": {
+            "type": "string",
+            "format": "date",
+            "description": "由服务端家庭时区确定并固定到会话，跨午夜不自动重置本次额度。"
+          },
+          "budget_timezone": {
+            "type": "string",
+            "description": "批准的 IANA 时区。"
+          },
+          "daily_budget_remaining_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 720000
+          },
+          "max_session_active_ms": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 720000
+          }
+        }
+      },
+      "EventBatch": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "events"
+        ],
+        "properties": {
+          "events": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "$ref": "#/components/schemas/Event"
+            }
+          }
+        }
+      },
+      "Event": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "event_id",
+          "seq",
+          "monotonic_ms",
+          "trial_id",
+          "type",
+          "payload"
+        ],
+        "properties": {
+          "event_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "seq": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "monotonic_ms": {
+            "type": "number",
+            "minimum": 0
+          },
+          "trial_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "format": "uuid"
+          },
+          "type": {
+            "type": "string",
+            "enum": [
+              "trial_presented",
+              "input",
+              "audio_status",
+              "trial_interrupted",
+              "trial_submitted",
+              "session_ended"
+            ]
+          },
+          "payload": {
+            "oneOf": [
+              {
+                "$ref": "#/components/schemas/PresentedPayload"
+              },
+              {
+                "$ref": "#/components/schemas/InputPayload"
+              },
+              {
+                "$ref": "#/components/schemas/AudioPayload"
+              },
+              {
+                "$ref": "#/components/schemas/InterruptedPayload"
+              },
+              {
+                "$ref": "#/components/schemas/SubmittedPayload"
+              },
+              {
+                "$ref": "#/components/schemas/EndedPayload"
+              }
+            ]
+          }
+        },
+        "description": "type 必须等于 payload.payload_type（下方条件模式校验）；trial_id 除 session_ended 外必须非空。客户端 assisted 是观测标记，服务端还须依据 help/replay 等事件重算辅助状态。",
+        "allOf": [
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "trial_presented"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "payload": {
+                  "$ref": "#/components/schemas/PresentedPayload"
+                },
+                "trial_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "input"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "payload": {
+                  "$ref": "#/components/schemas/InputPayload"
+                },
+                "trial_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "audio_status"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "payload": {
+                  "$ref": "#/components/schemas/AudioPayload"
+                },
+                "trial_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "trial_interrupted"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "payload": {
+                  "$ref": "#/components/schemas/InterruptedPayload"
+                },
+                "trial_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "trial_submitted"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "payload": {
+                  "$ref": "#/components/schemas/SubmittedPayload"
+                },
+                "trial_id": {
+                  "type": "string",
+                  "format": "uuid"
+                }
+              }
+            }
+          },
+          {
+            "if": {
+              "properties": {
+                "type": {
+                  "const": "session_ended"
+                }
+              },
+              "required": [
+                "type"
+              ]
+            },
+            "then": {
+              "properties": {
+                "payload": {
+                  "$ref": "#/components/schemas/EndedPayload"
+                },
+                "trial_id": {
+                  "type": "null"
+                }
+              }
+            }
+          }
+        ]
+      },
+      "PresentedPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payload_type",
+          "stimulus_ids",
+          "condition_id",
+          "render_lag_ms"
+        ],
+        "properties": {
+          "payload_type": {
+            "const": "trial_presented"
+          },
+          "stimulus_ids": {
+            "type": "array",
+            "minItems": 1,
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "condition_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "render_lag_ms": {
+            "type": "number",
+            "minimum": 0
+          }
+        }
+      },
+      "InputPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payload_type",
+          "action",
+          "target_id",
+          "input_mode"
+        ],
+        "properties": {
+          "payload_type": {
+            "const": "input"
+          },
+          "action": {
+            "type": "string",
+            "enum": [
+              "select",
+              "unselect",
+              "press",
+              "undo",
+              "help",
+              "replay"
+            ]
+          },
+          "target_id": {
+            "type": [
+              "string",
+              "null"
+            ],
+            "maxLength": 100
+          },
+          "input_mode": {
+            "type": "string",
+            "enum": [
+              "touch",
+              "mouse",
+              "keyboard",
+              "assistive"
+            ]
+          }
+        }
+      },
+      "AudioPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payload_type",
+          "asset_id",
+          "status"
+        ],
+        "properties": {
+          "payload_type": {
+            "const": "audio_status"
+          },
+          "asset_id": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "started",
+              "ended",
+              "cancelled",
+              "failed"
+            ]
+          }
+        }
+      },
+      "InterruptedPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payload_type",
+          "reason"
+        ],
+        "properties": {
+          "payload_type": {
+            "const": "trial_interrupted"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "background",
+              "user_pause",
+              "asset_failure",
+              "render_failure",
+              "system_interrupt"
+            ]
+          }
+        }
+      },
+      "SubmittedPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payload_type",
+          "selected_ids",
+          "assisted"
+        ],
+        "properties": {
+          "payload_type": {
+            "const": "trial_submitted"
+          },
+          "selected_ids": {
+            "type": "array",
+            "maxItems": 100,
+            "items": {
+              "type": "string",
+              "maxLength": 100
+            }
+          },
+          "assisted": {
+            "type": "boolean"
+          }
+        }
+      },
+      "EndedPayload": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "payload_type",
+          "reason"
+        ],
+        "properties": {
+          "payload_type": {
+            "const": "session_ended"
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "plan_completed",
+              "child_stopped",
+              "time_limit",
+              "technical_failure"
+            ]
+          }
+        }
+      },
+      "EventReceipt": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "accepted_ids",
+          "duplicate_ids",
+          "highest_contiguous_seq",
+          "received_at"
+        ],
+        "properties": {
+          "accepted_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "duplicate_ids": {
+            "type": "array",
+            "items": {
+              "type": "string",
+              "format": "uuid"
+            }
+          },
+          "highest_contiguous_seq": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "received_at": {
+            "type": "string",
+            "format": "date-time"
+          }
+        }
+      },
+      "FinalizeSession": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "last_seq",
+          "reason"
+        ],
+        "properties": {
+          "last_seq": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "reason": {
+            "type": "string",
+            "enum": [
+              "plan_completed",
+              "child_stopped",
+              "time_limit",
+              "technical_failure"
+            ]
+          }
+        }
+      },
+      "Result": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "session_id",
+          "result_revision",
+          "scorer_version",
+          "state",
+          "valid_trials",
+          "excluded_trials",
+          "blocks"
+        ],
+        "properties": {
+          "session_id": {
+            "type": "string",
+            "format": "uuid"
+          },
+          "result_revision": {
+            "type": "integer",
+            "minimum": 1
+          },
+          "scorer_version": {
+            "type": "string"
+          },
+          "state": {
+            "type": "string",
+            "enum": [
+              "completed",
+              "aborted"
+            ]
+          },
+          "valid_trials": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "excluded_trials": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "blocks": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/BlockResult"
+            }
+          }
+        }
+      },
+      "BlockResult": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "task_id",
+          "protocol_version",
+          "condition_id",
+          "mode",
+          "valid_independent_trials",
+          "assisted_trials",
+          "metrics",
+          "adaptation",
+          "reason_code"
+        ],
+        "properties": {
+          "task_id": {
+            "type": "string"
+          },
+          "protocol_version": {
+            "type": "string"
+          },
+          "condition_id": {
+            "type": "string"
+          },
+          "mode": {
+            "type": "string",
+            "enum": [
+              "training",
+              "measurement"
+            ]
+          },
+          "valid_independent_trials": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "assisted_trials": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "metrics": {
+            "type": "array",
+            "items": {
+              "$ref": "#/components/schemas/Metric"
+            }
+          },
+          "adaptation": {
+            "type": "string",
+            "enum": [
+              "hold",
+              "easier",
+              "harder",
+              "stop",
+              "explain",
+              "not_applicable"
+            ]
+          },
+          "reason_code": {
+            "type": "string",
+            "maxLength": 100
+          }
+        }
+      },
+      "Metric": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "name",
+          "numerator",
+          "denominator",
+          "value"
+        ],
+        "properties": {
+          "name": {
+            "type": "string",
+            "maxLength": 100
+          },
+          "numerator": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "denominator": {
+            "type": "integer",
+            "minimum": 0
+          },
+          "value": {
+            "type": [
+              "number",
+              "null"
+            ],
+            "minimum": 0,
+            "maximum": 1
+          }
+        }
+      },
+      "Problem": {
+        "type": "object",
+        "additionalProperties": false,
+        "required": [
+          "code",
+          "request_id",
+          "message",
+          "retryable"
+        ],
+        "properties": {
+          "code": {
+            "type": "string",
+            "enum": [
+              "INVALID_REQUEST",
+              "UNAUTHENTICATED",
+              "FORBIDDEN",
+              "CONSENT_REVOKED",
+              "PROFILE_DELETED",
+              "SESSION_CONFLICT",
+              "EVENT_CONFLICT",
+              "IDEMPOTENCY_CONFLICT",
+              "MISSING_EVENTS",
+              "INVALID_EVENT",
+              "CONTENT_REVOKED",
+              "PAYLOAD_TOO_LARGE",
+              "RATE_LIMITED",
+              "SERVICE_UNAVAILABLE"
+            ]
+          },
+          "request_id": {
+            "type": "string"
+          },
+          "message": {
+            "type": "string"
+          },
+          "retryable": {
+            "type": "boolean"
+          },
+          "missing_ranges": {
+            "type": "array",
+            "items": {
+              "type": "object",
+              "additionalProperties": false,
+              "required": [
+                "start",
+                "end"
+              ],
+              "properties": {
+                "start": {
+                  "type": "integer",
+                  "minimum": 1
+                },
+                "end": {
+                  "type": "integer",
+                  "minimum": 1
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

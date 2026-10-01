@@ -1,0 +1,7 @@
+.history-intro { display: grid; gap: 8px; margin-bottom: 24px; }
+.history-intro .quiet { justify-self: start; }
+.history-pages { border-top: 1px solid var(--line); padding-block: 18px; margin-block: 10px 32px; }
+.history-pages > div { display: flex; flex-wrap: wrap; gap: 12px; }
+.history-pages button { min-height: 48px; text-align: start; white-space: normal; }
+.history-pages p { margin-block: 8px; }
+.history-pages + .section-title h2, .record-list { scroll-margin-top: 20px; }

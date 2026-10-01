@@ -1,0 +1,12 @@
+.git
+.focus-data
+.native-tools
+.bundle
+dist
+docs
+tests
+node_modules
+apps/family-mobile/ios
+apps/family-mobile/android
+apps/family-mobile/node_modules
+*.log

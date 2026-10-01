@@ -1,0 +1,31 @@
+{
+  "name": "@focus/family-mobile",
+  "version": "0.2.8",
+  "private": true,
+  "main": "index.ts",
+  "scripts": {
+    "start": "node ../../scripts/mobile.mjs start --localhost --port 4183",
+    "check": "tsc --noEmit",
+    "bundle": "node ../../scripts/mobile.mjs export --platform ios --platform android --output-dir ../../dist/mobile"
+  },
+  "dependencies": {
+    "expo": "57.0.26",
+    "expo-audio": "57.0.5",
+    "expo-build-properties": "57.0.22",
+    "expo-crypto": "57.0.3",
+    "expo-device": "57.0.2",
+    "expo-file-system": "57.0.7",
+    "expo-secure-store": "57.0.4",
+    "expo-sharing": "57.0.22",
+    "expo-sqlite": "57.0.3",
+    "expo-status-bar": "57.0.1",
+    "react": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "5.7.0",
+    "react-native-svg": "15.15.4"
+  },
+  "devDependencies": {
+    "@types/react": "19.2.17",
+    "typescript": "6.0.3"
+  }
+}

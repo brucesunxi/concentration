@@ -1,0 +1,2065 @@
+<!doctype html>
+<html lang="zh-CN"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1"><meta name="color-scheme" content="light"><title>专注力家庭产品 · 产品化方案与技术设计</title><style>
+:root{--ink:#182b2b;--muted:#526461;--teal:#145e54;--mint:#e6f1eb;--line:#d6dfd8;--paper:#fffefa;--orange:#ad542f;--serif:Georgia,"Songti SC","SimSun",serif}
+*{box-sizing:border-box}html{scroll-behavior:smooth;scroll-padding-top:28px}body{margin:0;background:#f2f3ed;color:var(--ink);font:16px/1.85 -apple-system,BlinkMacSystemFont,"PingFang SC","Microsoft Yahei",sans-serif}a{color:var(--teal);text-underline-offset:4px}a:hover{color:#934326}a:focus-visible,button:focus-visible,summary:focus-visible{outline:3px solid #ad542f;outline-offset:4px}button,summary{cursor:pointer}button{font:inherit;border:1px solid var(--line);border-radius:6px;padding:8px 18px;background:var(--paper);color:var(--ink)}.skip{position:fixed;top:-100px;left:12px;background:white;padding:10px;z-index:5}.skip:focus{top:12px}
+.sidebar{position:fixed;left:0;top:0;bottom:0;width:248px;border-right:1px solid var(--line);padding:30px 23px;background:#f7f8f2;overflow:auto}.brand{font-weight:800;letter-spacing:2px;font-size:19px}.brand small{display:block;font-size:10px;letter-spacing:2.4px;color:var(--muted);margin:3px 0 30px}.sidebar .meta{font-size:12px;color:var(--muted);margin-top:24px}.nav-section{margin:18px 0}.section-link{display:flex;align-items:center;gap:12px;font-size:15px;font-weight:700;text-decoration:none}.section-link span{font-size:10px;border:1px solid var(--line);padding:2px 6px;border-radius:4px}.nav-section summary{font-size:11px;color:var(--muted);margin:5px 0 0 35px}.sub-link{display:block;font-size:12px;line-height:1.7;margin:10px 0 10px 16px;text-decoration:none;color:var(--muted)}.section-link.active{color:var(--orange)}.sidebar button{font-size:12px;margin-top:20px;width:100%}
+main{margin-left:248px;padding:44px 5vw 90px;max-width:1540px}.cover{background:var(--teal);color:#fffefa;padding:52px 48px 32px;border-radius:4px;position:relative;overflow:hidden}.eyebrow{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:#cce0d3}.cover h1{font-size:clamp(29px,3.3vw,48px);font-family:var(--serif);line-height:1.5;letter-spacing:1px;max-width:800px;margin:24px 0 16px;font-weight:600}.cover .lead{color:#dcebe3;max-width:690px;font-size:15px;line-height:2}.badge{display:inline-block;font-size:12px;border:1px solid #77a89b;border-radius:30px;padding:3px 13px;margin:18px 7px 10px 0}.cover-bottom{border-top:1px solid #62988a;margin-top:32px;padding-top:20px;font-size:12px;color:#dae8e0;display:flex;justify-content:space-between;gap:20px}.stats{display:grid;grid-template-columns:repeat(4,1fr);background:var(--paper);border:1px solid var(--line);margin-top:20px;border-radius:4px}.stat{padding:22px;border-right:1px solid var(--line)}.stat:last-child{border:0}.stat strong{font-family:var(--serif);font-size:31px;font-weight:500}.stat span{display:block;color:var(--muted);font-size:12px}.intro-note{border-left:3px solid var(--orange);padding:9px 20px;margin:30px 0;font-size:14px;background:#f9eee5}.map{display:grid;grid-template-columns:repeat(3,1fr);gap:12px;margin:26px 0}.map div{background:var(--paper);border:1px solid var(--line);padding:18px}.map b{display:block;color:var(--teal);font-size:14px}.map p{font-size:12px;color:var(--muted);margin:7px 0 0}
+article{background:var(--paper);border:1px solid var(--line);border-radius:4px;padding:40px 44px;margin-top:35px;scroll-margin-top:24px;overflow-wrap:anywhere}.chapter-label{font-size:11px;letter-spacing:2px;text-transform:uppercase;color:var(--orange);margin-bottom:12px}article h1{font-family:var(--serif);font-size:30px;line-height:1.5;font-weight:600;margin:0 0 18px}article h2{font-size:22px;line-height:1.6;margin:44px 0 18px;border-bottom:1px solid var(--line);padding-bottom:12px;scroll-margin-top:28px}article h3{font-size:17px;margin-top:28px;scroll-margin-top:28px}p{margin:12px 0}li{margin:8px 0}ul,ol{padding-left:1.5em}article>p:first-of-type{color:var(--muted);font-size:13px}.table-scroll{overflow:auto;margin:22px 0}table{border-collapse:collapse;width:100%;font-size:13px;line-height:1.8}th,td{padding:12px 13px;vertical-align:top;border:1px solid var(--line);min-width:95px}th{background:#edf3ee;text-align:left;font-weight:700;color:#184b42}tr:nth-child(even) td{background:#fbfcf8}table a{word-break:break-word}code{background:#edf1ea;border-radius:3px;padding:2px 5px;font:12px/1.8 ui-monospace,SFMono-Regular,Menlo,monospace}pre{background:#eef2ec;padding:18px;overflow:auto;line-height:1.7;border-radius:4px}pre code{padding:0;background:transparent;white-space:pre}.diagram{background:#f3f7f1;border:1px solid var(--line);padding:24px;margin:24px 0;border-radius:4px}.diagram figcaption{font-weight:700;font-size:14px;margin-bottom:20px}.arch-row{display:flex;gap:12px}.arch-row>div{flex:1;border:1px solid #b9cfc1;background:white;text-align:center;padding:14px 10px;font-size:13px;font-weight:600}.arch-row small{display:block;font-weight:400;font-size:11px;color:var(--muted);margin-top:4px}.arch-row .accent{background:var(--mint);border-color:#7da899}.arch-arrow{text-align:center;font-size:22px;line-height:1.3;padding:7px;color:var(--teal)}.diagram details{margin-top:18px;font-size:12px}.state-flow{display:flex;flex-wrap:wrap;gap:12px}.state-flow>span{border:1px solid #b9cfc1;background:white;padding:12px;font-size:12px;flex:1;min-width:145px}.state-flow b{font-family:var(--serif);font-size:18px;margin-right:10px;color:var(--teal)}.diagram-note{font-size:12px;color:var(--muted)}footer{padding:30px 0;font-size:12px;color:var(--muted);text-align:center}.top-link{position:fixed;bottom:20px;right:20px;background:#fffefa;border:1px solid var(--line);font-size:12px;padding:9px 14px;border-radius:30px;text-decoration:none}
+@media(max-width:1000px){.sidebar{width:200px;padding:26px 18px}main{margin-left:200px;padding:30px 25px}.cover,article{padding:30px}.stat{padding:16px}.stat strong{font-size:26px}.map{grid-template-columns:1fr}.map p{margin-top:3px}}
+@media(max-width:720px){.sidebar{position:static;width:100%;height:auto;border-right:0;border-bottom:1px solid var(--line);padding:20px}.brand small{margin-bottom:12px}.sidebar nav{display:flex;flex-wrap:wrap;gap:12px}.nav-section{margin:0}.section-link{font-size:13px;gap:6px}.sidebar details,.sidebar .meta,.sidebar button{display:none}main{margin:0;padding:18px 12px}.cover{padding:28px 24px}.cover h1{font-size:29px}.cover-bottom{display:flex;flex-direction:column;gap:5px}.stats{grid-template-columns:repeat(2,1fr)}.stat:nth-child(2){border-right:0}.stat:nth-child(-n+2){border-bottom:1px solid var(--line)}article{padding:25px 20px}article h1{font-size:25px}article h2{font-size:20px}.table-scroll{margin-left:-7px;margin-right:-7px}table{font-size:12px}th,td{min-width:120px;padding:10px}.arch-row{flex-direction:column;gap:7px}.diagram{padding:16px}.top-link{bottom:12px;right:12px}}
+@media(prefers-reduced-motion:reduce){html{scroll-behavior:auto}}
+@media print{@page{size:A4;margin:16mm 13mm}body{background:white;font-size:10pt;line-height:1.65}.sidebar,.top-link,.skip{display:none}main{margin:0;max-width:none;padding:0}.cover{background:white;color:var(--ink);padding:20px 0;border:0}.cover h1{font-size:26pt}.cover .lead,.eyebrow,.cover-bottom{color:var(--muted)}.badge{border-color:var(--line);font-size:9pt}.cover-bottom{margin-top:12px}.stats{margin-bottom:12px}.stat{padding:12px}.stat strong{font-size:20pt}.map{margin:12px 0}.intro-note{margin:14px 0}article{border:0;padding:0;margin-top:24px;break-before:page}article h1{font-size:22pt}article h2{font-size:15pt;margin-top:24px;break-after:avoid}article h3{font-size:12pt;break-after:avoid}table{font-size:8pt}th,td{min-width:0;padding:6px;overflow-wrap:anywhere}.table-scroll{overflow:visible}thead{display:table-header-group}tr{break-inside:avoid}pre{white-space:pre-wrap;overflow:visible}pre code{white-space:pre-wrap}.diagram{break-inside:avoid}.diagram details{display:none}a{color:inherit}footer{font-size:8pt}}
+</style></head><body id="top"><a class="skip" href="#main">跳到正文</a><aside class="sidebar"><div class="brand">专注力家庭产品<small>PRODUCT & ENGINEERING</small></div><nav aria-label="文档目录"><div class="nav-section"><a class="section-link" href="#overview"><span>01</span>方案总览</a><details><summary>方向与关键决定</summary><a class="sub-link" href="#overview-h2">结论</a><a class="sub-link" href="#overview-h3">本次设计的七项决定</a><a class="sub-link" href="#overview-h4">阅读顺序与交付物</a><a class="sub-link" href="#overview-h5">设计起点与当前实现</a><a class="sub-link" href="#overview-h6">立项后必须明确的五个业务决定</a></details></div><div class="nav-section"><a class="section-link" href="#product"><span>02</span>产品方案</a><details><summary>人群、课程、体验与验证</summary><a class="sub-link" href="#product-h2">1. 定位与价值</a><a class="sub-link" href="#product-h5">2. 年龄与体验分层</a><a class="sub-link" href="#product-h7">3. 能力框架和任务组合</a><a class="sub-link" href="#product-h10">4. 八周课程：从策略尝试到生活实践</a><a class="sub-link" href="#product-h12">5. 家庭体验与信息架构</a><a class="sub-link" href="#product-h17">6. 效果验证：先证明可用，再检验有用</a><a class="sub-link" href="#product-h21">7. 国际化与市场进入</a><a class="sub-link" href="#product-h24">8. 商业模式与运营</a><a class="sub-link" href="#product-h28">9. 指标与产品决策</a><a class="sub-link" href="#product-h29">10. 第一版范围冻结</a></details></div><div class="nav-section"><a class="section-link" href="#technical"><span>03</span>技术设计</a><details><summary>引擎、数据、素材与平台</summary><a class="sub-link" href="#technical-h2">1. 现有代码评估与迁移</a><a class="sub-link" href="#technical-h3">2. 总体架构与选型</a><a class="sub-link" href="#technical-h7">3. 任务引擎与计时</a><a class="sub-link" href="#technical-h11">4. 自适应难度：保守、可解释、可复现</a><a class="sub-link" href="#technical-h14">5. 数据模型与权限</a><a class="sub-link" href="#technical-h17">6. API、离线与同步</a><a class="sub-link" href="#technical-h21">7. 内容、图片与语音生产线</a><a class="sub-link" href="#technical-h25">8. 隐私、安全与数据生命周期</a><a class="sub-link" href="#technical-h29">9. 支付与权益</a><a class="sub-link" href="#technical-h30">10. 运维、容量与质量门槛</a><a class="sub-link" href="#technical-h35">11. 主要架构决定与取舍</a></details></div><div class="nav-section"><a class="section-link" href="#delivery"><span>04</span>执行计划</a><details><summary>团队、排期、预算与验收</summary><a class="sub-link" href="#delivery-h2">1. 组织与责任</a><a class="sub-link" href="#delivery-h3">2. 32 周路线图</a><a class="sub-link" href="#delivery-h5">3. 每个发布门槛的验收表</a><a class="sub-link" href="#delivery-h6">4. 可直接拆票的工作包</a><a class="sub-link" href="#delivery-h7">5. 前两轮迭代：从明天可以开始</a><a class="sub-link" href="#delivery-h10">6. 预算与商业测算</a><a class="sub-link" href="#delivery-h11">7. 风险登记与处理</a><a class="sub-link" href="#delivery-h12">8. 上线完成的定义</a></details></div><div class="nav-section"><a class="section-link" href="#evidence"><span>05</span>证据与假设</a><details><summary>研究、规则与设计边界</summary><a class="sub-link" href="#evidence-h2">1. 科学依据</a><a class="sub-link" href="#evidence-h3">2. 未成年人、隐私与渠道规则</a><a class="sub-link" href="#evidence-h4">3. 工程依据</a><a class="sub-link" href="#evidence-h5">4. 假设登记</a></details></div></nav><button type="button" onclick="window.print()">打印 / 保存为 PDF</button><p class="meta">设计基线 1.0<br>2026 年 9 月 30 日<br>供团队评审与实施拆解</p></aside>
+<main id="main"><header class="cover"><div class="eyebrow">Little Focus Island · Productization Blueprint</div><h1>从三个小游戏，走向<br>值得家庭信任的产品。</h1><p class="lead">面向全球儿童、青少年与家长，把适龄练习、生活策略、可靠技术和效果验证连成一套可实施的产品体系。</p><span class="badge">全球家庭</span><span class="badge">儿童与青少年</span><span class="badge">完整研发团队</span><div class="cover-bottom"><span>产品方案 · 技术设计 · 交付路线 · 证据依据</span><span>2026.09 / v1.0</span></div></header>
+<section class="stats" aria-label="方案范围"><div class="stat"><strong>6–17</strong><span>建议覆盖年龄</span></div><div class="stat"><strong>4 档</strong><span>分别设计与验证</span></div><div class="stat"><strong>8 周</strong><span>课程可行性验证周期</span></div><div class="stat"><strong>32 周</strong><span>有限市场发布目标</span></div></section>
+<div class="intro-note"><strong>设计已进入实施。</strong>当前 Web/API 为 v0.29：四年龄双语 32 个任务组合中 6 个已接入固定语音、26 个尚缺。原生声音失败可退回文字说明，安全存储失败可重试；283 项业务检查和两平台构建通过。<a href="qa/audio-fallback-v0.29-qa.md">本批验收及测试包</a> · <a href="NEXT-DELIVERY.md">团队交接</a>。iOS 模拟器测试包缺 Keychain 权限，登录与声音尚不能验收；Android 尚无设备安装。专业审稿、正式身份、地区准入和产品自身效果研究仍待完成。</div>
+<section class="map" aria-label="产品价值链"><div><b>01 · 练习一种策略</b><p>看清目标、等待、记住顺序、短段留意。</p></div><div><b>02 · 带进真实生活</b><p>孩子自己选择任务，家长提供合适支持。</p></div><div><b>03 · 用证据决定下一步</b><p>分清任务熟练、生活变化与可靠研究结论。</p></div></section>
+<article id="overview"><div class="chapter-label">01 / 方案总览</div><h1 id="overview-h1">专注力家庭产品：产品化方案与技术设计</h1>
+<p>版本：设计基线 1.0 · 2026-09-30 · 状态：进入 v0.29 本地实施，原生声音失败可退回文字说明，安全存储失败可重试；iOS 模拟器包缺 Keychain 权限，原生练习、设备验收与完整发布要求仍未完成。</p>
+<h2 id="overview-h2">结论</h2>
+<p>本轮工程交接见 <a href="qa/audio-fallback-v0.29-qa.md">v0.29 原生声音与安全存储验收</a>；完整语音制作范围见 <a href="qa/content-readiness-v0.28.md">语音缺口清单</a>。前批生活目标见 <a href="FAMILY-LIFE.md">家庭生活目标</a>，练习与观察历史见 <a href="FAMILY-HISTORY.md">家庭历史翻页</a>；面向产品和团队的原方案继续作为目标基线。</p>
+<p>已补交包含声音降级和安全存储重试的 <a href="qa/audio-fallback-v0.29-qa.md#%E6%9C%AC%E5%9C%B0%E6%B5%8B%E8%AF%95%E5%8C%85">v0.29 本地测试包</a>。iOS 模拟器包已安装并显示重试页面，系统诊断指出其 Keychain 权限缺失；Android APK 已签名核验但未安装。实际加密、登录、声音和设备流程仍未验收。</p>
+<p>以当前三个小游戏为实验起点，建立面向全球家庭的「注意相关技能练习 + 生活中的策略实践 + 家长支持」产品。目标年龄暂定 <strong>6–17 岁</strong>，按 6–8、9–11、12–14、15–17 岁分别设计；用户是家庭家长和孩子，不以学校、机构管理系统为主线。</p>
+<p>产品真正需要加深的是：任务协议是否可靠、孩子是否理解、能否把策略带进生活、家长能否提供合适的支持，以及是否有证据说明产品带来了变化。增加关卡、延长使用时间、生成更多报告，都不能单独回答这些问题。</p>
+<h2 id="overview-h3">本次设计的七项决定</h2>
+<ol>
+<li><strong>全球架构，分市场发布。</strong> 英语、简体中文先做内容验证；国家、年龄、语言、任务版本分别设开放条件，翻译完成不等于可以上市。</li>
+<li><strong>儿童与青少年两套体验。</strong> 共享任务引擎与家庭账号，但故事、美术、语言、目标和家长共享方式不同。6 岁以下作为独立研究方向，不向下直接套用。</li>
+<li><strong>训练与生活实践相连接。</strong> 每次练习只教一个可执行策略，结束后安排一个短小的现实任务；不把游戏分数包装为「专注力指数」。</li>
+<li><strong>语音仍使用预生成素材。</strong> 延续已认可的 Azure 中文音色，制作与校对固定语音包；运行时播放文件，不接实时大模型，不上传儿童语音。</li>
+<li><strong>完整团队并行建设。</strong> 建议约 12 个全职等效岗位，以 32 周为有限市场发布目标；效果研究另有完整观察周期，不能以版本上线代替。</li>
+<li><strong>先建立可信的基础能力。</strong> 首批四类任务、家庭账号、监护人同意、可靠记录、跨设备恢复、家长周报、内容发布系统与支付闭环优先。</li>
+<li><strong>效果按证据逐步表述。</strong> 上市初期提供适龄练习和家庭支持，不宣称治疗 ADHD、提高智商或保证学习成绩。任何效果主张须限定到经过研究的版本、人群和结果。</li>
+</ol>
+<p>用户已确认面向全球家庭，且已有完整研发团队。下述约 12 个全职等效岗位是能力和工时分配参考；执行时把负责人映射到现有团队，不以重新组建团队为前提。6–17 岁是当前建议的首期覆盖范围，各年龄和市场仍分别验收。</p>
+<h2 id="overview-h4">阅读顺序与交付物</h2>
+<p>可先打开 <a href="index.html">完整阅读版</a>，内含全部章节、目录与架构图，也可用浏览器打印。下列 Markdown 是便于研发评审和持续修改的源文档。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>文档</th>
+<th>谁先读</th>
+<th>解决的问题</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="#product">产品方案</a></td>
+<td>产品、设计、科学负责人、增长负责人</td>
+<td>服务谁，练什么，如何使用，如何验证和收费</td>
+</tr>
+<tr>
+<td><a href="#technical">技术设计</a></td>
+<td>技术负责人、研发、测试、安全</td>
+<td>系统边界、状态机、数据、同步、算法、媒体、运维</td>
+</tr>
+<tr>
+<td><a href="#delivery">执行计划</a></td>
+<td>项目负责人、各专业负责人</td>
+<td>32 周路线、人员、预算、验收、上线门槛及前两轮迭代</td>
+</tr>
+<tr>
+<td><a href="NEXT-DELIVERY.md">下一阶段实施交接</a></td>
+<td>现有完整团队的各负责人</td>
+<td>从 v0.29 接续开发的两周工作包、随后两周的纵向交付与家庭试用条件</td>
+</tr>
+<tr>
+<td><a href="IMPLEMENTATION.md">实施进度与验收</a></td>
+<td>研发与项目负责人</td>
+<td>已实现的闭环、验证证据和未完成要求</td>
+</tr>
+<tr>
+<td><a href="FAMILY-MEMBERS.md">家长协作与独立账号</a></td>
+<td>产品、身份、两端、安全与测试</td>
+<td>邀请、创建者确认、成员孩子范围、撤销、历史升级与发布缺口</td>
+</tr>
+<tr>
+<td><a href="PRACTICE-WINDOW.md">单次期限与休息询问</a></td>
+<td>方法、前后端、移动与测试</td>
+<td>总期限、安全节点、继续/休息、旧授权和可靠关闭</td>
+</tr>
+<tr>
+<td><a href="PRACTICE-LIMITS.md">练习与休息</a></td>
+<td>产品、前后端、移动与测试</td>
+<td>分龄上限、家长安排、跨日生效、离线授权、并发和额度结算</td>
+</tr>
+<tr>
+<td><a href="ACCOUNT-SECURITY.md">家庭账号与登录管理</a></td>
+<td>前后端、移动、安全与测试</td>
+<td>密码、全部退出、执行身份、迁移与界面验收</td>
+</tr>
+<tr>
+<td><a href="LOCAL-API.md">本地运行接口</a></td>
+<td>前后端与测试</td>
+<td>当前 <code>/api</code> 开发服务的真实行为</td>
+</tr>
+<tr>
+<td><a href="PROTOCOL-CONTENT.md">任务协议与内容发布实现</a></td>
+<td>前端、移动端、后端、内容、测试</td>
+<td>版本绑定、计时排除、审核签名与召回的已实现规则</td>
+</tr>
+<tr>
+<td><a href="NATIVE-APP.md">原生 App 交接</a></td>
+<td>移动端、后端与测试</td>
+<td>实际架构、构建方式、身份和存储边界、设备验收</td>
+</tr>
+<tr>
+<td><a href="PARENT-DATA.md">家长资料管理</a></td>
+<td>移动端、后端、安全与测试</td>
+<td>观察重试、敏感操作、导出范围和可靠清理</td>
+</tr>
+<tr>
+<td><a href="WEEKLY-REVIEW.md">家长周回顾</a></td>
+<td>产品、方法、前后端与测试</td>
+<td>日历边界、同条件比较、数据缺口与家长解释</td>
+</tr>
+<tr>
+<td><a href="FAMILY-HISTORY.md">家庭历史翻页</a></td>
+<td>两端、后端与测试</td>
+<td>稳定位置、微秒精度、独立翻页、局部错误和权限清理</td>
+</tr>
+<tr>
+<td><a href="COMPACT-FAMILY.md">家庭 Web 小屏交互</a></td>
+<td>Web、设计与测试</td>
+<td>常用导航、完整菜单、键盘焦点、触控尺寸与设备复验边界</td>
+</tr>
+<tr>
+<td><a href="FAMILY-CONTENT.md">家庭内容审核发布</a></td>
+<td>内容、方法、母语、平台与两端研发</td>
+<td>四年龄双语版本、三项独立审阅、签名、目标绑定与召回</td>
+</tr>
+<tr>
+<td><a href="PARENT-GUIDE.md">家长陪伴课程</a></td>
+<td>产品、方法、内容、前后端与移动</td>
+<td>分龄双语指导、课程对应、只读边界、生活建议与审核缺口</td>
+</tr>
+<tr>
+<td><a href="FAMILY-LIFE.md">家庭生活目标</a></td>
+<td>产品、前后端、移动与测试</td>
+<td>分龄模板、家长建议与孩子选择、状态/权限、冲突和数据管理</td>
+</tr>
+<tr>
+<td><a href="DEVICE-RECOVERY.md">换设备与旧记录恢复</a></td>
+<td>产品、前后端、移动、安全与测试</td>
+<td>家长确认、并发冲突、旧设备补传、额度结算与来源区分</td>
+</tr>
+<tr>
+<td><a href="CONTINUATION-AUTHORIZATION.md">离线续练授权</a></td>
+<td>前后端、移动、安全与测试</td>
+<td>计划/设备绑定、家庭跨日、到期停止、补传和历史兼容</td>
+</tr>
+<tr>
+<td><a href="WEB-OFFLINE.md">Web 断网重开</a></td>
+<td>前端、平台、安全与测试</td>
+<td>公共缓存、原子日志、跨页锁、更新与浏览器验收</td>
+</tr>
+<tr>
+<td><a href="OFFLINE-RESUME.md">原生断网恢复</a></td>
+<td>移动、后端、安全与测试</td>
+<td>最小缓存、时钟检查点、身份切换、记录核验与设备验收</td>
+</tr>
+<tr>
+<td><a href="VISUAL-ASSETS.md">图片资产与交付规范</a></td>
+<td>设计、内容、前端、移动与测试</td>
+<td>新图片、原图/提示词、交付尺寸、历史恢复和预算</td>
+</tr>
+<tr>
+<td><a href="CONTENT-STUDIO.md">内容工作台</a></td>
+<td>内容、方法、本地化、平台与安全</td>
+<td>独立身份、编辑冻结、双审签名、本地发布与召回</td>
+</tr>
+<tr>
+<td><a href="CANDIDATE-PREVIEW.md">候选试玩与审核证据</a></td>
+<td>内容、方法、前端、平台与测试</td>
+<td>冻结候选、真实任务界面、回放回执与审核门槛</td>
+</tr>
+<tr>
+<td><a href="WEB-RELEASE.md">家庭网页版本发布</a></td>
+<td>平台、前端、运维与测试</td>
+<td>独立构建、文件校验、原子切换、旧页面连续使用和发布失败处理</td>
+</tr>
+<tr>
+<td><a href="REFLECTION-SHARING.md">生活回顾自主分享</a></td>
+<td>产品、身份、前后端、移动与测试</td>
+<td>默认不保存答案、明确分享、撤回、历史迁移与兼容发布</td>
+</tr>
+<tr>
+<td><a href="qa/content-readiness-v0.28.md">固定语音缺口清单</a></td>
+<td>内容、方法、母语与测试</td>
+<td>32 组合的准确台词、已有声音与制作、听审、设备验收步骤</td>
+</tr>
+<tr>
+<td><a href="qa/audio-fallback-v0.29-qa.md">v0.29 原生声音与安全存储验收</a></td>
+<td>移动、安全与测试</td>
+<td>声音失败降级、重试入口、构建核验与 Keychain 阻断证据</td>
+</tr>
+<tr>
+<td><a href="MEDIA-LIBRARY.md">图片与固定语音素材库</a></td>
+<td>内容、本地化、平台与测试</td>
+<td>格式检查、来源/权利声明、不可变文件、换稿、访问和运行限制</td>
+</tr>
+<tr>
+<td><a href="#evidence">证据与来源</a></td>
+<td>全体评审人</td>
+<td>哪些来自研究与规则，哪些只是待检验的产品假设</td>
+</tr>
+<tr>
+<td><a href="contracts/openapi.yaml">核心接口草案</a></td>
+<td>前后端、测试</td>
+<td>会话创建、事件补传、结果提交的核心约定</td>
+</tr>
+<tr>
+<td><a href="contracts/content-pack.example.json">内容包示例</a></td>
+<td>引擎、内容、国际化团队</td>
+<td>协议、参数、语音文案和发布状态如何绑定</td>
+</tr>
+</tbody></table></div>
+<p><code>contracts/</code> 中的核心接口草案和内容示例用于设计评审，尚未与运行契约完全对齐。已运行接口以本地接口说明为准；当前内容均为开发预览，不能作为经审核的儿童训练内容直接发布。</p>
+<h2 id="overview-h5">设计起点与当前实现</h2>
+<p>设计起点是三个任务、单设备数据和 16 段固定 MP3 的静态原型，原有 20 项检查构成迁移基线。已新增家庭客户端、四类任务、双语文本、权限与持久化服务；v0.4 接入原生入口与加密日志，v0.5 补齐原生资料管理和计时修复，v0.6 增加规则化周回顾，v0.7 更新图片并保留历史素材，v0.8 接通家庭生活目标，v0.9 增加签名续练授权，v0.10 接通换设备确认和旧记录恢复，v0.11 增加原生断网恢复入口，v0.12 增加 Web 断网重开与跨页保护，v0.13 接通独立内容工作台和双审发布/召回，v0.14 接通候选任务试玩、回执核对及审核关联，v0.15 接通 PNG/MP3 导入、来源声明与换稿，v0.16 接通生活回顾自主分享和撤回，v0.17 接通家庭网页版本发布与旧资源保留，v0.18 接通两端家长陪伴小课与生活建议联动；v0.19 接通真实 PostgreSQL 家庭隔离与运行权限分离；v0.20 接通两端账号管理和执行身份复核；v0.21 接通两端练习与休息、家长上限与暂停安排；v0.22 接通单次总期限和安全间隙询问；v0.23 接通独立家长账号、邀请确认、孩子范围与成员撤销。v0.24 接通家长课与生活目标的三项审阅、签名发布及召回。v0.24 的 264 项自动检查、12 项真实接口检查及 15 项 PostgreSQL 检查通过；内置浏览器已完成中文儿童与英文青少年恢复流程，原生 App 界面、实际加密文件和设备复验尚未完成。详见 <a href="IMPLEMENTATION.md">实现进度</a> 和 <a href="qa/family-content-v0.24.md">前批内容验收</a>。v0.25 完成家庭 Web 小屏导航、完整菜单与键盘焦点管理；本批构建和浏览器交互检查通过，未重跑完整业务套件，详见 <a href="qa/compact-family-v0.25.md">小屏验收</a>。v0.26 接通两端练习与观察的历史翻页，271 项业务、13 项接口及 16 项 PostgreSQL 回归通过；最终专项、构建、原生导出和 Web 故障重试证据见 <a href="qa/history-v0.26.md">当前验收</a>。</p>
+<p>v0.27 接通生活目标的稳定翻页和后台刷新；282 项业务、14 项 HTTP、构建及原生导出通过，独立 PostgreSQL 检查在环境准备阶段失败，新增用例尚未运行。详细范围见 <a href="qa/life-history-v0.27.md">生活历史验收</a>。</p>
+<p>v0.28 核对当前 32 份开发任务包：6 份有匹配的固定语音、26 份尚缺；正式 <code>published</code> 内容必须带固定 MP3 和音色 ID。283 项业务、14 项 HTTP、Web 构建及两平台原生包核验通过，独立 PostgreSQL 本轮未重跑。准确范围见 <a href="qa/content-readiness-v0.28-qa.md">本批验收</a>。</p>
+<p>v0.29 修复原生声音加载和安全存储入口的失败处理；283 项业务与两平台构建通过。iOS 模拟器真实启动发现测试签名缺 Keychain 权限，当前包不能用于登录与练习验收；Android 仍需设备安装。见 <a href="qa/audio-fallback-v0.29-qa.md">本批验收</a>。</p>
+<p>旧原型保留供对照。当前可运行版本仍未完成原生设备验收、内容审核、地区准入与商业发布；专业适用性和效果尚未验证。技术设计中的现状评估记录设计起点，动态实现状态以实施进度账本为准。</p>
+<h2 id="overview-h6">立项后必须明确的五个业务决定</h2>
+<p>这些事项不阻止当前设计，但各有明确截止点：</p>
+<ul>
+<li>第 2 周：目标经营主体、首发国家名单与销售渠道。</li>
+<li>第 4 周：首个效果研究的人群、主要结果指标及研究伙伴。</li>
+<li>第 4 周：12 个全职等效岗位是否到位，供应商预算上限。</li>
+<li>第 8 周：是否接受儿童版与青少年版两种原生应用发布形态。</li>
+<li>第 16 周：根据家庭试用与付费访谈确定首发价格，不提前以价格假设承诺收入。</li>
+</ul>
+<p>评审采用「证据、负责人、通过条件」记录。未通过某个国家或年龄段的门槛，只关闭该范围，不默认扩大到全世界。</p>
+</article>
+<article id="product"><div class="chapter-label">02 / 产品方案</div><h1 id="product-h1">产品方案：全球家庭的注意相关技能练习</h1>
+<p>设计版本 1.0 / 2026-09-30。所有课程时长、难度阈值、价格与经营目标均为待验证的设计假设，不能引用为已证实的效果。</p>
+<p>v0.24 已将家长课与生活模板纳入按年龄的双语版本和三项独立审阅，支持发布、召回和原目标版本保留。实际流程见 <a href="FAMILY-CONTENT.md">家庭内容发布</a>；真实专业审核和生活效果验证仍是发布条件。</p>
+<h2 id="product-h2">1. 定位与价值</h2>
+<h3 id="product-h3">1.1 要解决的实际问题</h3>
+<p>家庭通常看到的是「开始作业很困难」「做两步就忘了下一步」「急着点、急着回答」「遇到干扰后回不来」。这些表现可能受到睡眠、情绪、任务难度、感官条件、环境或发展差异影响。产品不能仅凭游戏表现判断原因。</p>
+<p>产品的承诺是：提供结构清楚、时间有限的练习，帮助孩子尝试具体策略，帮助家长观察同类生活任务中的变化。核心价值链为：<strong>理解规则 → 尝试策略 → 完成适度挑战 → 在生活中尝试 → 一起回顾</strong>。</p>
+<p>购买者是家长；真正使用者包含儿童和青少年。家长需要透明的方法、可控的花费、可解释的进展；孩子需要自主、胜任感和尊重。产品设计必须同时满足双方，不能把孩子变成家长监控面板中的分数。</p>
+<h3 id="product-h4">1.2 可表达与暂不可表达的价值</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>允许的初期表达</th>
+<th>需要产品自身证据后才能表达</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>提供视觉查找、等待反应、顺序记忆等练习</td>
+<td>能改善某个年龄段日常注意表现，需明确研究条件与效果大小</td>
+</tr>
+<tr>
+<td>提供循序渐进的任务和家长活动建议</td>
+<td>比其他产品更有效，需直接比较或有充分依据</td>
+</tr>
+<tr>
+<td>记录自己在相同任务条件下的表现</td>
+<td>改善学习成绩、治疗 ADHD、替代专业支持</td>
+</tr>
+<tr>
+<td>用短时练习学习具体策略</td>
+<td>某分数代表注意力年龄、智商或临床风险</td>
+</tr>
+</tbody></table></div>
+<p>现有研究对任务内进步和部分近迁移提供了一些支持，对广泛的日常迁移与长期效果仍有明显限制。2023 年和 2026 年的研究综合结论存在测量与人群差异，不能直接据此给本产品写疗效文案。<a href="https://pubmed.ncbi.nlm.nih.gov/36977764/">2023 年元分析</a>、<a href="https://pubmed.ncbi.nlm.nih.gov/42110889/">2026 年元分析</a></p>
+<p>如果家庭反馈问题长期、明显地影响学习和生活，家长帮助页可建议向合适的专业人员咨询；不给出自动诊断、停药建议或风险标签。</p>
+<h2 id="product-h5">2. 年龄与体验分层</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>年龄</th>
+<th>主要体验</th>
+<th>家长角色</th>
+<th>第一版交互假设</th>
+<th>每次屏幕练习上限假设</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>6–8</td>
+<td>明确目标、少量图案、语音示范、可触摸的大按钮</td>
+<td>前几次陪伴理解；之后在附近支持</td>
+<td>一屏一个动作，短句，先演示再操作</td>
+<td>6–8 分钟</td>
+</tr>
+<tr>
+<td>9–11</td>
+<td>小型任务探索、策略选择、比较自己的不同做法</td>
+<td>一起选择每周生活目标，按需帮助</td>
+<td>可阅读简短规则，自主选择练习主题</td>
+<td>8–10 分钟</td>
+</tr>
+<tr>
+<td>12–14</td>
+<td>探索、设计、运动或生活主题；去幼儿化</td>
+<td>与孩子协商支持方式和共享范围</td>
+<td>自定目标、简短反思、可跳过音频</td>
+<td>8–12 分钟</td>
+</tr>
+<tr>
+<td>15–17</td>
+<td>任务启动、计划、干扰管理、自我检查</td>
+<td>提供资源与协商，尊重更强自主性</td>
+<td>工具化界面、任务拆解与可撤销的目标</td>
+<td>8–12 分钟</td>
+</tr>
+</tbody></table></div>
+<p>这些时长不是治疗剂量或医学建议。首轮按每周 3 次、连续 8 周验证可接受性；不要求补课，不因漏练扣奖励。年龄不能代替实际理解能力，提供简明模式、低动态模式、视觉/听觉替代路径；适配改变任务条件时记录独立版本。</p>
+<p>计划日默认只安排一次正式练习。每日累计主动训练上限初定为 6–8 岁 8 分钟、9–11 岁 10 分钟、12–17 岁 12 分钟，重复开启也计入；说明与必要操作不催促孩子，达到上限后结束于当前安全节点。暂停不消耗主动训练额度，但不能通过暂停重置已用时长。家庭可调低，不用补练填满额度。这些上限同样需要可用性验证。</p>
+<p>6 岁以下需要更多共同游戏、发展适配与专门验证，首期不开放训练档案。18 岁时提供账号与共享权限重新确认和迁移流程，不能永久沿用儿童监护权限。</p>
+<h3 id="product-h6">2.1 儿童与青少年美术方向</h3>
+<ul>
+<li>儿童版延续「专注岛」，统一角色比例、表情与材质。任务目标与干扰物必须在识别上可区分；装饰不与可点击元素混淆。</li>
+<li>青少年版使用探索工作台、路线规划、音乐节准备等主题，由目标用户共创验证；不把幼儿界面单纯换成深色。</li>
+<li>两者都不使用连续签到惩罚、随机付费奖励、无限关卡或同龄排名。奖励对应策略尝试和结束练习，不奖励刷时长。</li>
+<li>多文化审稿覆盖手势、动物象征、肤色、节庆、家庭结构与翻译；地域包可以换故事，测量刺激改变必须重新验证。</li>
+</ul>
+<h2 id="product-h7">3. 能力框架和任务组合</h2>
+<p>产品训练具体的注意相关行为，不声称一个小游戏能纯粹测量某一种脑功能。语言理解、运动反应、视觉识别和经验都会影响表现。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>任务族</th>
+<th>第一版任务设计</th>
+<th>可调维度</th>
+<th>必须记录</th>
+<th>对应生活策略</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>选择性注意</td>
+<td>在图案中寻找符合条件的目标</td>
+<td>目标数、干扰相似度、阵列大小；一次只调一维</td>
+<td>命中、漏选、误选、提交/提示、条件</td>
+<td>先说出目标，再分区查找，最后检查</td>
+</tr>
+<tr>
+<td>反应抑制</td>
+<td>看到目标行动，看到另一种图案等待</td>
+<td>刺激间隔、目标比例、规则；速度最后调整</td>
+<td>Go 命中/漏反应、No-Go 误反应/正确等待</td>
+<td>看清 → 停一下 → 决定做不做</td>
+</tr>
+<tr>
+<td>顺序工作记忆</td>
+<td>记住短顺序，再按顺序复现</td>
+<td>长度、编码方式、延迟、材料熟悉度</td>
+<td>完整与位置正确、查看次数、模式</td>
+<td>分组、复述、借助外部清单</td>
+</tr>
+<tr>
+<td>持续留意</td>
+<td>在短、可预测长度的情境中留意目标变化</td>
+<td>段落长度、目标间隔、干扰；限制等待长度</td>
+<td>分段命中/误报、有效时长、主动暂停</td>
+<td>短段专注，走神后找到当前一步</td>
+</tr>
+<tr>
+<td>规则切换（二期）</td>
+<td>按提示切换分类规则</td>
+<td>切换比例、提示方式、规则数</td>
+<td>切换/非切换表现分开记录</td>
+<td>开始前确认这一次用哪条规则</td>
+</tr>
+<tr>
+<td>计划与自查（二期）</td>
+<td>排好完成生活小目标的步骤并检查</td>
+<td>步骤数、限制条件、干扰任务</td>
+<td>计划修改、遗漏、主动检查</td>
+<td>把任务分小，做完一步标记一步</td>
+</tr>
+</tbody></table></div>
+<p>首批建设四类任务，后两类在基础记录和研究协议稳定后加入。每个年龄段都有四类任务的适配内容，但某一组合未完成该年龄/语言验证时保持关闭。</p>
+<h3 id="product-h8">3.1 三个现有任务的升级方向</h3>
+<p><strong>视觉搜索</strong>：不能始终只有两个兔子，以免用户学会「点两个就结束」。允许目标数变化和可明确说明的零目标轮；目标数、视觉相似度和阵列大小分别操控。前期保留自定节奏，不以快点奖励。</p>
+<p><strong>Go/No-Go</strong>：练习必须涵盖命中、漏反应、误反应和正确等待。分别计算两类试次表现，避免「一直不点」取得看似不错的总正确率。目标序列受约束随机生成，正式任务不固定第一个必为兔子。短块提供规则回顾，不冒充临床持续操作测试。</p>
+<p><strong>顺序记忆</strong>：明确视觉、听觉或双通道模式。按钮如果写「听一遍顺序」，必须真实播放该次物品顺序。再次查看仍允许，但与首次回忆分开记录；自定编码版本与固定编码版本不直接比较。</p>
+<h3 id="product-h9">3.2 每个任务上线的最小协议</h3>
+<p>必须具备：目标年龄/语言、训练目标、替代解释、说明与示范、练习通关条件、刺激与随机规则、有效试次条件、反馈文案、可调参数边界、停止/暂停行为、指标分母、无障碍变体、生活活动、风险记录、版本号及审核人。</p>
+<p>难度变化发生在小块之间，研究测量任务使用固定协议。不能在孩子表现不好时偷偷修改判分规则。</p>
+<h2 id="product-h10">4. 八周课程：从策略尝试到生活实践</h2>
+<p>课程从家庭第一次开始的日期计时，不按自然年周数轮转。进度以实际完成的单元推进，跳过一周时保留原位置。孩子可以选择先休息；家长不能通过购买解除时长上限。</p>
+<p>v0.21 已接通家长选择较短有效练习上限或暂停新练习，所有修改从下一家庭日生效，并向孩子透明显示。今天已准备的离线练习保留原授权，不能承诺远程即时停止。这不是设备总屏幕时间；完整健康使用规则仍待验证，详见 <a href="PRACTICE-LIMITS.md">练习与休息</a>。</p>
+<p>第 0 周是开始八周课程前的入门与基线窗口；常规产品可按实际完成节奏延长，研究队列则固定八周观察窗口，未完成单元如实记录，不为研究成绩临时补练。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>周</th>
+<th>屏幕练习重点</th>
+<th>生活实践例子</th>
+<th>家长支持</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>0</td>
+<td>理解规则、设备适配、起始表现采集</td>
+<td>选一个具体且可重复的生活目标</td>
+<td>不提示答案；记一次原来的做法</td>
+</tr>
+<tr>
+<td>1</td>
+<td>确认目标、分区查找</td>
+<td>找出第二天要用的三件物品</td>
+<td>只提示「先看看目标是什么」</td>
+</tr>
+<tr>
+<td>2</td>
+<td>看清后行动、允许等待</td>
+<td>按家庭约定轮流选择活动</td>
+<td>示范等待，不把快当成好</td>
+</tr>
+<tr>
+<td>3</td>
+<td>分组与顺序复述</td>
+<td>完成两到三步整理，允许用清单</td>
+<td>记录需要几次提醒</td>
+</tr>
+<tr>
+<td>4</td>
+<td>短段留意与暂停后返回</td>
+<td>选择一小段阅读、拼装或整理任务</td>
+<td>帮忙减少一种环境干扰</td>
+</tr>
+<tr>
+<td>5</td>
+<td>同一策略在新材料中使用</td>
+<td>换一份类似清单或另一处收纳区</td>
+<td>问「你想用哪种办法」</td>
+</tr>
+<tr>
+<td>6</td>
+<td>孩子主动选择策略</td>
+<td>提前计划一次自主活动</td>
+<td>由孩子决定要不要帮助</td>
+</tr>
+<tr>
+<td>7</td>
+<td>独立检查和适时求助</td>
+<td>完成后按清单检查遗漏</td>
+<td>反馈具体动作，不评价性格</td>
+</tr>
+<tr>
+<td>8</td>
+<td>回顾、平行版本复测、维持计划</td>
+<td>选一种有帮助的做法继续使用</td>
+<td>可以结束课程，不强推续费</td>
+</tr>
+</tbody></table></div>
+<p>低龄例子是书包、玩具和日常收纳；青少年例子是课前准备、个人项目、运动装备和作业启动。相同策略不是相同措辞。没有证据时不把一次生活记录变化解释为训练的因果效果。适龄游戏与共同活动的设计可参考 <a href="https://developingchild.harvard.edu/resources/handouts-tools/activities-guide-enhancing-and-practicing-executive-function-skills/">Harvard 执行功能活动指南</a>，该指南并未验证本产品。</p>
+<p>v0.22 新增单次总期限与安全间隙休息询问，说明/暂停/后台都在这份练习的期限内；已答步骤按原规则保存，不给阅读较慢或主动休息扣分。具体开发参数和仍未完成的健康使用规则见 <a href="PRACTICE-WINDOW.md">期限设计</a>。</p>
+<h3 id="product-h11">4.1 一次典型练习</h3>
+<ol>
+<li>孩子看到今天的一个目标，选择「开始」「换一种」「今天先不做」。</li>
+<li>演示一遍，并用实际操作确认理解；两次仍不理解时转共同练习，不继续堆正式错误。</li>
+<li>做两个短块，中间可以停；各年龄时长范围见第 2 节，任务组合服从上限。</li>
+<li>给一条行为反馈，例如「你这次提交前又检查了一遍」。没有对应事件时不生成该反馈。</li>
+<li>孩子选择一个生活小任务，或选「稍后再说」。离开屏幕后才做，不要求持续开着应用计时。</li>
+<li>家长每周花约 3 分钟回顾同类任务；避免每次都追问分数。</li>
+</ol>
+<h2 id="product-h12">5. 家庭体验与信息架构</h2>
+<h3 id="product-h13">5.1 家长端</h3>
+<p>首页显示本周约定、下一次建议、孩子选择的生活目标和「需要帮助」入口。报告分为三张卡：练过什么策略、同条件任务里发生了什么、生活记录有没有变化。</p>
+<p>每张趋势卡必须标注任务版本、有效次数、是否使用提示、可比较条件和数据缺口。样本不足显示「还需要几次相同条件的练习」，不画平滑的能力增长曲线。家长可看账单、调整提醒、导出/删除数据、管理照护人；这些权限不能等同。</p>
+<h3 id="product-h14">5.2 儿童与青少年端</h3>
+<p>儿童端只显示本次目标、操作区域、帮助和结束按钮。青少年端允许选择目标、查看自己的策略记录，并清楚知道哪些信息会与家长共享。初期不采集自由文本日记、情绪隐私日志或私聊内容，减少不必要的敏感信息。</p>
+<p>共享分层：基础使用状态与家庭约定；可选的策略回顾；原始事件仅在合法必要、权限明确的导出或研究流程中处理。青少年自评默认不作为家长绩效看板；当地法律涉及监护人访问或数据主体权利时，由政策与支持流程处理，不能承诺绝对秘密。</p>
+<p>共享范围改变前，用孩子能读懂的话展示。例如：「爸爸现在能看到这周练了哪些策略和你愿意分享的目标。」涉及适用法定同意年龄或成年转换时重新确认权限。家长分离、监护争议、邀请撤销设人工处理入口，不让付款者天然获得全部儿童数据。</p>
+<p>本地 v0.16 已实现逐次结构化回顾分享：默认不保存答案，明确分享后家长可见，可撤回目标与历史中的答案。它是上述分层的一部分；独立身份、逐成员权限、地区访问权和成年转换仍待实施。见 <a href="REFLECTION-SHARING.md">自主分享设计</a>。</p>
+<p>v0.23 已实现家庭内独立协作账号、邀请后的创建者确认、指定孩子范围与撤销；家长作用域的生活目标/回顾仍仅开放给创建者。当前共享孩子模式不验证屏幕前身份，不能替代独立青少年隐私边界。见 <a href="FAMILY-MEMBERS.md">成员设计</a>。</p>
+<h3 id="product-h15">5.3 必须覆盖的异常流程</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>场景</th>
+<th>预期行为</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>孩子说不想做、累了、烦了</td>
+<td>一步结束，保留已完成内容；不给失败评价</td>
+</tr>
+<tr>
+<td>连续多次错误</td>
+<td>停止加难；检查规则理解，允许示范或退出</td>
+</tr>
+<tr>
+<td>来电话、切换应用、锁屏</td>
+<td>当前试次标记中断；回到练习说明，不算漏反应</td>
+</tr>
+<tr>
+<td>音频加载失败</td>
+<td>显示文本和可重试；可切换到已批准的视觉练习并改协议，不能假装听觉有效或把两种结果直接比较</td>
+</tr>
+<tr>
+<td>离线或换设备</td>
+<td>明确显示是否已保存、是否已同步；不以缓存消失判定孩子未完成</td>
+</tr>
+<tr>
+<td>家长同意撤回或地区未开放</td>
+<td>停止对应采集与训练计划，保留依法可访问的导出/删除入口</td>
+</tr>
+<tr>
+<td>订阅到期</td>
+<td>清楚说明权益，保留数据管理；不对孩子说「让爸妈付款才能变好」</td>
+</tr>
+</tbody></table></div>
+<h3 id="product-h16">5.4 可访问性验收</h3>
+<p>以 WCAG 2.2 AA 为目标，另设产品自己的儿童交互要求：主要点击区至少 56 CSS 像素，其他操作至少 48；支持键盘与可见焦点、减少动态效果、字幕和音量关闭；形状/位置/文字共同传达规则，不单靠颜色或声音。上述按钮尺寸是本产品更严格的设计值，不是 WCAG 原文阈值。<a href="https://www.w3.org/TR/WCAG22/">WCAG 2.2</a></p>
+<p>训练任务中的感官要求不能靠「无障碍通过」一笔带过。视觉查找改成听觉后，目标和测量都可能变化，需要独立版本、说明与验证。禁止动画闪烁、突发高音量和不可跳过的庆祝效果。</p>
+<h2 id="product-h17">6. 效果验证：先证明可用，再检验有用</h2>
+<h3 id="product-h18">6.1 四层证据</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>层级</th>
+<th>要回答的问题</th>
+<th>方法</th>
+<th>可以支持的结论</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>工程可靠性</td>
+<td>记录与规则是否一致</td>
+<td>自动测试、设备测试、事件回放</td>
+<td>程序按协议工作</td>
+</tr>
+<tr>
+<td>可用性</td>
+<td>孩子是否理解并愿意使用</td>
+<td>分年龄、分语言家庭观察，记录提示与退出</td>
+<td>该范围可理解、负担可接受</td>
+</tr>
+<tr>
+<td>可行性</td>
+<td>家庭能否完成课程与生活实践</td>
+<td>8 周小规模前瞻试用，退出原因、缺失率</td>
+<td>流程可执行，估计下一研究参数</td>
+</tr>
+<tr>
+<td>效果</td>
+<td>相比合理对照是否带来改善</td>
+<td>预注册随机对照研究、独立评估、随访</td>
+<td>仅支持预设人群和指标中的结果</td>
+</tr>
+</tbody></table></div>
+<p>已有数字训练随机试验说明严谨研究可行，但某款产品、特定临床样本中的结果不能移植为本产品的认证，也不能照搬其练习剂量。<a href="https://pubmed.ncbi.nlm.nih.gov/33334505/">STARS-ADHD 原始试验</a></p>
+<h3 id="product-h19">6.2 可行性研究建议</h3>
+<p>首轮 32–48 个家庭开展可用性研究，四个年龄段均覆盖英语与简体中文，纳入不同设备、阅读能力与家庭结构；每个分层仍是少量样本，只用于发现问题。后续 80–120 个家庭开展 8 周可行性研究，观察练习完成、生活实践、挫败或不适、退出原因和数据缺失，不作疗效宣称。</p>
+<p>正式效果研究先选一个明确人群，例如「英语地区 6–11 岁、家长报告日常注意困难、符合明确纳排标准的家庭」。是否纳入已有 ADHD 诊断、是否保持其他支持不变，由研究负责人和伦理审查决定；分层随机并记录共同干预，不能混入后再作未经计划的比较。</p>
+<h3 id="product-h20">6.3 正式研究的执行要求</h3>
+<ul>
+<li>主要结果只选一个，优先与家庭日常功能有关的、年龄与语言适用的有效工具；在招募前完成授权、量表选择与统计分析计划。具体量表由研究负责人在第 4 周定稿。</li>
+<li>次要结果包含未训练材料任务、策略使用、孩子可接受性和家长负担；训练游戏分数作为机制/过程结果，不代替主要结果。</li>
+<li>使用时长、关注程度、期待与视觉吸引力尽量匹配的主动对照。用户不能完全盲法时承认这一限制；独立评估者与统计分析按可能范围设盲。</li>
+<li>T0 起始、T1 第 8 周、T2 结束后 4 周；平行材料减小重测熟悉效应，固定协议不随自适应难度变动。</li>
+<li>按随机分组分析，预先处理缺失与多重比较；给出效应量和置信区间，同时报告负面或无差异结果。</li>
+<li>未成年人参与需适用的监护人同意和本人愿意参与；研究同意单独取得，退出研究不能失去已购买的基础服务。</li>
+<li>记录不适、亲子冲突、反复受挫与过度使用。严重或疑似与产品有关的事件立即暂停对应流程并由负责人评估；不等待样本量达标。</li>
+</ul>
+<p>样本量不能凭经验定成 30 人。仅作预算示例：双侧 α=0.05、80% 把握度、标准化差异 d=0.35，简单独立两组近似约 128 人/组；若预计 20% 失访，总招募约 320 人。基线调整、主要量表、家庭内相关性、多个年龄/语言分层都会改变结果，正式数字须统计人员计算。不能用这 320 人同时证明四个年龄段、所有国家和两种语言都有效。</p>
+<h2 id="product-h21">7. 国际化与市场进入</h2>
+<h3 id="product-h22">7.1 发布单元</h3>
+<p>发布单元是 <strong>国家/地区 × 年龄段 × 语言 × 内容协议 × 客户端渠道</strong>。后台只有这组组合全部通过评审，才可开户与发放训练计划。语言选择不改变数据区域和监护政策；修改居住国家需要重新评估与迁移流程。</p>
+<p>建议先选择美国、英国作为英语候选首发市场；简体中文用于同步内容验证，中国大陆商业开放需单独完成分类与运营审查。欧盟逐成员国扩展，再评估加拿大、澳大利亚、巴西等市场。不因网站能访问就视为已批准当地销售。首发顺序是业务假设，可在第 2 周根据经营主体与招募资源调整。</p>
+<h3 id="product-h23">7.2 首批规则矩阵</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>地区</th>
+<th>设计要求</th>
+<th>上线前交付证据</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>美国</td>
+<td>面向 13 岁以下的服务按 COPPA 评估可验证监护人同意、通知、访问删除与留存；青少年还要评估州法</td>
+<td>同意验证方案、数据清单、供应商协议、适用州要求评审</td>
+</tr>
+<tr>
+<td>欧盟/欧洲经济区</td>
+<td>GDPR 处理依据逐目的明确；直接向儿童提供在线服务并依赖同意时，成员国门槛在 13–16 岁范围内；不统一写成 13 岁</td>
+<td>国家政策表、DPIA、权利流程、供应商/跨境安排</td>
+</tr>
+<tr>
+<td>英国</td>
+<td>依赖儿童对在线服务的数据处理同意时注意 13 岁门槛；同时评估面向未满 18 岁者的儿童设计准则</td>
+<td>最佳利益评估、适龄说明、默认高隐私、家长监控透明度</td>
+</tr>
+<tr>
+<td>中国大陆</td>
+<td>不满 14 岁个人信息按敏感信息处理；监护同意与儿童专门规则；另行判定互联网服务、应用备案和网络游戏适用要求</td>
+<td>法律分类意见、经营和备案清单、数据路径与跨境评估</td>
+</tr>
+</tbody></table></div>
+<p>政策依据：<a href="https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions">FTC COPPA FAQ</a>、<a href="https://www.edpb.europa.eu/sites/default/files/files/file1/edpb_guidelines_202005_consent_en.pdf">EDPB 同意指南</a>、<a href="https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/children-and-the-uk-gdpr/overview-and-key-definitions/">ICO 儿童与 UK GDPR</a>、<a href="https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/age-appropriate-design-a-code-of-practice-for-online-services/">ICO Children’s Code</a>、<a href="https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm">中国个人信息保护法</a>。这是一组工程设计输入，不是各国已完成的法律结论。</p>
+<p>中国大陆若被认定属于相关网络游戏服务，运营要求可能与本方案的每周课程安排产生实质冲突，必须在开放前解决；不能通过把名称改成「教育」规避。<a href="https://www.nppa.gov.cn/xxfb/tzgs/202108/t20210830_666285.html">国家新闻出版署 2021 年相关通知</a></p>
+<p>商店发布需单独评审。Apple Kids Category 的年龄分组覆盖至 11 岁，因此规划「儿童版」和具有实质差异的「青少年/家庭版」两种发布形态，共享技术与家庭权益；最终依商店规则和审核反馈确定。Google Play 按实际目标年龄申报，儿童相关 SDK 与数据处理逐一核对。<a href="https://developer.apple.com/kids/">Apple Kids</a>、<a href="https://support.google.com/googleplay/android-developer/answer/9893335?hl=en">Google Play Families</a></p>
+<h2 id="product-h24">8. 商业模式与运营</h2>
+<h3 id="product-h25">8.1 收费结构</h3>
+<p>建议家庭付费，默认一个家庭最多 3 个儿童档案；先验证 8 周课程包和家庭订阅两种方案，避免无限使用成为卖点。免费体验包含完整的规则说明、数次练习与生活活动，家长能在购买前理解产品。</p>
+<p>价格仅作访谈锚点：月付 9.99–14.99 美元、年付 69–99 美元，或 8 周课程包 19–29 美元；不是定价结论，年付价格与支持成本须用真实留存重新计算。各地区按购买力、税、退款与渠道费定价，不机械汇率换算。</p>
+<p>所有支付、续费、取消和外链由成人完成；儿童界面没有促销倒计时、广告、抽奖或劝说购买。到期不阻断导出、删除与已形成记录的访问。研究参与与付费分离。</p>
+<h3 id="product-h26">8.2 单位经济测算</h3>
+<p>以已扣税退款但未扣渠道费的家庭月收入 10 美元举例，假设渠道成本 15%、每家庭月可变成本 1.5 美元，则贡献毛利约 7 美元。获客成本 40 美元对应约 5.7 个付费月才能回收，尚未覆盖固定研发与研究成本。这里的 15% 只是模型输入，不是任一商店的确定费率；不同渠道需单独重算。没有真实付费留存时不公布长期价值或盈利结论。</p>
+<h3 id="product-h27">8.3 首批获客与服务</h3>
+<p>先做 20–30 个分市场的家长定价访谈和青少年体验访谈，再用经审核的方法介绍、家庭活动内容和家长社区开展小范围招募。邀请家庭自愿推荐，不要求儿童传播个人成绩，不把诊断标签用于广告定向。</p>
+<p>客服提供取消退款、设备故障、共享权限和家庭使用建议。客服不远程诊断孩子；查看家庭数据必须有授权、最小权限和审计。首发语言要有相应客服能力，只有界面翻译不够。</p>
+<h2 id="product-h28">9. 指标与产品决策</h2>
+<p>主指标：每周完成家庭自己约定的适量练习，并尝试至少两次生活策略的家庭比例。允许家庭调整计划；分母以当周有效计划家庭计算，同时报告退出和缺失，不能剔除不满意家庭美化结果。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>类型</th>
+<th>指标</th>
+<th>解读限制</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>理解</td>
+<td>不依赖成人代操作的规则通过率；各年龄/语言单列</td>
+<td>成人提示须标记，不可算独立通过</td>
+</tr>
+<tr>
+<td>负担</td>
+<td>主动停止、不适反馈、家长耗时、亲子冲突反馈</td>
+<td>退出不是孩子失败；要查看原因</td>
+</tr>
+<tr>
+<td>可靠性</td>
+<td>有效会话率、事件完整率、同步延迟、崩溃</td>
+<td>技术可靠不等于有效</td>
+</tr>
+<tr>
+<td>练习</td>
+<td>同条件有效试次的各项表现</td>
+<td>难度变化与提示会改变可比性</td>
+</tr>
+<tr>
+<td>生活</td>
+<td>同类任务所需提醒、自定目标达成</td>
+<td>家长自报有期待偏差，不单独证明因果</td>
+</tr>
+<tr>
+<td>商业</td>
+<td>家庭激活、4/8 周留存、付费转换、退款、回收期</td>
+<td>不以总屏幕时长优化增长</td>
+</tr>
+</tbody></table></div>
+<p>可做的初期实验：家长引导措辞、规则演示形式、报告可读性。训练剂量、测量协议和涉及儿童权益的策略变更进入研究与伦理评审流程；不进行诱导同意、隐藏退出或加长使用的增长实验。</p>
+<h2 id="product-h29">10. 第一版范围冻结</h2>
+<p>必做：四类任务、四年龄段内容规范、两种界面、英语与简体中文素材、家庭/儿童档案、同意和共享策略、离线练习与同步、可靠报告、生活活动、固定语音、美术审核、家长支付、客服与删除链路。</p>
+<p>后续：规则切换、计划任务、更多语言、更多地域支付、研究证据对应的产品声明。</p>
+<p>不在当前路线：实时儿童聊天、开放社交、教师班级后台、广告网络、脑电/眼动/摄像头识别、自动诊断、远程医疗和无证据的能力排行榜。以后引入任何一项，都需要独立的业务与风险评审。</p>
+</article>
+<article id="technical"><div class="chapter-label">03 / 技术设计</div><h1 id="technical-h1">技术设计：任务引擎、家庭平台与内容系统</h1>
+<blockquote>
+<p>实施补充（v0.28）：四年龄段、两语言、四任务的 32 个内容组合已生成固定语音台词与缺口清单；6 个已接入、26 个尚缺。正式 <code>published</code> 内容缺 MP3 或音色 ID 会被拒绝，字幕一致性沿用现有内容模型。283 项业务和 14 项 HTTP 检查通过，原生测试包已更新，真实听审与设备音频仍未完成。见 <a href="qa/content-readiness-v0.28.md">缺口清单</a> 和 <a href="qa/content-readiness-v0.28-qa.md">验收</a>。</p>
+</blockquote>
+<blockquote>
+<p>实施补充（v0.29）：原生播放器无法加载已验证声音时，保留文字说明并允许继续；安全存储读取失败时进入封闭重试页。iOS 模拟器启动诊断确认当前测试包缺 Keychain 权限（<code>-34018</code>），身份与声音设备流程不能验收；后续需要具备相应权限的开发签名。见 <a href="qa/audio-fallback-v0.29-qa.md">本批验收</a>。</p>
+</blockquote>
+<blockquote>
+<p>实施补充（v0.27）：两端生活目标接通稳定历史分页、当前目标单列、旧页撤回答案及后台读取代次保护；旧接口保留、schema 仍为 25。282 项业务和 14 项 HTTP 检查通过，独立 PostgreSQL 本批因 Docker 环境未启动。设计见 <a href="FAMILY-LIFE.md">家庭生活目标</a>，安装包与准确验收范围见 <a href="qa/life-history-v0.27.md">本批记录</a>。</p>
+</blockquote>
+<blockquote>
+<p>实施补充（v0.26）：两端家长记录接通稳定翻页、微秒精度和局部失败提示，Web 按需加载记录区；schema 保持 25。实现与边界见 <a href="FAMILY-HISTORY.md">家庭历史设计</a>，功能证据见 <a href="qa/history-v0.26.md">本批验收</a>。两平台安装包及 iOS 安装核验已补交，原生 UI 仍待验收，见 <a href="qa/native-package-v0.26.md">原生交付</a>。</p>
+</blockquote>
+<blockquote>
+<p>实施补充（v0.25）：家庭 Web 新增小屏四入口导航、完整菜单及键盘焦点管理；schema 仍为 25，无新依赖。本批构建和浏览器交互检查通过，完整套件及原生安装包证据仍属 v0.24。见 <a href="COMPACT-FAMILY.md">小屏交互设计</a> 与 <a href="qa/compact-family-v0.25.md">验收记录</a>。</p>
+</blockquote>
+<blockquote>
+<p>实施补充（v0.24）：家长课与生活任务接通按年龄的双语版本、方法/中文/英文三项独立审阅、签名发布、召回与历史版本保留；迁移至 schema 25。264 项业务、12 项 HTTP、15 项 PostgreSQL 检查通过。见 <a href="FAMILY-CONTENT.md">家庭内容发布设计</a> 与 <a href="qa/family-content-v0.24.md">当前验收</a>。真实专业审阅、正式身份与监护同意、原生真机及家庭研究仍未完成。</p>
+</blockquote>
+<p>设计基线 1.0 / 2026-09-30。技术选型是建议，不表示相关依赖已安装或服务已运行。详细依赖版本在启动实施时锁定到通过安全检查的稳定版本。</p>
+<h2 id="technical-h2">1. 现有代码评估与迁移</h2>
+<p>本节记录设计起点的原生 JavaScript + 静态 Node 原型；动态实现进度以 <a href="IMPLEMENTATION.md">实施账本</a> 为准。原型不能直接接入付费后上线。核查覆盖 <code>src/core.js</code>、<code>src/app.js</code>、音频清单、服务端脚本与现有测试。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>当前资产/问题</th>
+<th>事实</th>
+<th>迁移决策</th>
+<th>验收</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>三个任务核心规则</td>
+<td>纯函数与页面逻辑已有初步分离</td>
+<td>将规则迁入纯 TypeScript 引擎，保留旧样例作对照</td>
+<td>相同输入得相同事件与结果</td>
+</tr>
+<tr>
+<td>难度判断</td>
+<td>三级；最近两次合格记录达到 85% 升级，搜索/记忆每次仅 3 轮</td>
+<td>按任务、条件和有效样本窗口调整</td>
+<td>三轮全对不能触发正式算法升级</td>
+</tr>
+<tr>
+<td>课程安排</td>
+<td>用自然年周数模 4</td>
+<td>建立个人 enrollment，按实际单元完成推进</td>
+<td>跨年、漏练、跨时区不跳课</td>
+</tr>
+<tr>
+<td>本地数据</td>
+<td>localStorage 单使用者，最多各 100 条记录</td>
+<td>保留成人可导出；新平台提供显式迁移</td>
+<td>不自动把旧记录分给某个孩子</td>
+</tr>
+<tr>
+<td>统计展示</td>
+<td>历史任务记录可混合不同条件</td>
+<td>按协议、难度、提示、设备模式分组</td>
+<td>不混成一个能力总分</td>
+</tr>
+<tr>
+<td>顺序语音</td>
+<td>「听一遍顺序」播放泛化指令，没有读本次物品序列</td>
+<td>语音词表与序列事件绑定</td>
+<td>每个随机序列的播放顺序与字幕一致</td>
+</tr>
+<tr>
+<td>过桥纠错语音</td>
+<td>漏点兔子也可能播放狐狸等待提示</td>
+<td>按错误类型使用独立素材</td>
+<td>四类结果逐项核对文字与声音</td>
+</tr>
+<tr>
+<td>音频生命周期</td>
+<td>播放失败、取消与忙碌状态缺少统一控制</td>
+<td>独立播放器状态机和取消令牌</td>
+<td>暂停/换页/失败不会残留禁用按钮或串音</td>
+</tr>
+<tr>
+<td>16 段 Azure MP3</td>
+<td>只覆盖一部分固定流程，用户已认可中文音色</td>
+<td>保留音色基线，建立完整覆盖清单</td>
+<td>每个年龄、语言、状态都有批准文案与回退路径</td>
+</tr>
+<tr>
+<td>方法说明</td>
+<td>部分页面残留实时语音/模型的旧说明</td>
+<td>文案与架构单一来源</td>
+<td>页面描述与运行时网络请求相符</td>
+</tr>
+<tr>
+<td>图片与精灵</td>
+<td>已有生成图片，但尚无正式资产质量门槛</td>
+<td>做成统一资产包，重新检查识别、裁切、体积、授权来源</td>
+<td>小屏、低性能设备、色觉差异测试通过</td>
+</tr>
+<tr>
+<td>静态服务</td>
+<td>本机绑定、无业务 API、无身份与健康检查</td>
+<td>原型留作演示；另建生产平台</td>
+<td>禁止把演示服务直接当公网后端</td>
+</tr>
+</tbody></table></div>
+<p>设计起点的 20 项自动测试和语法检查通过；未覆盖生产权限、真实浏览器所有交互、全球适龄性或效果。迁移不得将旧数据伪装成使用新协议采集的基线。</p>
+<h2 id="technical-h3">2. 总体架构与选型</h2>
+<h3 id="technical-h4">2.1 系统结构</h3>
+<figure class="diagram"><figcaption>系统结构 · 公共内容与家庭数据分别管理</figcaption><div class="arch-row"><div>儿童 / 青少年客户端<small>共享任务引擎 · 本地队列</small></div><div>家长 Web / App<small>家庭目标 · 报告 · 权益</small></div><div>内容制作与人工审核<small>固定语音 · 图片 · 协议</small></div></div><div class="arch-arrow" aria-hidden="true">↓</div><div class="arch-row"><div class="accent">区域 API 与身份服务<small>家庭权限 · 同意 · 会话校验</small></div><div class="accent">签名内容包与媒体 CDN<small>仅公开内容 · 不含儿童记录</small></div></div><div class="arch-arrow" aria-hidden="true">↓</div><div class="arch-row"><div>区域数据库<small>结果重算 · 家庭记录</small></div><div>异步任务<small>报告 · 导出 · 删除</small></div><div>支付渠道<small>验签 · 去重 · 权益</small></div></div><details><summary>查看完整关系定义</summary><pre><code>flowchart TB
+  C[儿童 / 青少年客户端] --&gt; E[共享纯 TypeScript 任务引擎]
+  P[家长 Web / App] --&gt; G[区域 API 与身份服务]
+  C --&gt; G
+  E --&gt; L[本地任务缓存与待同步事件]
+  L --&gt; G
+  G --&gt; F[家庭 / 同意 / 课程 / 权益模块]
+  G --&gt; S[会话校验与结果重算]
+  F --&gt; D[(区域 PostgreSQL)]
+  S --&gt; D
+  G --&gt; J[后台任务队列]
+  J --&gt; R[周报 / 导出 / 删除 / 通知]
+  A[内容制作与人工审核] --&gt; B[签名内容包与媒体 CDN]
+  B --&gt; C
+  A --&gt; V[一次性 TTS 与素材制作]
+  W[渠道支付通知] --&gt; F</code></pre></details></figure>
+<p>建议 <strong>模块化单体后端 + 独立异步工作进程</strong>。同一业务代码库内划分清楚权限与事务边界；数据规模或团队边界证明需要后再拆服务。无需第一天搭建复杂微服务平台。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>层</th>
+<th>建议</th>
+<th>原因与边界</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Web</td>
+<td>React + TypeScript，家长端与浏览器训练端</td>
+<td>支持响应式布局、可访问性和快速评审；保持语义化 DOM</td>
+</tr>
+<tr>
+<td>移动端</td>
+<td>React Native，共享协议、算法、数据模型</td>
+<td>原生音频、缓存和商店支付；不假设 Web 与原生计时完全一致</td>
+</tr>
+<tr>
+<td>引擎</td>
+<td>纯 TypeScript，无 UI、网络和系统时钟依赖</td>
+<td>随机种子、时钟和输入可注入，便于回放</td>
+</tr>
+<tr>
+<td>服务端</td>
+<td>Node.js LTS + TypeScript；Fastify 或团队现有受支持框架</td>
+<td>启动时确定一种，核心领域不依赖框架</td>
+</tr>
+<tr>
+<td>数据</td>
+<td>托管 PostgreSQL + 对象存储</td>
+<td>事务、关系约束、区域备份；对象存储负责媒体/临时导出</td>
+</tr>
+<tr>
+<td>队列</td>
+<td>初期数据库任务队列，满足负载后再引入托管队列/Redis</td>
+<td>支付、报告与删除任务均幂等</td>
+</tr>
+<tr>
+<td>内容管理</td>
+<td>结构化表单、预览、差异审核、签名发布</td>
+<td>管理员 MFA，编辑与批准分权</td>
+</tr>
+<tr>
+<td>可观测性</td>
+<td>第一方指标、结构化脱敏日志、必要崩溃报告</td>
+<td>默认不记录孩子文本、请求正文、屏幕回放或广告标识</td>
+</tr>
+</tbody></table></div>
+<p>儿童版与青少年版可以共享仓库、任务引擎和家庭权益，但 UI、内容包与商店声明独立验证。第一阶段浏览器完成协议验证，原生团队同步建设壳层与设备测试；不得等到全部 Web 完成才研究原生音频和计时差异。</p>
+<h3 id="technical-h5">2.2 推荐目录</h3>
+<pre><code class="language-text">apps/family-web/           家长与网页练习
+apps/kids-mobile/          儿童体验
+apps/teen-mobile/          青少年体验
+apps/api/                  区域业务 API
+apps/worker/               报告、同步处理、删除、通知
+apps/content-admin/        编辑、审核、发布
+packages/task-engine/      状态机、生成器、评分
+packages/contracts/        API、事件和内容模式
+packages/policy/           年龄、地区、权限策略
+packages/content/          审核后的版本化元数据
+packages/audio/            平台播放器接口与素材索引
+packages/design-tokens/    字体、颜色、间距与动效约束
+infra/                     区域部署、监控、备份
+research/                  独立受控分析代码，不含原始受试者资料
+</code></pre>
+<h3 id="technical-h6">2.3 地区与数据边界</h3>
+<p>至少规划美国、欧洲、中国大陆三类区域部署能力；英国是否采用欧洲区域，由具体供应商与跨境安排决定。此为降低复杂度与风险的设计选择，不宣称 GDPR 普遍要求全部本地化。</p>
+<p>全球公共层仅分发公开内容包、翻译与版本信息。家庭身份、同意、训练、账单映射、客服工单和备份留在批准区域；地域路由用最小化的不透明标识，仍按可能关联个人的信息管理。认证供应商和监控也必须纳入区域数据流，不能只把数据库放在当地就称作数据不出境。</p>
+<p>客户端改变语言不迁移区域。跨区域迁移是重新取得必要同意、核对接收方与权限、加密导出导入、验证与清理的独立工作流，首版可由支持团队人工执行。中国大陆采用独立配置、密钥、域名与供应商链路，商业开放依赖分类审查。</p>
+<h2 id="technical-h7">3. 任务引擎与计时</h2>
+<h3 id="technical-h8">3.1 状态机</h3>
+<figure class="diagram"><figcaption>一次任务的状态流转</figcaption><div class="state-flow"><span><b>1</b>资源与权限检查</span><span><b>2</b>说明与练习</span><span><b>3</b>主动开始</span><span><b>4</b>呈现 → 输入</span><span><b>5</b>反馈与休息</span><span><b>6</b>摘要 → 同步确认</span></div><p class="diagram-note">各环节均可结束。失焦或暂停使当前试次失效，恢复时重做；撤回授权后停止继续采集。</p><details><summary>查看完整状态定义</summary><pre><code>stateDiagram-v2
+  [*] --&gt; Preflight
+  Preflight --&gt; Explain: 权限与资源就绪
+  Explain --&gt; Practice
+  Practice --&gt; Explain: 尚未理解
+  Practice --&gt; Ready: 理解检查通过
+  Ready --&gt; Stimulus: 用户主动开始
+  Stimulus --&gt; Response
+  Response --&gt; Feedback
+  Feedback --&gt; Ready: 还有有效试次
+  Feedback --&gt; Rest: 当前短块完成
+  Rest --&gt; Ready: 用户继续下一块
+  Rest --&gt; Summary: 计划完成或达到上限
+  Stimulus --&gt; Paused: 失焦或用户暂停
+  Response --&gt; Paused: 失焦或用户暂停
+  Paused --&gt; Ready: 新试次重做
+  Summary --&gt; PendingSync
+  PendingSync --&gt; Completed: 服务端校验完成</code></pre></details></figure>
+<p>所有状态都允许退出到 Aborted；受权限撤回、内容召回或数据删除影响时进入 Revoked。Aborted 保留有效的已完成块，Revoked 不继续上传训练事件。计时任务不可通过关闭退出按钮强行完成。</p>
+<h3 id="technical-h9">3.2 计时与有效性规则</h3>
+<ul>
+<li>使用单调时钟记录试次内相对时间；服务端时间用于接收与账务，不替代客户端反应时。墙上时钟仅作课程日期参考。</li>
+<li>页面布局和素材就绪后，在确认绘制的时点记录视觉 onset；听觉任务在音频实际播放回调记录 onset。音频资源下载开始不能算刺激出现。</li>
+<li>屏幕刷新、触控输入、蓝牙音频延迟、设备负载都会影响测量；设备模式与渲染/音频异常随试次记录。不得宣传毫秒级临床精度或直接跨设备比较。</li>
+<li>前后台切换、系统打断、资源失败、明显帧异常时，将该试次标记 <code>interrupted</code> 或 <code>technical_invalid</code>；不作为漏反应，不进入难度计算。</li>
+<li>同一试次仅接受协议允许的输入；重复点击按原始输入保留并由评分器处理，不能简单在客户端丢弃后声称没有冲动误触。</li>
+<li>练习、正式练习、固定测量分别标记 <code>mode</code>。提示后形成 <code>assisted</code> 试次，允许继续，不混入首次独立表现。</li>
+<li>正式测量固定时序、种子策略与参数，训练自适应不可修改测量协议。</li>
+</ul>
+<p>随机算法与种子版本固定；服务端发放计划种子及内容版本，可重建目标序列。客户端事件记录呈现结果、输入与异常，服务端重算得分。此机制能发现程序错误或不一致，<strong>不能证明实际操作人就是孩子，也不能阻止所有客户端伪造</strong>。</p>
+<h3 id="technical-h10">3.3 首个协议实现的参数起点</h3>
+<p>以下值是供科学负责人评审与仿真的草案，尚未验证适合全部年龄。每次默认一个核心任务、两个短块，年龄化示范与生活活动另计；可在额度内组合任务，但不能为了凑算法样本数延长当天练习。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>任务</th>
+<th>入门短块</th>
+<th>练习理解检查</th>
+<th>第一维升级候选</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>搜索</td>
+<td>4 个阵列，每阵列 6 项、1–2 个目标；自定提交；零目标轮需单独教过后开放</td>
+<td>连续两个示例能找全且无误选；提示后再试</td>
+<td>阵列由 6 到 9 项，暂不改相似度或加倒计时</td>
+</tr>
+<tr>
+<td>抑制</td>
+<td>12 次，8 Go/4 No-Go；最长同类连串 3；入门窗口 3.6 秒、间隔 1 秒</td>
+<td>对 Go 和 No-Go 各成功两次，错误类型独立解释</td>
+<td>先增加材料变化；加速必须采用单独审核的下一参数档</td>
+</tr>
+<tr>
+<td>顺序记忆</td>
+<td>4 个序列，每个 2 项，不重复；先自定编码；物品词表先确认理解</td>
+<td>两个不同顺序能独立复现</td>
+<td>长度 2 到 3 项；编码方式和延迟保持不变</td>
+</tr>
+<tr>
+<td>持续留意</td>
+<td>12 次短呈现，4 目标/8 非目标；每次 3 秒、间隔 1 秒；不超过 48 秒</td>
+<td>先分别示范目标变化与无变化，再完成一个 4 次练习块</td>
+<td>增加少量呈现次数，目标/非目标比例和反应窗口保持</td>
+</tr>
+</tbody></table></div>
+<p>日额度以 enrollment 的家庭时区和孩子为单位，由服务端原子保留，设备租约携带剩余额度；本地单调时钟累计并落盘，重开、换设备或更改系统时间不直接补回额度。时区变更设冷却并保留当天已消耗量；系统应允许家长降低额度。边界遇到无时限题目时先停止新刺激，提供结束/保存，不突然用失败音截断。</p>
+<h2 id="technical-h11">4. 自适应难度：保守、可解释、可复现</h2>
+<h3 id="technical-h12">4.1 先分开计算不同结果</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>任务</th>
+<th>主要指标</th>
+<th>禁止的简化</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>搜索</td>
+<td>命中率 = 命中/目标数；误选率 = 误选/非目标数；整轮准确率</td>
+<td>不把点击次数多视为积极表现；零分母返回空值</td>
+</tr>
+<tr>
+<td>Go/No-Go</td>
+<td>命中率与正确等待率；平衡准确率 = 两者平均</td>
+<td>不以总正确率让「一直等待」获得高评价</td>
+</tr>
+<tr>
+<td>顺序记忆</td>
+<td>完整序列正确率；位置匹配率；是否辅助</td>
+<td>不将二项与五项序列、视觉与听觉混合</td>
+</tr>
+<tr>
+<td>持续留意</td>
+<td>目标命中、非目标误报、按段表现、有效时长</td>
+<td>不能从十几次短任务估计临床持续注意水平</td>
+</tr>
+</tbody></table></div>
+<p>反应时仅汇总有效正确反应的中位数和分布，需同时展示正确性；极短反应标记是否为提前输入，阈值按协议预定。小样本不输出 d′、年龄百分位或伪精确能力值。</p>
+<h3 id="technical-h13">4.2 首版策略 v1 的完整规则</h3>
+<ol>
+<li>先通过理解检查和设备检查。初始参数取该年龄/协议的保守起点，适配需要可进一步降低，不依据诊断标签推断难度。</li>
+<li>每块结束后选取<strong>当前协议、模态、设备类别和相同难度</strong>下的有效独立数据；最多回看最近 14 天 3 次会话。中断或辅助块不作为失败，但不能被跳过后持续选择远期好成绩。</li>
+<li>最低样本：搜索 12 个完整阵列、且至少 24 个目标机会；记忆 20 个完整序列；抑制至少 40 个 Go 和 20 个 No-Go；持续留意至少 20 个目标和 40 个非目标。均需覆盖至少两次会话；不要求在一次练习内凑够。</li>
+<li>升级须满足：主要成功率 ≥85%，关键错误率 ≤10%，且主要成功率的 80% Wilson 区间下界 ≥70%；双类别任务分别检查两类，不只看均值。阈值与置信水平是产品假设，需仿真和试用校准，不是心理测量常模。</li>
+<li>降级：同条件有效独立块连续两块主要成功率 &lt;60%，或者孩子主动选「简单一点」。用户求助立即生效，无需等待样本量。升级证据不足时保持，不能因不升级提醒孩子「落后」。</li>
+<li>连续 3 个明确错误时先暂停并解释，不直接推断疲劳或注意缺陷。孩子自报累/不想继续时停止，系统不凭反应时给情绪标签。</li>
+<li>每次只改一个维度，且最多一步；升级最多每个任务每次会话一次。视觉复杂度、序列长度与时间窗口不能同时变化。</li>
+<li>换设备、改模态、规则更新或阈值变更，建立新的可比序列；新版本需要桥接验证，不能把差异画成能力变化。</li>
+</ol>
+<pre><code class="language-text">decideNext(block, history, policy):
+  if childRequestsStop or hardLimitReached: return STOP
+  if childRequestsHelp: return EASIER_OR_DEMO
+  if comprehensionUncertain or repeatedErrors: return EXPLAIN
+  window = comparableIndependentWindow(history, block, policy)
+  if twoLowValidBlocks(window): return LOWER_ONE_DIMENSION
+  if not enoughEvidence(window): return HOLD
+  if upgradeConditions(window) and not upgradedThisSession:
+      return RAISE_ONE_DIMENSION
+  return HOLD
+</code></pre>
+<p>每次保存输入窗口摘要、策略版本、决定和原因码，例如 <code>HOLD_INSUFFICIENT_NO_GO</code>。家长可见「继续巩固等待规则」，无需展示统计术语；研究和审计可回放决定。早期不使用黑箱强化学习或大模型决定难度。</p>
+<p>实现约定：Wilson 下界使用双侧 80% 区间，z=1.281551566，p=k/n，计算 <code>(p + z²/(2n) - z·sqrt(p(1-p)/n + z²/(4n²))) / (1 + z²/n)</code>；n=0 返回空值。这里的区间只衡量所选试次比例的不确定性，试次间并非完全独立，不能把它解释为心理能力的置信区间。仿真同时检查这种简化造成的升级偏差。</p>
+<h2 id="technical-h14">5. 数据模型与权限</h2>
+<h3 id="technical-h15">5.1 核心实体</h3>
+<p>所有个人记录包含区域、创建时间、版本和必要的删除状态；UUID 不能替代权限控制。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>实体</th>
+<th>关键字段</th>
+<th>约束</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>Guardian</td>
+<td>id, region, auth_subject, verified_status</td>
+<td>成人身份与儿童训练身份分开</td>
+</tr>
+<tr>
+<td>Family</td>
+<td>id, region, billing_owner_id</td>
+<td>付款权不自动授予全部数据权</td>
+</tr>
+<tr>
+<td>Membership</td>
+<td>family_id, guardian_id, role, child_scope, revoked_at</td>
+<td>邀请需验证、到期、单次接受；撤销立即生效</td>
+</tr>
+<tr>
+<td>ChildProfile</td>
+<td>id, family_id, alias, birth_month/year, age_policy, locale</td>
+<td>不要求实名；若年龄边界需精确确认，单独完成，默认采用更严格策略</td>
+</tr>
+<tr>
+<td>ConsentReceipt</td>
+<td>purpose, legal_basis, policy_version, verifier_ref, granted/withdrawn_at</td>
+<td>记录谁对什么目的确认；不留存验证证件副本</td>
+</tr>
+<tr>
+<td>SharingPolicy</td>
+<td>child_id, viewer_id, field_scope, version</td>
+<td>按年龄、当地权利和家庭选择共同约束</td>
+</tr>
+<tr>
+<td>Enrollment</td>
+<td>child_id, curriculum_version, started_at, unit, timezone</td>
+<td>按个人进度，不按自然年周次</td>
+</tr>
+<tr>
+<td>Session</td>
+<td>child_id, pack_version, policy_version, seed, mode, lease, state</td>
+<td>单个孩子同时仅一个计入计划的会话</td>
+</tr>
+<tr>
+<td>Trial/Event</td>
+<td>session_id, trial_id, event_id, seq, monotonic_ms, type, payload</td>
+<td>唯一事件 ID、会话内唯一序号、严格类型与大小限制</td>
+</tr>
+<tr>
+<td>BlockResult</td>
+<td>session_id, scorer_version, denominators, validity, provenance</td>
+<td>服务端计算；结果可追溯重算</td>
+</tr>
+<tr>
+<td>TransferObservation</td>
+<td>child_id, goal_id, context_enum, reminder_count, reporter</td>
+<td>初期结构化记录，不收集学校名、教师姓名或日记</td>
+</tr>
+<tr>
+<td>Entitlement</td>
+<td>family_id, channel, product, state, valid_until, revision</td>
+<td>由验证后的交易更新，孩子不能自行提交付费成功</td>
+</tr>
+<tr>
+<td>ContentRelease</td>
+<td>pack_id/version, sha256, reviewer_ids, status</td>
+<td>已发布版本不可原地修改</td>
+</tr>
+<tr>
+<td>DeletionJob</td>
+<td>scope, processors, steps, retry, completed_at</td>
+<td>删除覆盖副本、队列、导出和恢复流程</td>
+</tr>
+</tbody></table></div>
+<p>研究数据使用独立身份映射与访问域，研究同意独立记录；去掉姓名后仍可能关联个人，不能直接称为匿名数据。</p>
+<h3 id="technical-h16">5.2 权限矩阵</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>身份</th>
+<th>训练</th>
+<th>看家庭摘要</th>
+<th>原始数据/导出</th>
+<th>付款</th>
+<th>管理同意/成员</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>儿童会话</td>
+<td>仅本人、已获准任务</td>
+<td>适龄本人结果</td>
+<td>通过适龄权利流程</td>
+<td>无</td>
+<td>无</td>
+</tr>
+<tr>
+<td>青少年</td>
+<td>本人</td>
+<td>本人及共享设置范围</td>
+<td>按当地权利与验证流程</td>
+<td>无</td>
+<td>可表达意愿；法定权利独立处理</td>
+</tr>
+<tr>
+<td>经验证监护人</td>
+<td>发放授权</td>
+<td>仅授权儿童范围</td>
+<td>需重新验证及权利检查</td>
+<td>仅有账务角色者</td>
+<td>依法有权且权限明确者</td>
+</tr>
+<tr>
+<td>受邀照护人</td>
+<td>协助被授权孩子</td>
+<td>最小共享范围</td>
+<td>默认无</td>
+<td>默认无</td>
+<td>无权提升自己</td>
+</tr>
+<tr>
+<td>客服</td>
+<td>无</td>
+<td>默认无；申请临时授权</td>
+<td>无批量导出</td>
+<td>仅必要账务状态</td>
+<td>特殊事项双人审批</td>
+</tr>
+<tr>
+<td>内容编辑/研究员</td>
+<td>无家庭访问</td>
+<td>无</td>
+<td>仅独立批准研究范围</td>
+<td>无</td>
+<td>无</td>
+</tr>
+</tbody></table></div>
+<p>家长区入口的算术题或长按只能防误触，不能代替身份认证或可验证监护同意。支付、导出、邀请、撤销同意和查看敏感信息需服务器验证的成人会话与必要重新认证。</p>
+<p>Web 用 Secure/HttpOnly/SameSite cookie 与 CSRF 防护；原生令牌放系统安全存储。儿童模式使用绑定特定 child_id、权限和期限的令牌，不保留成人高权限会话。数据库 RLS 作第二道隔离，应用连接角色不能是表所有者或 BYPASSRLS；使用事务内设置上下文并测试连接池复用。<a href="https://www.postgresql.org/docs/current/ddl-rowsecurity.html">PostgreSQL 行级安全</a></p>
+<p>核心 OpenAPI 草案展示原生端的儿童 Bearer 凭据。Web 由同源会话网关把 HttpOnly 儿童会话映射到相同的内部作用域，不能为了复用示例把成人令牌搬到 localStorage。平台提供的年龄范围与监护信号纳入政策适配器，在支持地区减少生日采集；这些信号不自动替代所有处理目的的合法依据或监护同意。<a href="https://developer.apple.com/kids/">Apple 适龄体验接口说明</a></p>
+<h2 id="technical-h17">6. API、离线与同步</h2>
+<p>核心机器可读草案见 <a href="contracts/openapi.yaml">OpenAPI</a>。以下规则对 Web 与原生一致。</p>
+<h3 id="technical-h18">6.1 会话事务</h3>
+<ol>
+<li>创建会话：验证地区/年龄/同意/成员关系/权益/内容发布状态，用 <code>Idempotency-Key</code> 请求。服务端返回 session_id、计划种子、冻结的版本、离线授权到期时间与事件限制。</li>
+<li>本地逐事件落盘，再向界面显示「已在此设备保存」。建议每完成试次写一次事务；事件上传可按块或最多 100 条/256 KiB 批量发送。</li>
+<li>同步事件：服务端先验权，再校验版本、类型、会话归属和序号；重复 ID 且规范化内容一致返回已接收；同 ID 不同内容返回冲突，禁止覆盖。</li>
+<li>结束提交：客户端提交最后序号 <code>last_seq</code> 和完成原因。服务端确认 1..last_seq 连续、必需事件完整后重算；缺失返回 409 和范围，客户端补传后重试。明确零事件放弃的请求独立处理。</li>
+<li>结果页本地可以先展示标注为「待同步」的结果；只有服务端确认的版本进入跨设备周报。结束重复提交得到同一结果，不二次累计。</li>
+</ol>
+<p><code>seq</code> 是传输完整性依据，不是可信墙上时间。服务端接受乱序到达但不接受重复序号不同事件；不允许客户端直接上传「得分 95」作为事实。删除/撤销检查优先于幂等重放，旧请求不能复活已删除档案。</p>
+<h3 id="technical-h19">6.2 离线授权与冲突</h3>
+<ul>
+<li>下载的公共训练内容可长期缓存，私人事件放 IndexedDB/原生加密存储；缓存可能被系统清理，应明确尚未同步的数据风险。<a href="https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria">浏览器存储配额与清理</a></li>
+<li>首版仅允许已在线授权的会话在限定窗口离线继续，授权最长 24 小时且受预计时长约束；无有效授权时可进入不记录个人数据的公共示范，不自行创建计入课程的新会话。</li>
+<li>离线令牌不含姓名等资料，签名并绑定档案、设备、版本和范围。离线无法即时感知撤销，界面如实说明；联网先检查撤销/删除，再处理 outbox。不得承诺能即时擦除永不联网的设备。</li>
+<li>为避免两台设备重复推进，一名孩子只允许一个有效训练租约；第二台可只读进度或确认接管，接管会使旧会话失去计入计划资格。旧设备数据仅在仍有合法处理依据时进入带来源的练习记录，不合并伪装成连续一次。</li>
+<li>自适应状态、课程单元采用服务器版本号与 compare-and-swap；过期客户端不能覆盖新决定。用户目标、共享范围更新用 If-Match，冲突时显示两份选择，由成人/有权用户确认。</li>
+<li>Service Worker 仅缓存公开静态资源，不缓存私人 API 响应；退出家庭、切换档案、成员撤销和删除时清理对应本地命名空间。活跃试次中不强行升级 Service Worker。</li>
+<li>超过 7 天的未同步事件按已告知策略清理；到期前提醒家长设备有未同步记录。失去同意后的事件不继续收集；必要的删除状态查询与用户权利处理须有独立合法依据。</li>
+</ul>
+<h3 id="technical-h20">6.3 其他业务接口边界</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>接口族</th>
+<th>关键行为</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><code>/families</code>, <code>/memberships</code>, <code>/children</code></td>
+<td>成人权限、地区与版本检查；禁止 ID 越权</td>
+</tr>
+<tr>
+<td><code>/consents</code>, <code>/sharing-policies</code></td>
+<td>目的独立、证据版本化、撤回实时失效</td>
+</tr>
+<tr>
+<td><code>/plans</code>, <code>/content-releases</code></td>
+<td>仅下发已批准年龄/语言/地区组合</td>
+</tr>
+<tr>
+<td><code>/observations</code>, <code>/reports</code></td>
+<td>报告由确定规则生成，显示分母与缺失</td>
+</tr>
+<tr>
+<td><code>/exports</code>, <code>/deletions</code></td>
+<td>成人/主体权利验证、异步处理、下载短期有效</td>
+</tr>
+<tr>
+<td><code>/billing/webhooks</code></td>
+<td>签名验证、事件去重、订单校验、退款与恢复</td>
+</tr>
+</tbody></table></div>
+<p>所有 API 统一错误码、request_id、速率限制、输入长度和结构校验。错误日志不写入令牌、密钥、原始儿童文本或支付凭据。租户信息来自验证后的会话与关系查询，不能相信请求头自报的 family_id。</p>
+<h2 id="technical-h21">7. 内容、图片与语音生产线</h2>
+<h3 id="technical-h22">7.1 内容发布</h3>
+<p>流程：任务协议 → 文案 → 适龄/跨文化审稿 → 素材制作 → 自动检查 → 人工试听/试玩 → 双人批准 → 签名不可变包 → 灰度 → 监控与召回。</p>
+<p>内容包含 task_version、policy_version、locale、年龄范围、刺激定义、随机化、参数上下限、字幕、音频映射、生活活动、资源校验值与审核记录。发布人不能同时是唯一批准人。示例见 <a href="contracts/content-pack.example.json">内容包草案</a>。</p>
+<p>客户端只解释受限数据，不从内容包执行 JavaScript。策略参数超界、签名不符、依赖不兼容或未批准区域时拒绝加载。会话锁定包版本；正常更新在下一会话生效，安全召回则暂停并解释。</p>
+<h3 id="technical-h23">7.2 语音</h3>
+<p>延续 <code>zh-CN-XiaoxiaoNeural</code> 作为中文候选主音色，保留现有用户认可的试听样本作参考。语音生成在受控制作环境一次完成；运行时只播放素材。生产工具的密钥保存在密钥管理服务，浏览器、Git、构建产物和日志不包含密钥；既往在聊天或其他非密钥系统出现的凭据应进入轮换清单。</p>
+<p>不把孩子姓名、表现、家长自由文本传给 TTS。英语及其他语言选音色后由母语审稿人试听，不把翻译文本批量生成成功当成可用。云 TTS 只发送固定文案，供应商合同与其他业务数据流仍需单独评估。<a href="https://learn.microsoft.com/zh-cn/azure/ai-services/speech-service/rest-text-to-speech">Azure 文本转语音接口</a></p>
+<p>每条素材记录 text_id、规范文本、voice、locale、SSML 版本、生成工具版本、文件 hash、时长、响度、授权来源、审核人。字幕与声音共用一条文案源，不各自手写。</p>
+<p>顺序任务先制作完整词表，以稳定停顿拼接已审核物品名；如拼接效果不自然，按受限任务空间离线生成完整序列音频，不能运行时调云服务。较长序列需限制组合空间并记录词汇熟悉度；儿童不知道图案名称时先教学或更换词表。</p>
+<p>播放器仅有一个活动通道，支持 prepare/play/stop/replay/fail 状态，使用 generation token 丢弃过期回调。点击重播、换页、暂停时同步清理队列与 busy；播放失败只触发一次回退。听觉测量模式播放失败即标无效；普通引导可用字幕继续。系统 TTS 仅作家长明确选择的便利功能，声音来源与可能联网情况需说明，不作为正式测量的默认回退。</p>
+<p>质量门槛：无削波与明显底噪、句首句尾不裁断、各段音量稳定、词序与字幕 100% 对应；响度初始目标 -18 LUFS 左右、真峰值 ≤-1 dBTP 是工程制作假设，短语还需实际设备试听。不同语言不要强行同一语速；验证儿童理解和听觉舒适度。</p>
+<h3 id="technical-h24">7.3 图片与本地化</h3>
+<p>图像资产必须有源文件、授权与生成记录、尺寸、透明区域、锚点、碰撞区、缩略图和低带宽版本。训练刺激优先保证边缘清晰、亮度/大小可控，装饰性的精致程度不能使目标比干扰物天然更显眼。</p>
+<p>四套年龄内容至少各有一套完整示范、正式刺激与生活活动。英语和中文使用 ICU 消息、复数/长度测试、字体覆盖；RTL 布局预留但未审稿前不宣称支持。刺激左右顺序在 RTL 语言下是否镜像，属于协议决定，不能由 CSS 自动改变。</p>
+<p>媒体预算假设：首屏压缩资源 ≤1.5 MB，首个离线训练包 ≤20 MB，后续按需下载；以真实中低端 Android/iPad、弱网、静音、蓝牙与大字号检查。下载进度和重试清楚可见。</p>
+<h2 id="technical-h25">8. 隐私、安全与数据生命周期</h2>
+<h3 id="technical-h26">8.1 最小采集</h3>
+<p>不默认采集精确位置、摄像头、麦克风、广告 ID、学校或诊断资料。年龄以满足适龄与法律判断所需的最小信息收集；生日临界需要确认时使用专门流程。诊断等研究资料放独立受控系统，不作为商业推荐标签。</p>
+<p>可验证监护同意是目的与法域相关的业务流程，不能只用勾选框。优先使用适用的验证供应商，保存方法、交易引用与结果，避免自己储存身份证件。营销同意、研究同意与提供核心服务所需处理分别管理，不以拒绝营销阻止孩子练习。</p>
+<h3 id="technical-h27">8.2 留存设计初稿</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>数据</th>
+<th>初始留存建议</th>
+<th>删除与验证</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>原始训练事件</td>
+<td>90 天；按目的必要性复核</td>
+<td>汇总后定期清理，研究另有独立同意与期限</td>
+</tr>
+<tr>
+<td>家庭训练摘要与生活记录</td>
+<td>默认滚动 12 个月，家长可提前删除</td>
+<td>删除不能只隐藏图表，需清除关联数据</td>
+</tr>
+<tr>
+<td>本地未同步队列</td>
+<td>最长 7 天，失去处理资格立即停止上传并清理</td>
+<td>断网设备下次启动/联网执行，并说明技术限制</td>
+</tr>
+<tr>
+<td>临时导出</td>
+<td>7 天后删除，下载链接最长 15 分钟有效</td>
+<td>下载须验证请求者，存储禁止公开访问</td>
+</tr>
+<tr>
+<td>备份</td>
+<td>初始滚动 35 天</td>
+<td>恢复时先重放删除清单，不复活已删除档案</td>
+</tr>
+<tr>
+<td>账务/同意/安全审计</td>
+<td>按地区法定义务与证明必要性另设期限</td>
+<td>与训练库分离，仅保留最少字段，不借此无限保存训练数据</td>
+</tr>
+</tbody></table></div>
+<p>上述期限是产品设计建议，最终由目的、法规与研究方案决定。常规删除服务目标 30 天内完成，适用法定时限优先；备份清理周期和例外提前告知。拒绝无限期保存用于「将来可能训练 AI」。</p>
+<p>删除事务：冻结新写入 → 撤销令牌/会话/共享链接 → 建立最小删除标记 → 清理数据库、对象、队列、缓存、报表及供应商副本 → 标记备份到期与恢复过滤 → 生成可审计结果。删除标记也要限定字段与保留目的。</p>
+<h3 id="technical-h28">8.3 重点威胁与测试</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>威胁</th>
+<th>控制</th>
+<th>必测场景</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>家庭 A 访问 B 的孩子</td>
+<td>服务端关系校验、RLS、对象级授权</td>
+<td>改 URL ID、批量事件、报告导出、缓存复用</td>
+</tr>
+<tr>
+<td>儿童进入成人敏感操作</td>
+<td>短权限会话、重新认证、不可由前端标记提权</td>
+<td>修改本地状态、回退导航、浏览器共享设备</td>
+</tr>
+<tr>
+<td>撤回后离线补传</td>
+<td>先验撤销/删除，再验幂等</td>
+<td>旧令牌、重复事件、恢复备份、旧客户端</td>
+</tr>
+<tr>
+<td>支付伪造/重复/退款竞态</td>
+<td>验签、渠道查询、事务去重、权益版本</td>
+<td>重放通知、乱序退款、订阅恢复</td>
+</tr>
+<tr>
+<td>内容供应链污染</td>
+<td>编辑批准分权、模式校验、签名、依赖扫描</td>
+<td>改音频 hash、越界难度、未知脚本字段</td>
+</tr>
+<tr>
+<td>内部人员过度访问</td>
+<td>最小权限、临时授权、审计、定期复核</td>
+<td>客服搜索、批量下载、生产数据库权限</td>
+</tr>
+</tbody></table></div>
+<p>完整威胁建模和外部渗透测试属于发布门槛。安全告警由指定值班人员分级响应；涉及个人信息事件按影响法域的通知义务处理，不能用统一 72 小时概括所有国家规则。</p>
+<h2 id="technical-h29">9. 支付与权益</h2>
+<p>以家庭为权益主体，采用渠道适配器支持 Web、App Store、Google Play 及批准市场的支付渠道。客户端支付回执需服务端验证，回调按 provider_event_id 去重，状态机处理 active、grace、expired、refunded。取消自动续费不等于已付周期立即失效；退款和账务调整以渠道与当地规则为准。</p>
+<p>允许网络故障时在签名权益宽限窗口内完成已授权练习，绝不因支付通知延迟中断正在进行的一题。付款入口、价格、续费与取消都在成人区。不得把某一家支付渠道的费率或全球覆盖写死为商业前提。</p>
+<h2 id="technical-h30">10. 运维、容量与质量门槛</h2>
+<h3 id="technical-h31">10.1 初期容量假设</h3>
+<p>假设 10,000 周活跃孩子，每周 3 次、每次 100 个事件，即每周 300 万事件。按每事件 1 KB 粗算约 3 GB 原始载荷/周，尚未计索引、复制和备份。10,000 次各 20 MB 的首次包下载约 200 GB。该估算用于容量压测与成本模型，不是用户增长预测。</p>
+<p>初期验证 500 并发练习、事件批量上传峰值与报告任务同时运行；根据实际每试次事件数重算容量。游戏运行不依赖逐次网络往返，CDN 故障和 API 故障分别降级。</p>
+<h3 id="technical-h32">10.2 候选 SLO</h3>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>指标</th>
+<th>首发目标</th>
+<th>测量口径</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>区域核心 API 可用性</td>
+<td>月度 ≥99.9%</td>
+<td>有效请求成功率，排除可解释的权限/输入拒绝</td>
+</tr>
+<tr>
+<td>会话无严重技术中断</td>
+<td>≥99.5%</td>
+<td>已开始且合法授权会话；按设备/版本分组</td>
+</tr>
+<tr>
+<td>已确认事件完整性</td>
+<td>正常重试/进程故障验收中零丢失、零重复计分；生产发现丢失立即响应</td>
+<td>比对确认回执与持久化；未发送数据与区域灾难 RPO 单独报告</td>
+</tr>
+<tr>
+<td>普通区域 API 延迟</td>
+<td>P95 &lt;300 ms</td>
+<td>约定区域服务端请求路径，不含用户公网 RTT/异步导出</td>
+</tr>
+<tr>
+<td>已缓存任务启动</td>
+<td>P95 &lt;2 秒</td>
+<td>参考设备和固定资源包，实际测量</td>
+</tr>
+<tr>
+<td>恢复目标</td>
+<td>RPO ≤15 分钟，RTO ≤4 小时</td>
+<td>实际恢复演练验证后才能对外承诺</td>
+</tr>
+</tbody></table></div>
+<h3 id="technical-h33">10.3 测试分层</h3>
+<ul>
+<li>规则：判分、分母为零、随机序列约束、策略边界、版本兼容，用确定样例和性质测试。</li>
+<li>状态：任何状态暂停/退出/重播不串音；后台恢复不制造漏反应；无有效试次不显示 100%。</li>
+<li>同步：重复、乱序、缺失、冲突、断网、设备接管、撤回后补传、删除后重试，验证最终只有一份结果。</li>
+<li>权限：跨家庭、跨孩子、照护人越权、成人会话泄漏、导出链接转发、连接池 RLS 上下文残留。</li>
+<li>内容：音文一致、词表顺序、资源 hash、任务参数边界、年龄/语言缺口与未批准版本拒绝。</li>
+<li>浏览器与设备：iOS/Android/Web 中低端设备、触控/键盘、弱网、低存储、大字号、色觉/听力适配；明确支持列表。</li>
+<li>发布：数据库迁移回滚、支付乱序、备份恢复、删除演练、签名包召回、研究版本冻结。</li>
+</ul>
+<h3 id="technical-h34">10.4 发布与回滚</h3>
+<p>内部成人 → 指定家庭 → 某一市场/年龄/语言的小比例 → 扩大。远程开关只能控制已编译能力和经过模式校验的参数。每个版本有 kill switch，能停止特定内容/地区的新会话而保留导出、取消与删除功能。</p>
+<p>数据库采用先兼容旧读写再清理的迁移方式。客户端至少支持约定的前两版内容契约；太旧时提供清楚升级路径，不能丢弃未同步数据。研究队列固定内容和策略；安全修复单独记录偏离协议，不在研究中静默改变难度。</p>
+<h2 id="technical-h35">11. 主要架构决定与取舍</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>决定</th>
+<th>获得什么</th>
+<th>承担什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>纯任务引擎共享，多端渲染独立</td>
+<td>规则一致、可回放</td>
+<td>原生/Web 仍需各自测计时、声音与可访问性</td>
+</tr>
+<tr>
+<td>服务端重算结果</td>
+<td>减少统计错误、便于审计</td>
+<td>增加协议与版本管理，不等于防作弊认证</td>
+</tr>
+<tr>
+<td>区域化模块单体</td>
+<td>权限、事务与运维更可控</td>
+<td>多区域发布与数据迁移需要专门流程</td>
+</tr>
+<tr>
+<td>固定素材与规则化报告</td>
+<td>内容可审核、低延迟、可离线</td>
+<td>新语言与反馈文案需要内容制作投入</td>
+</tr>
+<tr>
+<td>分年龄共享机制</td>
+<td>青少年体验更可信</td>
+<td>监护关系、地区规则与客服复杂度增加</td>
+</tr>
+<tr>
+<td>先规则自适应</td>
+<td>原因可解释、样本要求明确</td>
+<td>暂时不能宣称自动找到每个孩子最优训练</td>
+</tr>
+</tbody></table></div>
+<p>下一步不是一次重写全部旧项目：先用一个任务完成「内容包 → 客户端 → 事件 → 服务端结果 → 家长报告」的纵向闭环，再推广到四类任务和各端。</p>
+</article>
+<article id="delivery"><div class="chapter-label">04 / 执行计划</div><h1 id="delivery-h1">执行计划：团队、排期、验收与发布</h1>
+<blockquote>
+<p>实施补充（v0.24）：家长课与生活任务接通按年龄的双语版本、方法/中文/英文三项独立审阅、签名发布、召回与历史版本保留；迁移至 schema 25。264 项业务、12 项 HTTP、15 项 PostgreSQL 检查通过。见 <a href="FAMILY-CONTENT.md">家庭内容发布设计</a> 与 <a href="qa/family-content-v0.24.md">当前验收</a>。真实专业审阅、正式身份与监护同意、原生真机及家庭研究仍未完成。</p>
+</blockquote>
+<p>设计版本 1.0 / 2026-09-30。W1 为立项首周，日期随团队确认后排定；32 周为条件满足时的有限市场发布目标，不是全球全龄效果验证完成日期。</p>
+<p>现有团队从当前代码继续实施时，先阅读 <a href="NEXT-DELIVERY.md">下一阶段实施交接</a>。它将本地 v0.27 已有能力与下一轮责任、依赖和验收连接起来；本路线仍保留完整发布要求。当前准确测试与安装包范围见 <a href="qa/life-history-v0.27.md">生活历史验收</a>，不能按功能数量折算为商业发布完成比例。</p>
+<h2 id="delivery-h2">1. 组织与责任</h2>
+<p>建议投入 <strong>12 个全职等效岗位</strong>。已有完整研发团队时优先映射现有人员；以下工作量不能默认为都需要新增招聘。科学、统计、法务和母语内容质量不能由研发自动代替。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>职能</th>
+<th align="right">全职等效</th>
+<th>主要责任与最终负责内容</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>产品负责人</td>
+<td align="right">1</td>
+<td>用户范围、需求取舍、指标、商业方案、跨专业决策</td>
+</tr>
+<tr>
+<td>科学/儿童发展负责人</td>
+<td align="right">1</td>
+<td>任务协议、儿童使用边界、研究方案、不适事件评估</td>
+</tr>
+<tr>
+<td>体验设计与用户研究</td>
+<td align="right">1</td>
+<td>年龄分层、家庭流程、可访问性、试用观察</td>
+</tr>
+<tr>
+<td>Web 前端</td>
+<td align="right">2</td>
+<td>家长端、网页练习、事件记录、离线、报告</td>
+</tr>
+<tr>
+<td>移动端</td>
+<td align="right">2</td>
+<td>iOS/Android、音频缓存、权限、商店支付与设备质量</td>
+</tr>
+<tr>
+<td>后端</td>
+<td align="right">2</td>
+<td>身份、家庭权限、区域政策、会话、同步、支付</td>
+</tr>
+<tr>
+<td>测试</td>
+<td align="right">1</td>
+<td>跨端状态、协议、权限、同步与回归体系</td>
+</tr>
+<tr>
+<td>平台/安全</td>
+<td align="right">1</td>
+<td>部署、区域隔离、监控、供应链、备份、事件响应</td>
+</tr>
+<tr>
+<td>内容与本地化制作</td>
+<td align="right">1</td>
+<td>语音、图像、内容包、版本和母语审核协调</td>
+</tr>
+<tr>
+<td>合计</td>
+<td align="right">12</td>
+<td>外部专业支持另列预算</td>
+</tr>
+</tbody></table></div>
+<p>外部或共享岗位：统计人员、各市场隐私与产品法务、伦理/研究机构、母语审稿和译者、独立渗透测试、招募与家长客服。上线前明确客服语言、营业时段、升级渠道和账务权限。</p>
+<p>每个内容版本须科学负责人和内容审核人批准；每个国家开放由产品、法务和安全共同签署；技术负责人对发布可靠性负责。研究结论由研究负责人和统计人员确认，不能由增长负责人改写为夸大效果。</p>
+<h2 id="delivery-h3">2. 32 周路线图</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>阶段</th>
+<th>周</th>
+<th>主要交付</th>
+<th>并行事项</th>
+<th>进入下一阶段的门槛</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>定义与风险关闭</td>
+<td>W1–4</td>
+<td>年龄/市场范围、四任务协议、家庭流程、数据清单、架构决策、研究主要指标</td>
+<td>家长/青少年访谈，经营与游戏分类评估，设备/音频试验</td>
+<td>G0：关键负责人、可做的首发范围与研究路线明确</td>
+</tr>
+<tr>
+<td>纵向闭环</td>
+<td>W5–8</td>
+<td>一个任务的多端运行、内容签名、会话与事件、家长摘要、权限和撤回</td>
+<td>另三任务设计、中文/英语制作、移动端支付预研</td>
+<td>G1：一条端到端链路正确且可删除</td>
+</tr>
+<tr>
+<td>私有 Alpha</td>
+<td>W9–12</td>
+<td>四任务、儿童/青少年界面、两语言基础内容、离线恢复、多儿童、邀请与支付沙盒</td>
+<td>设备矩阵、母语审稿、运营后台、备份演练</td>
+<td>全部 P0 功能达成，成人内部与模拟家庭测试通过</td>
+</tr>
+<tr>
+<td>家庭可用性</td>
+<td>W13–16</td>
+<td>32–48 家庭观察，按四年龄/两语言分层改进</td>
+<td>外部安全测试，研究招募与知情同意，付费访谈</td>
+<td>G2：理解、可访问性、负担与关键缺陷达标</td>
+</tr>
+<tr>
+<td>八周可行性</td>
+<td>W17–24</td>
+<td>80–120 家庭完整课程，收集缺失、退出与生活实践</td>
+<td>客服、退款、国家渠道、商业内容审稿、实验平台</td>
+<td>G3：流程可持续，负面反馈可解释与处理</td>
+</tr>
+<tr>
+<td>随访与有限发布准备</td>
+<td>W25–28</td>
+<td>可行性随访、数据审计、最终定价、商店审核、应急演练</td>
+<td>正式研究协议冻结、伦理和统计复核</td>
+<td>按获准地区/年龄/语言确认首批名单</td>
+</tr>
+<tr>
+<td>有限市场发布</td>
+<td>W29–32</td>
+<td>小范围付费、服务与退款闭环、逐批放量</td>
+<td>正式效果研究可在批准后启动</td>
+<td>G4：生产门槛通过；无疗效结论也不得暗示有效</td>
+</tr>
+</tbody></table></div>
+<p>如果正式效果研究在 W29 启动，8 周干预加 4 周随访至少到 W41，之后还需数据清理与分析；招募分批会更晚。效果主张、额外年龄组与新语言的验证通常跨入第 9–12 个月或更长。32 周不是不可调整的销售承诺。</p>
+<h3 id="delivery-h4">2.1 关键依赖链</h3>
+<p>目标市场与年龄政策 → 同意/账号模型 → 数据采集与删除 → 任务协议冻结 → 有效试次记录 → 可比较报告 → 可行性研究 → 效果研究与可支持的表述。</p>
+<p>语音与图像制作可与基础平台并行，但须依赖稳定文案 ID 和任务协议。支付开发可并行，开放销售须等待隐私、渠道与消费者流程完成。</p>
+<h2 id="delivery-h5">3. 每个发布门槛的验收表</h2>
+<p>以下是候选内部目标，G0 时由团队承诺；没有达到时应缩小发布范围或修复，不为赶排期更换统计口径。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>门槛</th>
+<th>核心验收</th>
+<th>负责人</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>G0</td>
+<td>首发经营主体/国家明确；内容适龄审查路径；用途与法规分类备忘录；主要研究指标与预算；数据保护影响评估初稿</td>
+<td>产品 + 科学 + 法务</td>
+</tr>
+<tr>
+<td>G1</td>
+<td>同一批事件可重算出一致结果；跨家庭访问被拒；一次完整撤回/删除演练；播放失败/断网不制造错误得分</td>
+<td>技术 + 测试 + 安全</td>
+</tr>
+<tr>
+<td>G2</td>
+<td>每个拟开放年龄/语言分层观察独立理解情况；目标 ≥85% 经一次演示可完成理解检查；无未关闭严重不适或权限缺陷</td>
+<td>设计 + 科学</td>
+</tr>
+<tr>
+<td>G3</td>
+<td>试用中有效事件完整率 ≥99%；至少 70% 家庭完成其约定练习次数的 60%；同时报告失访、负担和不适；不把留存当疗效</td>
+<td>产品 + 研究 + 数据</td>
+</tr>
+<tr>
+<td>G4</td>
+<td>关键安全缺陷为零、主要阻断缺陷为零；通过地区清单、同意、删除、支付、备份和客服演练；所有发布素材审核完成</td>
+<td>技术 + 安全 + 法务 + 运营</td>
+</tr>
+</tbody></table></div>
+<p>小样本达到 85% 不意味着人群真实理解率已被精确估计，需报告人数和区间。若某分层未达标，仅暂停该分层。严重/疑似相关不适或数据泄露立即单独响应，不等待汇总指标触线。</p>
+<h2 id="delivery-h6">4. 可直接拆票的工作包</h2>
+<p>估算为人日范围，表示单包实施量级，需在技术细化后重估；不是可简单求和的承诺，部分设计、联调与测试会交叠。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>ID</th>
+<th>优先级</th>
+<th>工作包</th>
+<th>负责人</th>
+<th>依赖</th>
+<th>验收标准</th>
+<th align="right">初估人日</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>P-01</td>
+<td>P0</td>
+<td>国家/年龄/语言发布矩阵</td>
+<td>产品/法务</td>
+<td>无</td>
+<td>未批准组合无法开户或下发计划；规则有来源和版本</td>
+<td align="right">5–8</td>
+</tr>
+<tr>
+<td>S-01</td>
+<td>P0</td>
+<td>四任务协议及风险审查</td>
+<td>科学/设计</td>
+<td>P-01</td>
+<td>每个任务包含指标分母、有效性、随机化、反馈与停止规则</td>
+<td align="right">12–20</td>
+</tr>
+<tr>
+<td>U-01</td>
+<td>P0</td>
+<td>家长与四年龄段交互原型</td>
+<td>设计</td>
+<td>S-01</td>
+<td>新家庭、帮助、暂停、退出、报告、共享、退款全流程</td>
+<td align="right">12–18</td>
+</tr>
+<tr>
+<td>E-01</td>
+<td>P0</td>
+<td>纯任务引擎与确定回放</td>
+<td>前端/后端</td>
+<td>S-01</td>
+<td>给定种子和事件得到同一结果，计时可注入</td>
+<td align="right">15–25</td>
+</tr>
+<tr>
+<td>E-02</td>
+<td>P0</td>
+<td>保守自适应与仿真</td>
+<td>科学/前端</td>
+<td>E-01</td>
+<td>全不点、随机点、连续求助、小样本不产生虚假升级</td>
+<td align="right">8–12</td>
+</tr>
+<tr>
+<td>A-01</td>
+<td>P0</td>
+<td>家庭身份和成员权限</td>
+<td>后端/安全</td>
+<td>P-01</td>
+<td>照护人与付款者不能越权访问全部孩子</td>
+<td align="right">15–25</td>
+</tr>
+<tr>
+<td>A-02</td>
+<td>P0</td>
+<td>同意、撤回、年龄转换</td>
+<td>后端/法务</td>
+<td>A-01</td>
+<td>验证方法与目的可审计，撤回后旧令牌写入失败</td>
+<td align="right">15–25</td>
+</tr>
+<tr>
+<td>D-01</td>
+<td>P0</td>
+<td>事件接收、完整性和结果重算</td>
+<td>后端/前端</td>
+<td>E-01,A-02</td>
+<td>重复、乱序、缺失、冲突均得到预期结果</td>
+<td align="right">12–20</td>
+</tr>
+<tr>
+<td>D-02</td>
+<td>P0</td>
+<td>本地队列与设备接管</td>
+<td>前端/移动</td>
+<td>D-01</td>
+<td>飞行模式、存储清理、换设备、撤回后重连均有明确结果</td>
+<td align="right">15–25</td>
+</tr>
+<tr>
+<td>C-01</td>
+<td>P0</td>
+<td>内容 CMS、双人审核与签名包</td>
+<td>后端/内容</td>
+<td>S-01</td>
+<td>未审批包或变更 hash 无法发布/加载，支持召回</td>
+<td align="right">15–25</td>
+</tr>
+<tr>
+<td>C-02</td>
+<td>P0</td>
+<td>中文/英语语音与刺激素材</td>
+<td>内容/设计</td>
+<td>C-01</td>
+<td>动态顺序一致，四类错误纠正准确，各年龄/语言人工签字</td>
+<td align="right">20–35</td>
+</tr>
+<tr>
+<td>M-01</td>
+<td>P0</td>
+<td>原生音频/缓存/状态适配</td>
+<td>移动</td>
+<td>E-01</td>
+<td>中断、锁屏、重播、蓝牙和静音通过设备矩阵</td>
+<td align="right">20–30</td>
+</tr>
+<tr>
+<td>R-01</td>
+<td>P0</td>
+<td>课程、生活活动、规则化周报</td>
+<td>前后端/科学</td>
+<td>D-01,S-01</td>
+<td>按个人进度；不混难度；缺数据不生成结论</td>
+<td align="right">15–22</td>
+</tr>
+<tr>
+<td>B-01</td>
+<td>P0</td>
+<td>成人支付、权益、退款</td>
+<td>后端/移动</td>
+<td>A-01</td>
+<td>乱序回调、重复退款、恢复购买都可回放且不重复发权益</td>
+<td align="right">18–30</td>
+</tr>
+<tr>
+<td>X-01</td>
+<td>P0</td>
+<td>导出、删除、供应商清理</td>
+<td>后端/安全</td>
+<td>D-01,A-02</td>
+<td>清理全链路、恢复备份不复活、删除后补传被拒</td>
+<td align="right">12–20</td>
+</tr>
+<tr>
+<td>O-01</td>
+<td>P0</td>
+<td>区域部署、监控、恢复演练</td>
+<td>平台</td>
+<td>A-01,D-01</td>
+<td>无儿童内容日志；区域隔离与 RPO/RTO 演练记录</td>
+<td align="right">15–25</td>
+</tr>
+<tr>
+<td>Q-01</td>
+<td>P0</td>
+<td>跨端、权限、内容与无障碍验收</td>
+<td>测试</td>
+<td>全部相关包</td>
+<td>P0 缺陷关闭，测试证据按发布组合存档</td>
+<td align="right">持续</td>
+</tr>
+<tr>
+<td>V-01</td>
+<td>P0</td>
+<td>可用性与可行性研究</td>
+<td>研究/设计</td>
+<td>G1/G2</td>
+<td>批准方案、同意、数据质量、退出原因、全结果报告</td>
+<td align="right">跨 16 周</td>
+</tr>
+<tr>
+<td>V-02</td>
+<td>P1</td>
+<td>预注册效果研究</td>
+<td>科学/统计</td>
+<td>V-01</td>
+<td>主结果、主动对照、样本量、分析与随访预定</td>
+<td align="right">单独预算</td>
+</tr>
+<tr>
+<td>E-03</td>
+<td>P1</td>
+<td>规则切换与计划任务</td>
+<td>科学/研发</td>
+<td>G3</td>
+<td>新协议完成同样质量流程，不直接继承效果主张</td>
+<td align="right">另估</td>
+</tr>
+</tbody></table></div>
+<p>P0 表示首发必需，P1 表示下一阶段。任何功能降级不得绕过同意、删除、基本退出、正确记录或已批准的内容边界。</p>
+<h2 id="delivery-h7">5. 前两轮迭代：从明天可以开始</h2>
+<h3 id="delivery-h8">Sprint 1：W1–2，确定边界并做真实技术验证</h3>
+<ul>
+<li>产品：映射 12 个岗位；确定候选市场与经营主体；建立决定记录、风险清单和需求看板。</li>
+<li>科学：把原有搜索、抑制、记忆任务写成规范；确定首个主要研究人群与主要结果候选。</li>
+<li>设计：访谈家长及两档青少年；完成家庭开户、儿童愿意参与、退出和共享的可点击流程。</li>
+<li>研发：盘点现有规则与素材；用一个搜索任务验证纯引擎、可注入计时与事件回放；不先重写全部页面。</li>
+<li>内容：核对 16 段语音，修订顺序播报和错误反馈需求；建立文案 ID、语音、字幕对应表。</li>
+<li>安全/法务：画出真实供应商数据流；评估监护同意供应商、市场分类、区域身份服务与密钥处理。</li>
+</ul>
+<p>演示材料：一份协议、一条完整的年龄/地区政策记录、一个可回放任务、家长/孩子全流程原型、已标记缺口的语音清单。Sprint 1 不以漂亮首页作为唯一完成标准。</p>
+<h3 id="delivery-h9">Sprint 2：W3–4，冻结接口并走通风险最大的路径</h3>
+<ul>
+<li>前后端共同冻结核心 API、事件契约、idempotency 与错误码；依据接口草案补齐身份与隐私接口。</li>
+<li>建立家庭 A/B、两个孩子、照护人的测试数据，证明对象级授权有效。</li>
+<li>做一次「开始 → 离线 → 中断 → 恢复 → 补传 → 重算 → 删除 → 再次补传被拒」的最小演示。</li>
+<li>移动团队用真实设备验证音频取消、触控事件、后台恢复与离线存储；记录与 Web 的差异。</li>
+<li>确定自适应样本窗口与仿真用例，明确什么情况下保持难度。</li>
+<li>研究负责人完成主要指标、招募路线、样本量计算计划和伦理路径；产品完成付费访谈脚本。</li>
+</ul>
+<p>Sprint 2 结束验收：G0 决议、核心契约 v0.1、威胁模型、两语言第一批审稿文案、未来四轮迭代的依赖与工时。未解决的法域或年龄组合保持关闭，不靠备注绕过。</p>
+<h2 id="delivery-h10">6. 预算与商业测算</h2>
+<p>下表只是立项估算方法，非市场报价。已有团队应同时算现金新增成本与人员占用成本；不同国家薪酬、研究采购与税费差别很大。</p>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>情景</th>
+<th align="right">人员全成本假设</th>
+<th align="right">12 人 × 8 个月</th>
+<th align="right">外部研究/法务/本地化/安全</th>
+<th align="right">云、测试设备、试点客服</th>
+<th align="right">加 20% 预备后的总额</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>较低投入假设</td>
+<td align="right">$5,000/人月</td>
+<td align="right">$480,000</td>
+<td align="right">$100,000</td>
+<td align="right">$40,000</td>
+<td align="right">$744,000</td>
+</tr>
+<tr>
+<td>规划中位假设</td>
+<td align="right">$9,000/人月</td>
+<td align="right">$864,000</td>
+<td align="right">$160,000</td>
+<td align="right">$60,000</td>
+<td align="right">$1,300,800</td>
+</tr>
+<tr>
+<td>较高投入假设</td>
+<td align="right">$13,000/人月</td>
+<td align="right">$1,248,000</td>
+<td align="right">$250,000</td>
+<td align="right">$100,000</td>
+<td align="right">$1,917,600</td>
+</tr>
+</tbody></table></div>
+<p>不含大规模买量、额外国家注册/特殊许可、独立医疗器械路线，也不保证覆盖全部正式效果研究。正式研究报价须按样本量、国家、量表授权、随访和合作机构另行核算，纳入第 9–12 月持续人力。不能把 32 周研发预算当作整个全球上市总成本。</p>
+<p>首发经营表按月记录：税后实收、渠道费、退款、支付失败、客服与云成本、招募成本、付费留存；使用真实数据替换产品方案中的价格与回收期假设。效果研究与内容审核预算不得当作可随意削减的上线装饰。</p>
+<h2 id="delivery-h11">7. 风险登记与处理</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>风险</th>
+<th>触发信号</th>
+<th>应对</th>
+<th>负责人</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>游戏进步无法迁移</td>
+<td>对照研究主要结果无差异</td>
+<td>公开限制，收缩效果表述，检验生活支持部分；不改用好看的次要结果宣传</td>
+<td>科学/产品</td>
+</tr>
+<tr>
+<td>跨年龄不适配</td>
+<td>某年龄层理解低、退出高、觉得幼稚</td>
+<td>停该分层，重做交互与内容；不靠加长指导硬推</td>
+<td>设计</td>
+</tr>
+<tr>
+<td>亲子冲突或不适</td>
+<td>家长反馈强迫练习、孩子反复拒绝</td>
+<td>调整目标和反馈，提供停止，审查通知与报告</td>
+<td>科学/运营</td>
+</tr>
+<tr>
+<td>分类与渠道不确定</td>
+<td>某市场需要额外许可或训练计划冲突</td>
+<td>关闭对应市场，完成分类和资质路径后再开放</td>
+<td>法务/产品</td>
+</tr>
+<tr>
+<td>数据越权/泄漏</td>
+<td>权限测试失败、异常导出、密钥暴露</td>
+<td>停相关通道、轮换、调查、按法域响应；修复后复验</td>
+<td>安全</td>
+</tr>
+<tr>
+<td>内容或音频不一致</td>
+<td>指令与判分不同、动态词序错</td>
+<td>召回内容版本，修复测试与制作流程</td>
+<td>内容/测试</td>
+</tr>
+<tr>
+<td>离线记录失真</td>
+<td>重复成绩、删除后回传、设备合并错</td>
+<td>停合并策略，按事件回放修复；告知受影响家庭</td>
+<td>后端</td>
+</tr>
+<tr>
+<td>收入不足以支持服务</td>
+<td>退款高、获客回收期长于留存</td>
+<td>改包装与成本，缩市场；不通过延长孩子使用拉收入</td>
+<td>产品/经营</td>
+</tr>
+<tr>
+<td>正式研究超时</td>
+<td>招募/伦理延迟或样本不足</td>
+<td>保留有限练习产品表述，延后效果声明和扩龄</td>
+<td>研究</td>
+</tr>
+</tbody></table></div>
+<h2 id="delivery-h12">8. 上线完成的定义</h2>
+<p>一个发布组合完成，不是「能打开网页」。必须同时满足：</p>
+<ol>
+<li>对应年龄与语言的协议、图片、语音、生活活动已审核，真实家庭可理解。</li>
+<li>数据权限、同意、撤回、跨设备、导出与删除都有实际测试证据。</li>
+<li>支付、取消、退款、客服和恢复流程可运行，家长知道买到什么。</li>
+<li>技术指标通过参考设备和生产演练，发现故障能停止新会话并恢复。</li>
+<li>营销文案逐条对应证据；未做研究的效果不写，未批准国家不开放销售。</li>
+<li>负责人签署发布记录，包含版本、范围、已知限制、监测指标与回退方案。</li>
+</ol>
+<p>第一项实施动作：确定负责人后，从 E-01 + D-01 + A-01 的最小纵向闭环开始，同时由科学负责人完成 S-01，内容负责人修正语音与实际任务不一致的问题。</p>
+</article>
+<article id="evidence"><div class="chapter-label">05 / 证据与假设</div><h1 id="evidence-h1">证据、规则与待验证假设</h1>
+<p>资料核对日期：2026-09-30。以下使用研究原文/摘要、监管机构和官方技术文档。规则可能更新，上线前由负责人再次核查；研究不自动适用于本产品、所有年龄和所有国家。</p>
+<h2 id="evidence-h2">1. 科学依据</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>来源</th>
+<th>可以支持什么</th>
+<th>不能据此得出什么</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://pubmed.ncbi.nlm.nih.gov/36977764/">Westwood 等，2023，36 项随机试验元分析</a></td>
+<td>计算机认知训练的结果要区分训练领域、症状、评价者与情境；部分记忆结果较好，广泛迁移有限</td>
+<td>本产品能治疗 ADHD、提高成绩，或所有任务组合都更好</td>
+</tr>
+<tr>
+<td><a href="https://pubmed.ncbi.nlm.nih.gov/42110889/">Ye 等，2026，17 项随机试验元分析</a></td>
+<td>部分执行功能与注意相关结果有小幅改善信号，仍需更高质量研究</td>
+<td>能把小效应夸大为大多数儿童都会明显改变；也不能直接套到普通家庭儿童</td>
+</tr>
+<tr>
+<td><a href="https://pubmed.ncbi.nlm.nih.gov/33334505/">Kollins 等，STARS-ADHD，2020 随机对照试验</a></td>
+<td>特定数字训练可以通过预设指标与主动对照研究；其样本、版本和评价条件明确</td>
+<td>已验证另一产品就等于验证本产品；照搬其时长就是正确训练剂量</td>
+</tr>
+<tr>
+<td><a href="https://developingchild.harvard.edu/resources/handouts-tools/activities-guide-enhancing-and-practicing-executive-function-skills/">Harvard 执行功能适龄活动指南</a></td>
+<td>活动应按发展阶段设计，并结合共同活动、规则和日常实践</td>
+<td>这是本产品课程的临床认证或疗效研究</td>
+</tr>
+</tbody></table></div>
+<p>2023 与 2026 年元分析的纳入研究、任务与结果不同；本方案采用共同的保守结论：可以尝试结构化练习，但日常功能收益要由本产品自己的研究检验。不能挑选显著结果后忽略无差异或有偏倚的结果。</p>
+<p>本方案没有把患有 ADHD 的研究样本等同于所有儿童，也没有提出诊断或治疗建议。医疗产品路线如将来启动，应另设临床、监管、质量体系与预算；本方案的家庭练习版本不能默认承担该用途。</p>
+<h2 id="evidence-h3">2. 未成年人、隐私与渠道规则</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>来源</th>
+<th>设计中的落点</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://www.ftc.gov/business-guidance/resources/complying-coppa-frequently-asked-questions">FTC COPPA FAQ</a></td>
+<td>美国儿童服务的通知、可验证监护人同意、访问删除与留存流程；不能用年龄自报页自动免责</td>
+</tr>
+<tr>
+<td><a href="https://www.ftc.gov/legal-library/browse/federal-register-notices/16-cfr-part-312-coppa-final-rule-amendments">FTC 2025 COPPA 修订公告</a></td>
+<td>合规审查应使用修订后的要求，不沿用旧产品模板</td>
+</tr>
+<tr>
+<td><a href="https://www.edpb.europa.eu/sites/default/files/files/file1/edpb_guidelines_202005_consent_en.pdf">EDPB Guidelines 05/2020 on consent</a></td>
+<td>GDPR 第 8 条适用条件与成员国 13–16 岁差异；按处理目的建立依据</td>
+</tr>
+<tr>
+<td><a href="https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/children-and-the-uk-gdpr/overview-and-key-definitions/">ICO 儿童与 UK GDPR 关键定义</a></td>
+<td>在相关在线服务依赖同意的情形下处理英国 13 岁门槛，不将其推广为所有法律的一般成年线</td>
+</tr>
+<tr>
+<td><a href="https://ico.org.uk/for-organisations/uk-gdpr-guidance-and-resources/childrens-information/childrens-code-guidance-and-resources/age-appropriate-design-a-code-of-practice-for-online-services/">ICO Children’s Code</a></td>
+<td>儿童最佳利益、默认高隐私、适龄解释、透明的家长控制和数据最小化</td>
+</tr>
+<tr>
+<td><a href="https://www.cac.gov.cn/2021-08/20/c_1631050028355286.htm">中国个人信息保护法</a></td>
+<td>不满 14 岁儿童个人信息、监护同意、敏感信息处理及相关评估</td>
+</tr>
+<tr>
+<td><a href="https://www.cac.gov.cn/2019-08/23/c_1124913903.htm">儿童个人信息网络保护规定</a></td>
+<td>专门儿童规则、责任人、访问与安全管理</td>
+</tr>
+<tr>
+<td><a href="https://www.nppa.gov.cn/xxfb/tzgs/202108/t20210830_666285.html">国家新闻出版署关于未成年人网络游戏的通知</a></td>
+<td>判断是否属于适用的网络游戏服务是大陆发布前置事项；教育命名不能替代分类</td>
+</tr>
+<tr>
+<td><a href="https://www.miit.gov.cn/jgsj/xgj/wjfb/art/2023/art_dd783a581c9644a4aee10afa582811db.html">工信部 APP 备案通知</a></td>
+<td>中国大陆应用渠道需核对备案与相关接入要求，具体随主体/形态判断</td>
+</tr>
+<tr>
+<td><a href="https://developer.apple.com/kids/">Apple Kids</a></td>
+<td>儿童类别年龄、家长操作与商店要求；与青少年体验分开审查</td>
+</tr>
+<tr>
+<td><a href="https://developer.apple.com/app-store/review/guidelines/">Apple App Review Guidelines</a></td>
+<td>儿童内容、数据、购买与订阅按最终上架形态逐项核对</td>
+</tr>
+<tr>
+<td><a href="https://support.google.com/googleplay/android-developer/answer/9893335?hl=en">Google Play Families Policies</a></td>
+<td>真实目标年龄申报、儿童 SDK 与数据要求、商业展示方式</td>
+</tr>
+</tbody></table></div>
+<p>上表不是全球法律完备清单。加拿大、澳大利亚、巴西、其他国家，以及美国州级隐私/消费者健康数据规则，均需在目标名单确定后单独核对。不开启任何未完成评审的发布组合。</p>
+<h2 id="evidence-h4">3. 工程依据</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>来源</th>
+<th>应用</th>
+</tr>
+</thead>
+<tbody><tr>
+<td><a href="https://www.w3.org/TR/WCAG22/">W3C WCAG 2.2</a></td>
+<td>AA 目标、键盘/焦点/对比度等；任务适配仍需单独验证</td>
+</tr>
+<tr>
+<td><a href="https://www.postgresql.org/docs/current/ddl-rowsecurity.html">PostgreSQL Row Security</a></td>
+<td>RLS 默认与绕过条件；不使用有绕过权限的应用角色</td>
+</tr>
+<tr>
+<td><a href="https://developer.mozilla.org/en-US/docs/Web/API/Storage_API/Storage_quotas_and_eviction_criteria">MDN 存储配额与清理</a></td>
+<td>浏览器缓存不是永久存储，尚未同步需明确提示</td>
+</tr>
+<tr>
+<td><a href="https://developer.mozilla.org/en-US/docs/Web/API/Service_Worker_API/Using_Service_Workers">MDN Service Worker 使用</a></td>
+<td>离线公共内容与客户端更新；私人 API 缓存另行约束</td>
+</tr>
+<tr>
+<td><a href="https://learn.microsoft.com/zh-cn/azure/ai-services/speech-service/rest-text-to-speech">Azure 文本转语音 REST</a></td>
+<td>一次性生成固定语音素材，不在儿童运行流程里使用云端实时语音</td>
+</tr>
+</tbody></table></div>
+<h2 id="evidence-h5">4. 假设登记</h2>
+<div class="table-scroll"><table>
+<thead>
+<tr>
+<th>假设</th>
+<th>验证方法</th>
+<th>何时决定</th>
+</tr>
+</thead>
+<tbody><tr>
+<td>6–17 岁适合分四档设计</td>
+<td>分层访谈、理解和负担观察</td>
+<td>G2，各档单独判断</td>
+</tr>
+<tr>
+<td>每周 3 次、8 周可被家庭接受</td>
+<td>可行性研究；不把留存当疗效</td>
+<td>G3</td>
+</tr>
+<tr>
+<td>6–12 分钟左右的分龄上限合适</td>
+<td>记录疲劳、自主结束、完成与负担</td>
+<td>G2/G3</td>
+</tr>
+<tr>
+<td>自适应阈值与样本窗口合理</td>
+<td>合成行为仿真 + 真实试用轨迹</td>
+<td>G1 后持续校准，研究期冻结</td>
+</tr>
+<tr>
+<td>生活策略安排有价值</td>
+<td>访谈、执行率及正式研究主要结果</td>
+<td>G3/正式研究</td>
+</tr>
+<tr>
+<td>两种 App 形态合适</td>
+<td>目标用户体验、渠道规则、维护成本</td>
+<td>W8 前方案确定，提交前复核</td>
+</tr>
+<tr>
+<td>价格区间成立</td>
+<td>访谈、付费小试点、退款与留存</td>
+<td>W16 后逐步定稿</td>
+</tr>
+<tr>
+<td>32 周可以有限发布</td>
+<td>团队投入、依赖、门槛与研究进度</td>
+<td>每四周复核</td>
+</tr>
+<tr>
+<td>容量、SLO 与留存期限够用</td>
+<td>压测、恢复与删除演练、法务评审</td>
+<td>G4 前</td>
+</tr>
+</tbody></table></div>
+<p>建议每季度及每次进入新市场前更新此文档；研究或政策出现重大变化时立即复核受影响设计。这是维护建议，本次没有创建任何自动提醒或定时任务。</p>
+</article><footer>源文档位于项目 docs/productization · 阅读版无外部字体、追踪或媒体依赖 · 资料访问需点击相应链接</footer></main><a class="top-link" href="#top">回到顶部 ↑</a>
+<script>const links=[...document.querySelectorAll('.section-link')];const observer=new IntersectionObserver(entries=>{for(const e of entries){if(e.isIntersecting){links.forEach(a=>{const current=a.hash==='#'+e.target.id;a.classList.toggle('active',current);if(current)a.setAttribute('aria-current','location');else a.removeAttribute('aria-current')})}}},{rootMargin:'-5% 0px -70% 0px'});document.querySelectorAll('article').forEach(a=>observer.observe(a));</script></body></html>

@@ -1,0 +1,4 @@
+source 'https://rubygems.org'
+
+# Keep the local iOS toolchain reproducible, including on the system Ruby 2.6.
+gem 'cocoapods', '1.16.2'

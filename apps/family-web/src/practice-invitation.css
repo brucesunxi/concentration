@@ -1,0 +1,7 @@
+.practice-invitation{display:grid;gap:16px;margin-top:22px}
+.practice-invitation p{margin:0;line-height:1.8;font-size:15px}
+.practice-invitation .practice-invitation-task{padding:14px 16px;border-radius:14px;background:#edf4e8;color:#285342;font-weight:650}
+.practice-invitation .subtle{font-size:13px}
+.practice-invitation-actions{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-top:6px}
+.practice-invitation-actions button{min-height:52px;white-space:normal}
+@media(max-width:420px){.practice-invitation-actions{grid-template-columns:1fr}}

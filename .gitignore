@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.focus-data/
+.env
+.env.*.local
+*.log
+.DS_Store
+coverage/
+.expo/
+.native-tools/
+.vercel/
+docs/productization/qa/
+.bundle/
+apps/family-mobile/ios/
+apps/family-mobile/android/
+.vercel

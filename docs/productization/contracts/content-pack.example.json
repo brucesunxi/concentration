@@ -1,0 +1,180 @@
+{
+  "schema_version": "1.0-design",
+  "pack_id": "focus-island.inhibition.zh-CN.6-8",
+  "version": "0.1.0-draft",
+  "status": "draft",
+  "locale": "zh-CN",
+  "age_band": {
+    "min": 6,
+    "max": 8
+  },
+  "allowed_markets": [],
+  "protocol": {
+    "id": "go-no-go-shape",
+    "version": "0.1.0-draft",
+    "mode": "training",
+    "construct": "辨认规则后选择行动或等待",
+    "limitations": [
+      "受图形识别、语言理解、动作输入与设备时序影响",
+      "不是临床注意力测评"
+    ]
+  },
+  "engine": {
+    "min_contract_version": "0.1.0",
+    "generator": "constrained-sequence-v1",
+    "scorer": "go-no-go-v1",
+    "seed_algorithm": "seed-v1"
+  },
+  "parameters": {
+    "trials_per_block": 12,
+    "go_trials": 8,
+    "no_go_trials": 4,
+    "first_trial": "seeded_random",
+    "max_same_type_run": 3,
+    "response_window_ms": 3600,
+    "feedback_gap_ms": 1000,
+    "dimensions_changed_per_step": 1
+  },
+  "adaptation": {
+    "policy_version": "conservative-v1-draft",
+    "window_days": 14,
+    "max_sessions": 3,
+    "min_sessions": 2,
+    "min_go_opportunities": 40,
+    "min_no_go_opportunities": 20,
+    "upgrade_success_rate": 0.85,
+    "max_critical_error_rate": 0.1,
+    "wilson_confidence": 0.8,
+    "wilson_lower_bound": 0.7,
+    "downgrade_threshold": 0.6,
+    "downgrade_consecutive_blocks": 2,
+    "max_upgrades_per_session": 1
+  },
+  "validity": {
+    "exclude": [
+      "background",
+      "asset_failure",
+      "render_failure",
+      "system_interrupt"
+    ],
+    "assisted_actions": [
+      "help",
+      "replay"
+    ],
+    "record_actual_onset": true
+  },
+  "stimuli": [
+    {
+      "id": "rabbit-go",
+      "role": "go",
+      "asset_id": "visual.rabbit"
+    },
+    {
+      "id": "fox-wait",
+      "role": "no_go",
+      "asset_id": "visual.fox"
+    }
+  ],
+  "copy": [
+    {
+      "id": "rule",
+      "text": "看到小兔，点一下。看到狐狸，等它离开。",
+      "audio_id": "audio.rule"
+    },
+    {
+      "id": "coach.missed_go",
+      "text": "刚才是小兔。看清小兔后，点一下。",
+      "audio_id": "audio.coach.missed_go"
+    },
+    {
+      "id": "coach.false_alarm",
+      "text": "刚才是狐狸。下次先看清，再决定要不要点。",
+      "audio_id": "audio.coach.false_alarm"
+    },
+    {
+      "id": "stop",
+      "text": "今天先到这里。你可以休息了。",
+      "audio_id": "audio.stop"
+    }
+  ],
+  "assets": [
+    {
+      "id": "visual.rabbit",
+      "kind": "image",
+      "status": "needs_production",
+      "path": null,
+      "sha256": null
+    },
+    {
+      "id": "visual.fox",
+      "kind": "image",
+      "status": "needs_production",
+      "path": null,
+      "sha256": null
+    },
+    {
+      "id": "audio.rule",
+      "kind": "audio",
+      "status": "needs_production",
+      "path": null,
+      "sha256": null,
+      "voice_candidate": "zh-CN-XiaoxiaoNeural",
+      "duration_ms": null
+    },
+    {
+      "id": "audio.coach.missed_go",
+      "kind": "audio",
+      "status": "needs_production",
+      "path": null,
+      "sha256": null,
+      "voice_candidate": "zh-CN-XiaoxiaoNeural",
+      "duration_ms": null
+    },
+    {
+      "id": "audio.coach.false_alarm",
+      "kind": "audio",
+      "status": "needs_production",
+      "path": null,
+      "sha256": null,
+      "voice_candidate": "zh-CN-XiaoxiaoNeural",
+      "duration_ms": null
+    },
+    {
+      "id": "audio.stop",
+      "kind": "audio",
+      "status": "needs_production",
+      "path": null,
+      "sha256": null,
+      "voice_candidate": "zh-CN-XiaoxiaoNeural",
+      "duration_ms": null
+    }
+  ],
+  "transfer_activity": {
+    "id": "take-turns",
+    "text": "和家人轮流选择一个活动。轮到别人时，先等一等。",
+    "screen_required": false
+  },
+  "accessibility": {
+    "reduce_motion": true,
+    "color_only_cues": false,
+    "caption_required": true,
+    "minimum_primary_target_css_px": 56
+  },
+  "review": {
+    "scientific": null,
+    "language": null,
+    "child_usability": null,
+    "privacy_market": null,
+    "asset_rights": null
+  },
+  "release": {
+    "signature": null,
+    "approved_by": [],
+    "release_blockers": [
+      "草案参数尚未完成仿真和家庭验证",
+      "无批准市场",
+      "素材尚未制作或关联",
+      "科学与母语审核尚未完成"
+    ]
+  }
+}

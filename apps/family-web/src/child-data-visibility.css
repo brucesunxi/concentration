@@ -1,0 +1,7 @@
+.child-data-entry{display:flex;align-items:center;gap:10px;margin:16px 0 0;min-height:48px}
+.child-data-entry svg:last-child{margin-left:auto}
+.child-data-visibility{display:grid;gap:16px;margin-top:20px;line-height:1.65}
+.child-data-visibility p,.child-data-visibility h3{margin:0}
+.child-data-visibility section{padding:14px 16px;border:1px solid #dfe5d6;border-radius:14px;background:#fbfcf7}
+.child-data-visibility h3{font-size:15px;margin-bottom:5px}
+.child-data-visibility .primary{min-height:56px}

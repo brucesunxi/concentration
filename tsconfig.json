@@ -1,0 +1,10 @@
+{
+  "compilerOptions": {
+    "target": "ES2023", "lib": ["ES2023", "DOM", "DOM.Iterable"],
+    "module": "ESNext", "moduleResolution": "Bundler", "jsx": "react-jsx",
+    "strict": true, "noEmit": true, "allowImportingTsExtensions": true,
+    "verbatimModuleSyntax": true, "skipLibCheck": true, "esModuleInterop": true,
+    "types": ["node", "vite/client"]
+  },
+  "include": ["api/**/*.ts", "apps/api/**/*.ts", "apps/family-web/**/*.ts", "apps/family-web/**/*.tsx", "apps/content-admin/**/*.tsx", "packages/**/*.ts", "scripts/**/*.ts", "tests/platform/**/*.ts", "tests/postgres/**/*.ts", "vite.config.ts", "vite.studio.config.ts"]
+}
