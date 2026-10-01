@@ -11,6 +11,7 @@
 - Preview 与受保护的 Production 域名共用内部预览数据库。`DATABASE_URL` 是带连接池的应用运行账号 URL。所有者 URL 不进入 Vercel。公开商用前须拆分环境。
 - Vercel 项目 `concentration` 的 `ssoProtection.deploymentType` 必须保持 `all`。
 - 项目与 `brucesunxi/concentration` 的 `main` 分支相连。当前访问域名是 `https://concentration-two.vercel.app/`，属于受保护的内部预览，不代表产品获准公开。
+- 原生 App 已可在构建时指定公开的 HTTPS API 根地址；当前受 Vercel Authentication 保护的域名仍仅供已登录的内部网页预览，不能把 Vercel 登录或绕过凭据打进儿童设备包。手机真机联调需要另行批准的可达测试入口，且服务端 `ZZ` 准入与正式发布门槛保持有效。
 - 注册、登录与接受邀请分别按客户端来源共享 10 分钟窗口，每类最多 12 次请求；计数保存在 Neon，跨无服务器实例与重启生效。只保存使用会话密钥派生的来源摘要，不保存原始 IP。已存在的家长账号还受数据库中的密码错误锁定保护。
 
 ## 复建步骤

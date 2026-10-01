@@ -8,9 +8,10 @@ import { invalidateOffline } from './storage';
 import { NetworkUnavailable } from '../../../packages/session-runtime/offline-session.ts';
 import { CredentialInterrupted, CredentialStore } from '../../../packages/session-runtime/credential-store.ts';
 import type { AccountAction } from '../../../packages/contracts/account-security.ts';
+import { mobileApiOrigin } from '../../../packages/contracts/mobile-api-origin.ts';
 
-// Simulator/adb reverse only. Production routing must come from approved regional configuration.
-export const API_ORIGIN = 'http://localhost:4181';
+// Public build-time routing only. Server policy still decides which market may open.
+export const API_ORIGIN = mobileApiOrigin(process.env.EXPO_PUBLIC_FOCUS_API_ORIGIN).origin;
 const CHILD_TOKEN = 'focus.local.child-token.v1';
 const options = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 export class MobileRequestError extends Error {

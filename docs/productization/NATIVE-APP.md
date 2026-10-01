@@ -141,7 +141,11 @@ xcodebuild -workspace FocusIslandDev.xcworkspace -scheme FocusIslandDev \
 
 刷新依赖目录后必须重新执行 Pods 配置：Expo SQLite 在该步骤按配置生成 SQLCipher 的 C 源码与头文件。不能仅复制新的依赖后直接复用旧编译缓存。若出现 `exsqlite3_*` 接口缺失，先核对 Pods 配置和生成头文件，再用新的专用 DerivedData 目录复验，不能通过关闭加密绕过错误。本机旧 Ruby 需要先加载锁定的 Bundler，再加载对应的 logger；团队 CI 仍应使用受支持 Ruby。
 
-Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 API，在用于编译的同一隔离目录运行 `npm run mobile:start`，端口 4183。原生 API 暂固定 `http://localhost:4181`，支持 iOS 模拟器；Android 模拟器需本机开发端口转发（4181 和 4183）。真机网络、区域路由和 HTTPS 配置尚待实现，不将本机服务开放到公网。
+Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 API，在用于编译的同一隔离目录运行 `npm run mobile:start`，端口 4183。未配置时原生 API 指向 `http://localhost:4181`，支持 iOS 模拟器；Android 模拟器需本机开发端口转发（4181 和 4183）。真机上的 `localhost` 是手机自身，不能用它连接开发机。
+
+测试远端 HTTPS 服务时，在**预生成原生工程、导出运行代码和编译 App 的同一构建环境**设置公开变量 `EXPO_PUBLIC_FOCUS_API_ORIGIN` 为服务根地址（例如 `https://api.example.test`，不含 `/api`、账号、查询参数或片段）。App 会对请求和签名素材使用同一根地址；无效地址及远端 HTTP 在构建配置阶段被拒绝。远端构建关闭 Android 明文网络许可和 iOS 本地网络例外。本机测试仍允许回环地址 HTTP。该变量会写入安装包，只能放公开地址，不能放令牌或密钥。[Expo 官方环境变量说明](https://docs.expo.dev/guides/environment-variables/)
+
+这只是连接配置，不会开放新市场或绕过服务端授权。当前 Vercel 预览受 Vercel Authentication 保护，原生 App 不能直接完成该网页登录；不要把预览绕过凭据编入 App。正式区域路由、可验证监护同意、真实设备联调和生产发布仍待完成，见[远端路由验收](qa/mobile-api-routing-v0.46-qa.md)。
 
 ### Android 开发包
 
