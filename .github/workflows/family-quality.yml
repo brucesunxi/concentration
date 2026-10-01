@@ -10,7 +10,7 @@ permissions:
 
 jobs:
   family-flow:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     timeout-minutes: 25
     steps:
       - uses: actions/checkout@v7
@@ -27,7 +27,8 @@ jobs:
           cache-dependency-path: scripts/qa/requirements.txt
       - run: npm ci
       - run: python -m pip install -r scripts/qa/requirements.txt
-      - run: python -m playwright install --with-deps chromium
+      - name: Check runner browser
+        run: test -x /usr/bin/google-chrome
       - name: Check contracts, clients and service
         run: |
           npm run check
@@ -38,6 +39,7 @@ jobs:
         run: npm run test:browser
         env:
           FOCUS_BROWSER_PYTHON: python
+          FOCUS_BROWSER_PATH: /usr/bin/google-chrome
       - uses: actions/upload-artifact@v7
         if: failure()
         with:
