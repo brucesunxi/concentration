@@ -15,3 +15,5 @@ docs/productization/qa/*
 apps/family-mobile/ios/
 apps/family-mobile/android/
 .vercel
+__pycache__/
+*.pyc

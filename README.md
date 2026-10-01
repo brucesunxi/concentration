@@ -137,11 +137,14 @@ npm test
 npm run check
 npm run build
 npm run test:http
+npm run test:browser
 npm run content:audit
 npm run visuals:check
 ```
 
 `test:http` 会在本机 4192/4195、4197 和 4201/4204 端口启动隔离的家庭与工作台服务，使用临时数据库验证请求保护和重启持久化，结束后清理自己的虚构数据。需要允许本地监听和连接。线上数据库使用 Neon，部署及运行步骤见 [Vercel + Neon 说明](docs/productization/VERCEL-NEON.md)。
+
+`test:browser` 需要 Python Playwright 和 Chromium，安装及验收范围见[浏览器自动验收](docs/productization/qa/browser-automation-v0.46-qa.md)。它会构建网页，并在隔离本机服务中走通虚构家庭的正式步骤与休息提示。
 
 v0.26 完整回归为 271 项业务、13 项真实 HTTP 和 16 项真实 PostgreSQL 检查通过；最终提示位置调整后又执行了历史专项、两端类型、构建和原生运行代码导出。浏览器已检查分页、超时保留与恢复重试，详见 [本批验收](docs/productization/qa/history-v0.26.md)。单次期限、休息询问、旧授权兼容与保存见 [v0.22 验收](docs/productization/qa/practice-window-v0.22.md)。两端练习安排、下一家庭日生效、共享额度和版本冲突见 [v0.21 练习与休息验收](docs/productization/qa/practice-limits-v0.21.md)。两端账号管理、执行身份复核、密码更改和全登录撤销见 [v0.20 账号验收](docs/productization/qa/account-security-v0.20.md)。新增十张表的家庭隔离、受限运行角色、并发与断连恢复，见 [v0.19 数据库验收](docs/productization/qa/postgres-v0.19.md)。新增两端家长陪伴课、分龄双语内容、课程关联和生活建议预选，见 [v0.18 家长课程验收](docs/productization/qa/parent-guide-v0.18.md)。新增独立构建、不可变版本、旧文件保留、并发发布及服务重启验证；浏览器已实际完成旧页面跨版本保存和新版读取，见 [v0.17 网页发布验收](docs/productization/qa/web-release-v0.17.md)。新增生活回顾自主分享、默认不保存答案、历史撤回及兼容保护，见 [v0.16 自主分享验收](docs/productization/qa/reflection-sharing-v0.16.md)。新增素材导入、不可变保存、换稿、访问控制和重启/召回验证；浏览器已完成导入图像和声音后的完整任务，见 [v0.15 素材库验收](docs/productization/qa/media-library-v0.15.md)。新增冻结内容的完整候选试玩，通过决定必须关联本人当前稿的完整记录；详见 [候选试玩验收](docs/productization/qa/candidate-preview-v0.14.md)。内容工作台的编辑、冻结、双角色审核、发布、召回与跨页退出已经用隔离虚构账号在浏览器走通，详见 [v0.13 工作台历史验收](docs/productization/qa/studio-v0.13.md)。已在内置浏览器用中文儿童与英文青少年虚构档案验证服务离线重开、重复页面保护、离线结束与补传；其他浏览器和原生设备验收仍待完成。详见 [v0.12 Web 验收](docs/productization/qa/web-offline-v0.12.md)、[原生构建记录](docs/productization/qa/offline-v0.11.md)、[换设备历史记录](docs/productization/qa/recovery-v0.10.md)、[家庭目标历史记录](docs/productization/qa/life-v0.8.md)、[计时修复历史记录](docs/productization/qa/interaction-v0.5.md) 和 [前一批浏览器记录](docs/productization/qa/2026-09-30.md)。
 
