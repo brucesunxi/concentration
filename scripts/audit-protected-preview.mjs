@@ -81,10 +81,12 @@ try {
     if (child.status !== 201 || typeof child.value?.id !== 'string') throw new Error(`SYNTHETIC_CHILD_FAILED_${child.status}`);
     const viewed = await call('/me', 'GET', undefined, original);
     if (viewed.status !== 200 || viewed.value?.children?.[0]?.id !== child.value.id) throw new Error('SYNTHETIC_READ_FAILED');
+    const billing = await call('/family/billing', 'GET', undefined, original);
+    if (billing.status !== 200 || billing.value?.state !== 'preview' || billing.value?.familyId !== viewed.value.family?.id || 'productId' in billing.value) throw new Error('SYNTHETIC_BILLING_STATUS_FAILED');
     if (await removeSyntheticFamily()) await unlink(pending);
     const revoked = await call('/me', 'GET', undefined, original);
     if (revoked.status !== 401 || revoked.value?.code !== 'UNAUTHENTICATED') throw new Error('SYNTHETIC_SESSION_STILL_ACTIVE');
-    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', databaseReady: true, familyCreated: true, childRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
+    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', databaseReady: true, familyCreated: true, childRead: true, billingPreviewRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
   }
 } catch (error) {
   if (credentials && !cleanupOnly) {
