@@ -80,7 +80,7 @@
 
 `environment` 必须包含 `platform`（web/ios/android）、`deviceClass`（desktop/tablet/phone）、`input`（pointer/touch/keyboard）和 `modality`（当前仅 visual）。Web 客户端示例为 `{"platform":"web","deviceClass":"desktop","input":"pointer","modality":"visual"}`；原生客户端使用 ios/android 和 touch。原生请求不能自称 web，Web 请求不能自称 ios/android，否则返回 ENVIRONMENT_TRANSPORT_MISMATCH。
 
-`/content-assets/:sha256.png` 和 `.mp3` 是不含家庭数据的公共素材，只返回登记的不可变字节，具有长期缓存头。发布包与公钥接口不缓存。当前六个既有中文儿童组合继续使用 0.7.2-preview，新增固定语音的 26 个组合使用 0.7.3-preview；0.3.0-preview 原始素材仍保留；中间版本 0.7.0-preview 和 0.7.1-preview 的记忆内容因图片与蓝莓名称不一致已召回，但制作证据继续保留。网页装饰 WebP 是静态构建资源，不作为任务素材。客户端仍必须核对素材摘要，详见 [内容与协议实现](PROTOCOL-CONTENT.md)。
+`/content-assets/:sha256.png` 和 `.mp3` 是不含家庭数据的公共素材，仅在有效内容包引用它们时返回登记的不可变字节；在线响应使用 `no-store`，以便召回生效。发布包与公钥接口不缓存。当前六个既有中文儿童组合继续使用 0.7.2-preview，新增固定语音的 26 个组合使用 0.7.3-preview；0.3.0-preview 原始素材仍保留；中间版本 0.7.0-preview 和 0.7.1-preview 的记忆内容因图片与蓝莓名称不一致已召回，但制作证据继续保留。网页装饰 WebP 是静态构建资源，不作为任务素材。客户端仍必须核对素材摘要，详见 [内容与协议实现](PROTOCOL-CONTENT.md)。
 
 ## 练习与休息
 

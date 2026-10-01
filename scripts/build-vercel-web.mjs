@@ -1,7 +1,6 @@
 import { build } from 'vite';
 import { spawn } from 'node:child_process';
-import { createHash } from 'node:crypto';
-import { copyFile, mkdir, readFile, readdir, writeFile } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 
 const root = resolve(import.meta.dirname, '..');
@@ -20,26 +19,15 @@ await check('scripts/audit-web-budget.mjs');
 await check('scripts/build-offline-shell.mjs');
 
 const mediaDir = resolve(output, 'media'), contentDir = resolve(output, 'content-assets');
-await Promise.all([mkdir(mediaDir, { recursive: true }), mkdir(contentDir, { recursive: true })]);
-let contentAssets = 0;
-async function contentAsset(path) {
-  const bytes = await readFile(resolve(root, path));
-  const hash = createHash('sha256').update(bytes).digest('hex');
-  const extension = path.endsWith('.mp3') ? 'mp3' : 'png';
-  await writeFile(resolve(contentDir, `${hash}.${extension}`), bytes);
-  contentAssets++;
+// A static file here would take precedence over the release-state API rewrite.
+try {
+  await stat(contentDir);
+  throw new Error('Content assets must not be present in the static Vercel output');
+} catch (error) {
+  if (error.code !== 'ENOENT') throw error;
 }
+await mkdir(mediaDir, { recursive: true });
 for (const name of await readdir(resolve(root, 'src/audio'))) {
   if (name.endsWith('.mp3')) await copyFile(resolve(root, 'src/audio', name), resolve(mediaDir, name));
 }
-for (const name of await readdir(resolve(root, 'src/audio/content'))) {
-  if (name.endsWith('.mp3')) await contentAsset(`src/audio/content/${name}`);
-}
-for (const path of [
-  'src/assets/characters-sheet.png', 'src/assets/objects-sheet.png',
-  'packages/visuals/archive/objects-sheet-640-preview.png',
-  'packages/visuals/archive/objects-sheet-512-preview.png',
-  'packages/visuals/runtime/characters-sheet.png',
-  'packages/visuals/runtime/objects-sheet.png',
-]) await contentAsset(path);
-console.log(JSON.stringify({ staticContentAssets: contentAssets }));
+console.log(JSON.stringify({ contentAssetsViaApi: true }));

@@ -149,6 +149,22 @@ test('release identity is immutable and recalls survive catalogue reinitializati
   await assert.rejects(again.get(ref.sha256), code('CONTENT_RECALLED'));
   const count = await db.query<{ n: number }>('SELECT count(*)::int n FROM content_releases'); assert.equal(count.rows[0].n, 32);
 });
+test('built-in media disappears after its last active release is recalled', async () => {
+  const isolated = await openDatabase('memory://');
+  try {
+    await migrate(isolated);
+    const catalogue = await createLocalContent(isolated, { now: () => now });
+    const ref = await catalogue.pick('search', '15-17', 'en');
+    const selected = await catalogue.get(ref.sha256);
+    const path = selected.body.pack.assets.find(asset => asset.id === selected.body.pack.audio?.assetId)!.path;
+    const refs = await isolated.query<{ hash: string }>("SELECT hash FROM content_releases WHERE state='active' AND envelope->'body'->'pack'->'assets' @> $1::jsonb", [JSON.stringify([{ path }])]);
+    assert.ok(refs.rows.length > 0);
+    assert.ok(await catalogue.readMedia(path, true));
+    for (const { hash } of refs.rows) await catalogue.recall(hash, 'synthetic-operator', 'Synthetic built-in media recall test');
+    assert.equal(await catalogue.readMedia(path, true), undefined);
+    assert.ok(await catalogue.readMedia(path), 'historical authoring evidence remains available to the studio');
+  } finally { await isolated.close(); }
+});
 test('recall rejects old event retries before deduplication and closes the active session', async () => {
   const api = service(db, () => now, content);
   const auth = await api.setup({ name: 'Synthetic recall family', password: 'test-content-recall', timezone: 'UTC', locale: 'zh-CN', acknowledgedLocalUse: true });

@@ -61,7 +61,7 @@ const server = http.createServer(async (req, res) => {
       if (url.pathname.startsWith('/content-assets/')) {
         const asset = await content.readMedia(url.pathname,true);
         if (!asset) throw new ApiError(404, 'NOT_FOUND', '未找到素材。');
-        res.writeHead(200, { 'Content-Type': asset.mime, 'Cache-Control': 'public, max-age=31536000, immutable' }); res.end(method === 'HEAD' ? undefined : asset.body); return;
+        res.writeHead(200, { 'Content-Type': asset.mime, 'Cache-Control': 'no-store' }); res.end(method === 'HEAD' ? undefined : asset.body); return;
       }
       const media = url.pathname.match(/^\/media\/([a-z0-9-]+\.mp3)$/);
       let asset;

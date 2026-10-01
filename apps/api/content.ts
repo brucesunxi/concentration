@@ -40,8 +40,8 @@ export async function createLocalContent(db: Database, options: { dataDir?: stri
     media.set(path, { body, mime });
     return { id, path, sha256: hash, bytes: body.length, mime, review: 'unreviewed', provenance: `${relative}; development asset; professional review pending`, ...extra };
   }
-  // Historical frozen plans still reference these exact bytes. Keep serving their
-  // immutable URLs after the catalogue changes; never substitute the new artwork.
+  // Historical frozen plans still reference these exact bytes. Retain them for
+  // active releases without substituting newer artwork after a catalogue change.
   await asset('characters', 'src/assets/characters-sheet.png');
   await asset('objects', 'src/assets/objects-sheet.png');
   // A live local preview registered this intermediate delivery size. Its release
@@ -96,12 +96,14 @@ export async function createLocalContent(db: Database, options: { dataDir?: stri
     family: await familyContent(db,trust,{now,readOnly:options.readOnly,identity,key}),
     trust, media, release,
     async readMedia(path:string,publishedOnly=false,tx:Queryable=db){
-      const builtIn=media.get(path);if(builtIn)return builtIn;
       const match=path.match(/^\/content-assets\/([a-f0-9]{64})\.(png|mp3)$/);if(!match)return undefined;
+      const builtIn=media.get(path);
       if(publishedOnly){
-        const publication=await tx.query("SELECT hash FROM content_releases WHERE state='active' AND envelope->'body'->>'channel' IN ('reviewed-preview','published') AND envelope->'body'->'pack'->'assets' @> $1::jsonb LIMIT 1",[JSON.stringify([{path}])]);
+        const channels=builtIn ? "('local-preview','reviewed-preview','published')" : "('reviewed-preview','published')";
+        const publication=await tx.query(`SELECT hash FROM content_releases WHERE state='active' AND envelope->'body'->>'channel' IN ${channels} AND envelope->'body'->'pack'->'assets' @> $1::jsonb LIMIT 1`,[JSON.stringify([{path}])]);
         if(!publication.rows.length)return undefined;
       }
+      if(builtIn)return builtIn;
       const row=(await tx.query<{hash:string;mime:string;bytes:number;body:Uint8Array}>('SELECT hash,mime,bytes,body FROM content_media_objects WHERE hash=$1',[match[1]])).rows[0];
       if(!row)return undefined;
       const body=Buffer.from(row.body);

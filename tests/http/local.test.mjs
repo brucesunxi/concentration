@@ -154,7 +154,7 @@ test('real HTTP service verifies a signed v2 practice, enforces access and persi
     for (const asset of pack.assets) {
       const media = await fetch(new URL(asset.path, base), { signal: AbortSignal.timeout(10000) });
       assert.equal(media.status, 200); assert.equal(media.headers.get('content-type'), asset.mime);
-      assert.match(media.headers.get('cache-control'), /immutable/);
+      assert.equal(media.headers.get('cache-control'), 'no-store');
       await verifyAsset(asset, new Uint8Array(await media.arrayBuffer()));
     }
     const events = completeEvents(started.body.plan);
@@ -190,13 +190,11 @@ test('real HTTP service verifies a signed v2 practice, enforces access and persi
       assert.equal(restoredMedia.status, 200);
       await verifyAsset(asset, new Uint8Array(await restoredMedia.arrayBuffer()));
     }
-    // The upgraded catalogue must also serve the exact immutable URLs referenced
-    // by pre-upgrade plans. A restart may not strand their original images.
+    // A fresh catalogue has no active releases for historical artwork.
     for (const file of ['src/assets/characters-sheet.png', 'src/assets/objects-sheet.png', 'packages/visuals/archive/objects-sheet-640-preview.png', 'packages/visuals/archive/objects-sheet-512-preview.png']) {
       const bytes = new Uint8Array(await readFile(resolve(root, file))), hash = await sha256(bytes);
       const historicalMedia = await fetch(new URL(`/content-assets/${hash}.png`, base));
-      assert.equal(historicalMedia.status, 200);
-      assert.equal(await sha256(new Uint8Array(await historicalMedia.arrayBuffer())), hash);
+      assert.equal(historicalMedia.status, 404, file);
     }
     const relogged = await call('/auth/login', { method: 'POST', data: { name: setup.name, password: setup.password } });
     assert.equal(relogged.response.status, 200);

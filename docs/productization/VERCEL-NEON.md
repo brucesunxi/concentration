@@ -4,8 +4,8 @@
 
 ## 架构
 
-- Vercel CDN 提供 `dist/web` 页面、内置图片和预录语音；`api/index.ts` 承接 `/api/*` 及非内置的动态素材。内置素材在构建时以内容哈希复制到静态目录。
-- 已验证内置哈希素材由 CDN 直接返回，未知哈希素材进入 API 并返回 404。内置静态字节不会经过动态素材的发布状态查询，召回内容包可阻止新计划使用，却不能从已部署 CDN 或设备缓存撤回这些字节。正式发布前须为可召回素材定义对象存储、CDN 失效与旧会话处理策略；当前只适用于受保护的内部预览。
+- Vercel CDN 提供 `dist/web` 页面；`api/index.ts` 承接 `/api/*` 与所有签名内容包的 `/content-assets/*` 图片及预录语音。构建不把签名素材复制到静态目录，防止静态文件优先于 Vercel API 重写规则返回。
+- 素材响应查询当前有效的内容包引用；内置 `local-preview` 与经审核发布的素材各遵守对应渠道规则。最后一个引用它的内容包召回后，在线 `/content-assets/*` 请求返回 404，响应为 `no-store`。相同哈希被另一个有效内容包引用时仍可读取。网页界面仍可能把相同图片作为界面图形打包进 `/assets/*`，旧 Vercel 部署也可能保留先前的静态副本，设备离线缓存可留存至授权失效。因此召回目前约束练习和正式素材地址，不能保证已分发的原始图像字节被删除；正式发布前仍须清理旧部署、区分界面与可召回素材、验证 CDN 失效与旧会话处置。
 - Neon 托管 PostgreSQL，schema 版本 31。准备过程使用数据库所有者身份；Vercel 只使用 `focus_family_runtime` 限权身份。
 - 会话签名私钥仅放在 Vercel Preview 与 Production 的 Sensitive 环境变量 `FOCUS_SESSION_SIGNING_JWK`；本地准备副本保存在被忽略的 `.focus-data/neon/`，不可提交。
 - Preview 与受保护的 Production 域名共用内部预览数据库。`DATABASE_URL` 是带连接池的应用运行账号 URL。所有者 URL 不进入 Vercel。公开商用前须拆分环境。
@@ -20,9 +20,9 @@
 2. 在本机私密环境中设置 `DATABASE_MIGRATION_URL`、`FOCUS_DATABASE_ROLE`、`FOCUS_DATA_DIR`，执行 `npm run db:prepare`。此命令仅供数据库所有者运行，迁移、安装内置内容、准备签名身份并授权运行账号。
 3. 将限权账号的池化 URL 作为 Vercel Preview 与 Production 的 Sensitive 变量 `DATABASE_URL`，把 `FOCUS_DATA_DIR/session-signing.jwk.json` 的完整 JSON 作为 `FOCUS_SESSION_SIGNING_JWK`。
 4. 确认 Vercel Authentication 保护所有部署后，执行 `vercel deploy --prod --archive=tgz`，或显式使用 `--target preview` 建立预览部署。运行 `npm run check`、`npm test`、`npm run test:http` 与 `npm run build:vercel`。
-5. 核对 `/api/ready` 返回 200 后，使用登录后的预览页检查家长注册、儿童空间、一次完整练习、静态图像和引导语音，确认不同家庭的数据隔离。`/api/health` 仅证明应用进程响应，不能单独证明数据库可用。
+5. 核对 `/api/ready` 返回 200 后，使用登录后的预览页检查家长注册、儿童空间、一次完整练习、内容图像和引导语音，确认不同家庭的数据隔离。`/api/health` 仅证明应用进程响应，不能单独证明数据库可用。
 
-部署与运行都不需要 Docker。Neon 所有者账号只参与受控迁移，不能作为应用运行账号。Vercel Preview 同时保留静态资源缓存，但 API、会话和家庭记录不得缓存。后续每次迁移先在隔离的 Neon 分支验证，再对目标库执行。正式公开前还需评估平台边缘防护和实际攻击流量，数据库限流不是完整的防滥用方案。
+部署与运行都不需要 Docker。Neon 所有者账号只参与受控迁移，不能作为应用运行账号。Vercel Preview 可缓存网页静态资源；签名素材、API、会话和家庭记录不得缓存。后续每次迁移先在隔离的 Neon 分支验证，再对目标库执行。正式公开前还需评估平台边缘防护和实际攻击流量，数据库限流不是完整的防滥用方案。
 
 ## 受保护预览的合成家庭验收
 
