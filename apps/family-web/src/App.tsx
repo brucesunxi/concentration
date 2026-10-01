@@ -85,14 +85,17 @@ export function App() {
   const invitedChild = practiceInvitation && me?.children.find(c => c.id === practiceInvitation.childId);
   const owner = me?.role === 'parent' && me.member?.role === 'owner', support = me?.role === 'parent' && me.member?.role === 'support';
   const t = translate(locale), teen = child ? isTeen(child.ageBand) : false, hostedPreview = isHostedPreview();
-  function accountEnded(outcome: AccountAccessOutcome, deletingFamily?: DeletedFamily) {
+  function accountEnded(outcome: AccountAccessOutcome, deletingFamily?: DeletedFamily, fromRequest = false) {
     accessVersion.current++; refreshVersion.current++;
     setMe(null); setSession(null);  setOfflineOffer(null); setModal(null); setPracticeInvitation(null); setSelected(''); setPage('home'); setLoading(false); setUnavailable(false); setAuthMode('login'); setAccountNotice(outcome); setError('');
-    void ((outcome === 'deleted' || outcome === 'deleted-local-pending') && deletingFamily
-      ? journal().clearFamily(deletingFamily.id,deletingFamily.childIds) : journal().invalidate()).catch(() => undefined);
+    if (!fromRequest || !deletingFamily) void (deletingFamily
+      ? outcome === 'deleted' || outcome === 'deleted-local-pending'
+        ? journal().clearFamily(deletingFamily.id,deletingFamily.childIds)
+        : journal().invalidateFamily(deletingFamily.id,deletingFamily.childIds)
+      : journal().invalidate()).catch(() => undefined);
   }
   useEffect(() => {
-    const changed = (event: Event) => {const detail=(event as CustomEvent<AccountAccessEvent>).detail;accountEnded(detail.outcome,detail.deletingFamily);};
+    const changed = (event: Event) => {const detail=(event as CustomEvent<AccountAccessEvent>).detail;accountEnded(detail.outcome,detail.deletingFamily,true);};
     window.addEventListener('focus-account-access', changed); return () => window.removeEventListener('focus-account-access', changed);
   }, []);
   useEffect(() => { document.documentElement.lang = locale;try{localStorage.setItem('focus-ui-locale',locale);}catch{} }, [locale]);

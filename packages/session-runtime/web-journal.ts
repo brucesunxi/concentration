@@ -95,6 +95,19 @@ export class WebJournal {
       tx.objectStore('meta').put({...meta,generation:meta.generation+1});tx.objectStore('offline').clear();done();
     },fail));
   }
+  /** Stop stale writes from one family's tabs without invalidating another family's recovery. */
+  async invalidateFamily(familyId:string,childIds:string[]) {
+    const children=new Set(childIds);
+    await this.transaction<void>(['meta','offline'],'readwrite',(tx,done,fail)=>reads(tx,[['meta',singleton],['offline',singleton]],([meta,resume]:[any,Resume|undefined])=>{
+      const generation=meta.generation+1;
+      tx.objectStore('meta').put({...meta,generation});
+      if(resume){
+        if(resume.capsule.familyId===familyId||children.has(resume.capsule.session.child_id))tx.objectStore('offline').clear();
+        else if(resume.generation===meta.generation)tx.objectStore('offline').put({...resume,generation});
+      }
+      done();
+    },fail));
+  }
   async read(id:string,childId:string,familyId?:string):Promise<EngineEvent[]> {
     await this.prune();
     return this.transaction(['sessions'],'readonly',(tx,done,fail)=>reads(tx,[['sessions',id]],([journal]:[Journal|undefined])=>{

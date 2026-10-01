@@ -18,25 +18,26 @@ function accountAccessEnded(outcome: AccountAccessOutcome, deletingFamily?: Dele
 export class RequestError extends Error { code: string; status: number; constructor(message: string, code: string, status: number) { super(message); this.code = code; this.status = status; } }
 export async function request<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}, options?: { deletingFamily?: DeletedFamily }): Promise<T> {
   const accountChange=(method==='POST' && /^\/auth\/(change-password|logout-all)$/.test(path)) || (method==='DELETE' && path==='/family');
-  if(method==='DELETE'&&path==='/family'&&!options?.deletingFamily)throw new Error('LOCAL_DELETION_CONTEXT_REQUIRED');
+  const deletingFamily=method==='DELETE'&&path==='/family'?options?.deletingFamily:undefined;
+  if(method==='DELETE'&&path==='/family'&&!deletingFamily)throw new Error('LOCAL_DELETION_CONTEXT_REQUIRED');
   const identityChange=accountChange||(method==='POST'&&(/^\/auth\/(login|setup|join|logout)$/.test(path)||/^\/children\/[^/]+\/(enter|sessions|withdraw)$/.test(path)||/^\/children\/[^/]+\/recovery\/[^/]+\/(resume|handover)$/.test(path)))||(method==='DELETE'&&/^\/children\/[^/]+$/.test(path));
   if(identityChange) {
     // A broken browser store must not prevent a parent from deleting records
     // on the server. The confirmed response separately reports local cleanup.
-    if(path==='/family')await journal().invalidate().catch(()=>undefined);
+    if(deletingFamily)await journal().invalidateFamily(deletingFamily.id,deletingFamily.childIds).catch(()=>undefined);
     else await journal().invalidate();
   }
   if(method!=='GET'&&!csrf&&!/^\/auth\/(login|setup|join)$/.test(path))await request('/me');
-  const res = await fetch('/api' + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal: AbortSignal.timeout(12000) }).catch(()=>{if(accountChange)accountAccessEnded(path==='/family'?'delete-uncertain':'uncertain');throw new NetworkUnavailable();});
-  const value = await res.json().catch(error=>{if(accountChange)accountAccessEnded(path==='/family'?'delete-uncertain':'uncertain');throw error;});
+  const res = await fetch('/api' + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal: AbortSignal.timeout(12000) }).catch(()=>{if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily);throw new NetworkUnavailable();});
+  const value = await res.json().catch(error=>{if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily);throw error;});
   if(accountChange && (res.status>=500 || res.ok)) {
     if (res.ok && value?.ok && value?.signInRequired && path==='/family') {
       let outcome: 'deleted' | 'deleted-local-pending' = 'deleted';
-      try { await journal().clearFamily(options!.deletingFamily!.id,options!.deletingFamily!.childIds); } catch { outcome = 'deleted-local-pending'; }
-      accountAccessEnded(outcome,options!.deletingFamily);
-    } else accountAccessEnded(res.ok && value?.ok && value?.signInRequired ? path.endsWith('change-password') ? 'password' : 'signout' : path==='/family' ? 'delete-uncertain' : 'uncertain');
+      try { await journal().clearFamily(deletingFamily!.id,deletingFamily!.childIds); } catch { outcome = 'deleted-local-pending'; }
+      accountAccessEnded(outcome,deletingFamily);
+    } else accountAccessEnded(res.ok && value?.ok && value?.signInRequired ? path.endsWith('change-password') ? 'password' : 'signout' : deletingFamily ? 'delete-uncertain' : 'uncertain',deletingFamily);
   }
-  if (res.status === 401 && path !== '/me' && !/^\/auth\/(login|setup|join)$/.test(path)) accountAccessEnded('signin');
+  if (res.status === 401 && path !== '/me' && !/^\/auth\/(login|setup|join)$/.test(path)) accountAccessEnded('signin',deletingFamily);
   if (!res.ok) throw new RequestError(value.message || 'Unable to complete request', value.code, res.status);
   if (value?.csrf) csrf = value.csrf;
   if (identityChange && !accountChange) {

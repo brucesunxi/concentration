@@ -98,6 +98,8 @@ test('deleting a family preserves a different family’s active browser recovery
   await store.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,generation);
   await store.write(other.sessionId,other.childId,other.familyId,events,generation);
   await store.prepare(otherCapsule,generation,checkpoint,events);
+  await store.invalidateFamily(capsule.familyId,[capsule.session.child_id]);
+  assert.equal((await new WebJournal(factory).resume())?.capsule.familyId,other.familyId);
   await store.clearFamily(capsule.familyId,[capsule.session.child_id]);
   const restored=await new WebJournal(factory).resume();
   assert.equal(restored?.capsule.familyId,other.familyId);
@@ -145,4 +147,36 @@ test('seven-day local retention warns first, expires atomically and cannot be ex
   assert.deepEqual(await store.read(capsule.session.id,capsule.session.child_id,capsule.familyId),[]);
   assert.equal(await store.expiringSoon(capsule.familyId,capsule.session.child_id),0);
   await assert.rejects(store.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,generation),OfflinePreparationChanged);
+});
+
+test('the Web deletion request preserves another family’s recovery on rejection and success',async()=>{
+  const factory=new IDBFactory(),store=new WebJournal(factory),generation=await store.generation();
+  const other={familyId:randomUUID(),childId:randomUUID(),sessionId:randomUUID()};
+  const otherCapsule=structuredClone(capsule);
+  otherCapsule.familyId=other.familyId;otherCapsule.session.id=other.sessionId;otherCapsule.session.child_id=other.childId;
+  await store.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,generation);
+  await store.write(other.sessionId,other.childId,other.familyId,events,generation);
+  await store.prepare(otherCapsule,generation,checkpoint,events);
+  const prior={indexedDB:globalThis.indexedDB,window:globalThis.window,fetch:globalThis.fetch};
+  const target=globalThis as typeof globalThis & {indexedDB:IDBFactory;window:Window};
+  const notices:unknown[]=[];
+  try {
+    target.indexedDB=factory;target.window=new EventTarget() as Window & typeof globalThis;
+    target.window.addEventListener('focus-account-access',event=>notices.push((event as CustomEvent).detail));
+    const api=await import('../../apps/family-web/src/api.ts');
+    const deletion={id:capsule.familyId,childIds:[capsule.session.child_id]};
+    api.setCsrf('synthetic-csrf');
+    globalThis.fetch=async()=>new Response(JSON.stringify({code:'PASSWORD_REJECTED',message:'Rejected'}),{status:403});
+    await assert.rejects(api.request('/family','DELETE',{currentPassword:'wrong'}, {}, {deletingFamily:deletion}),{code:'PASSWORD_REJECTED'});
+    assert.equal((await store.resume())?.capsule.familyId,other.familyId);
+    assert.deepEqual(await store.read(capsule.session.id,capsule.session.child_id,capsule.familyId),events);
+    globalThis.fetch=async()=>new Response(JSON.stringify({ok:true,signInRequired:true}),{status:200});
+    assert.deepEqual(await api.request('/family','DELETE',{currentPassword:'correct'}, {}, {deletingFamily:deletion}),{ok:true,signInRequired:true});
+    assert.equal((await store.resume())?.capsule.familyId,other.familyId);
+    assert.deepEqual(await store.read(capsule.session.id,capsule.session.child_id,capsule.familyId),[]);
+    assert.deepEqual(await store.read(other.sessionId,other.childId,other.familyId),events);
+    assert.deepEqual(notices,[{outcome:'deleted',deletingFamily:deletion}]);
+  } finally {
+    target.indexedDB=prior.indexedDB;target.window=prior.window;globalThis.fetch=prior.fetch;
+  }
 });
