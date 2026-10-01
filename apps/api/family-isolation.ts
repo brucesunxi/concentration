@@ -94,7 +94,9 @@ export async function verifyRuntimeRole(db: Database, kind: 'family' | 'studio')
   if (!role || role.unsafe) throw new Error('DATABASE_RUNTIME_ROLE_UNSAFE');
   if (!(await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.schema_migrations','SELECT') AS yes")).rows[0].yes) throw new Error('DATABASE_SCHEMA_UPGRADE_REQUIRED');
   const version = (await db.query<{ version: number }>('SELECT max(version) AS version FROM schema_migrations')).rows[0].version;
-  if (version !== REQUIRED_SCHEMA_VERSION) throw new Error('DATABASE_SCHEMA_UPGRADE_REQUIRED');
+  // Permit the next additive schema during a rolling Vercel deployment. The
+  // application still verifies every table and privilege it currently uses.
+  if (version < REQUIRED_SCHEMA_VERSION || version > REQUIRED_SCHEMA_VERSION + 1) throw new Error('DATABASE_SCHEMA_UPGRADE_REQUIRED');
   const tables = (await db.query<{ name: string; protected: boolean; owner_access: boolean; policies: number; expected: boolean; confirmation_read: boolean }>(`SELECT c.relname AS name,c.relrowsecurity AS protected,pg_has_role(current_user,c.relowner,'MEMBER') AS owner_access,
     (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policies,
     EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_isolation_v1') AS expected,
