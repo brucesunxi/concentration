@@ -16,7 +16,7 @@ export interface Database extends Queryable { transaction<T>(fn: (tx: Queryable)
 
 export async function openDatabase(location: string, postgresUrl?: string): Promise<Database> {
   if (postgresUrl) {
-    const pool = new pg.Pool({ connectionString: postgresUrl, max: 8, connectionTimeoutMillis: 5000 });
+    const pool = new pg.Pool({ connectionString: postgresUrl, max: 8, connectionTimeoutMillis: 20000 });
     const context = databaseContext();
     pool.on('error', () => console.error(JSON.stringify({ event: 'DATABASE_IDLE_CONNECTION_LOST' })));
     const database: Database = {
