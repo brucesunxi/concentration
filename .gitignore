@@ -9,7 +9,8 @@ coverage/
 .expo/
 .native-tools/
 .vercel/
-docs/productization/qa/
+docs/productization/qa/*
+!docs/productization/qa/*.md
 .bundle/
 apps/family-mobile/ios/
 apps/family-mobile/android/

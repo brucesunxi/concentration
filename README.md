@@ -1,6 +1,8 @@
 # 专注岛 · 家庭成长空间
 
-面向全球 6–17 岁家庭的注意相关技能练习产品。当前为 **v0.44 本地开发版**；Web、原生 App 和内容工作台持续按[产品化方案](docs/productization/README.md)实现，尚未开放真实家庭试用或商业服务。
+面向全球 6–17 岁家庭的注意相关技能练习产品。当前为 **v0.46 内部预览版**；Web、原生 App 和内容工作台持续按[产品化方案](docs/productization/README.md)实现，尚未开放真实家庭试用或商业服务。
+
+Vercel + Neon 内部预览地址：[concentration-two.vercel.app](https://concentration-two.vercel.app/)（需登录有权限的 Vercel 账号）。部署受 Vercel Authentication 保护；所有者数据库凭据不在 Vercel 运行环境。部署结构和开放前条件见 [Vercel + Neon 说明](docs/productization/VERCEL-NEON.md)。
 
 v0.44 调整两端常用点击区域：主按钮至少 56 像素，次要按钮、图标按钮和折叠记录入口至少 48 像素；网页小屏规则也覆盖这些尺寸。[Android arm64 本地测试包](dist/mobile-native/v0.44/android/focus-island-v0.44-arm64-local.apk)已构建并做静态核验。长期使用的[年龄档复核与成年转换实施契约](docs/productization/PROFILE-LIFECYCLE.md)明确了旧授权、未同步记录和监护许可的处理边界；实际转换功能仍待实现。详见[本批验收](docs/productization/qa/touch-targets-v0.44-qa.md)。
 

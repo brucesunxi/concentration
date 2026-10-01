@@ -4,11 +4,12 @@
 
 ## 架构
 
-- Vercel CDN 提供 `dist/web` 静态文件；`api/index.ts` 承接 `/api/*`、`/content-assets/*` 与 `/media/*`。
+- Vercel CDN 提供 `dist/web` 页面、内置图片和预录语音；`api/index.ts` 承接 `/api/*` 及非内置的动态素材。内置素材在构建时以内容哈希复制到静态目录。
 - Neon 托管 PostgreSQL，schema 版本 30。准备过程使用数据库所有者身份；Vercel 只使用 `focus_family_runtime` 限权身份。
 - 会话签名私钥仅放在 Vercel Preview 与 Production 的 Sensitive 环境变量 `FOCUS_SESSION_SIGNING_JWK`；本地准备副本保存在被忽略的 `.focus-data/neon/`，不可提交。
 - Preview 与受保护的 Production 域名共用内部预览数据库。`DATABASE_URL` 是带连接池的应用运行账号 URL。所有者 URL 不进入 Vercel。公开商用前须拆分环境。
 - Vercel 项目 `concentration` 的 `ssoProtection.deploymentType` 必须保持 `all`。
+- 项目与 `brucesunxi/concentration` 的 `main` 分支相连。当前访问域名是 `https://concentration-two.vercel.app/`，属于受保护的内部预览，不代表产品获准公开。
 
 ## 复建步骤
 
