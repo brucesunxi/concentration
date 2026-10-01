@@ -1,4 +1,5 @@
 import type { AgeBand, Locale } from '../task-engine/index.ts';
+import type { PracticeLimits } from './practice-limits.ts';
 
 type Invitation = { title: string; body: string; begin: string; later: string; parentHint: string };
 
@@ -23,4 +24,29 @@ const copy: Record<AgeBand, Record<Locale, Invitation>> = {
 
 export function practiceInvitationCopy(ageBand: AgeBand, locale: Locale): Invitation {
   return copy[ageBand][locale];
+}
+
+export function practiceInvitationDay(limits: PracticeLimits, locale: Locale) {
+  const t = (zh: string, en: string) => locale === 'zh-CN' ? zh : en;
+  if (!limits.collectionActive || limits.status === 'collection-stopped') return {
+    mayStart: false,
+    message: t('这份档案已停止新练习。已有记录仍可在家庭空间查看。', 'New practice has stopped for this profile. Saved records remain available in your family space.'),
+  };
+  if (limits.status === 'paused') return {
+    mayStart: false,
+    message: t('家里安排今天先休息。可以去生活里试试一个小策略。', 'Your family has planned a rest day. You can try a small strategy in everyday life.'),
+  };
+  if (limits.status === 'reserved') return {
+    mayStart: false,
+    message: t('还有一份未结束或未确认的练习。请先和家长一起恢复或处理记录。', 'There is an unfinished or unconfirmed practice. Please recover or resolve its record with a parent first.'),
+  };
+  if (limits.availableMs < 5000) return {
+    mayStart: false,
+    message: t('今天的练习安排已经够了，不需要再开一份。', 'Today’s practice allowance is complete. There is no need to start another.'),
+  };
+  if (limits.confirmedMs > 0) return {
+    mayStart: true,
+    message: t('今天已经练习过了。可以先离开屏幕，把刚试过的策略用在生活里；不必用完剩余时间。', 'You have already practised today. You can step away and try that strategy in everyday life; there is no need to use the remaining time.'),
+  };
+  return { mayStart: true, message: '' };
 }

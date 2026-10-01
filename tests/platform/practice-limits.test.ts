@@ -12,6 +12,7 @@ import type { AgeBand, EngineEvent } from '../../packages/task-engine/index.ts';
 import { nextFamilyDay } from '../../packages/session-runtime/day-boundary.ts';
 import { PracticeLimitClient } from '../../packages/session-runtime/practice-limit-client.ts';
 import type { PracticeLimits } from '../../packages/contracts/practice-limits.ts';
+import { practiceInvitationDay } from '../../packages/contracts/practice-invitation.ts';
 let db: Database, api: FocusService, catalogue: Awaited<ReturnType<typeof createLocalContent>>, authority: Awaited<ReturnType<typeof createSessionAuthority>>;
 const base = Date.parse('2026-10-01T08:00:00Z'); let clock = base;
 const denied = (code: string) => (error: unknown) => error instanceof ApiError && error.code === code;
@@ -42,6 +43,7 @@ test('all four age defaults are read-only, family scoped and children may read o
   for (const age of Object.keys(DAILY_LIMIT) as AgeBand[]) {
     const f = await fixture(age), before = (await db.query('SELECT * FROM children WHERE id=$1', [f.c.id])).rows;
     const overview = await api.practiceLimits(f.p, f.c.id); assert.equal(overview.currentMinutes * 60000, DAILY_LIMIT[age]); assert.equal(overview.availableMs, DAILY_LIMIT[age]);
+    assert.deepEqual(practiceInvitationDay(overview, 'en'), { mayStart: true, message: '' });
     assert.equal(overview.next, null); assert.equal(overview.canEdit, true); assert.deepEqual((await db.query('SELECT * FROM children WHERE id=$1', [f.c.id])).rows, before);
     const sibling = await api.addChild(f.p, { alias: 'Sibling', ageBand: age, locale: 'en', localConfirmation: true });
     const child = (await api.authenticate((await api.enterChild(f.p, f.c.id)).auth.value))!;
@@ -81,8 +83,13 @@ test('new limits take effect at the family day boundary and cannot change an exi
 test('repeated starts, pauses and pending handovers do not reset or refund active-time allowance', async () => {
   const f = await fixture(); await set(f, 1); clock = nextFamilyDay(clock, 'UTC'); f.p = await login(f);
   await stop(f, 20000); const one = await api.practiceLimits(f.p, f.c.id); assert.equal(one.confirmedMs, 20000); assert.equal(one.availableMs, 40000);
+  assert.equal(practiceInvitationDay(one, 'en').mayStart, true);
+  assert.match(practiceInvitationDay(one, 'en').message, /already practised today/);
+  assert.match(practiceInvitationDay(one, 'zh-CN').message, /今天已经练习过了/);
   const s = await start(f); assert.equal(s.session.budget_ms, 40000);
   const held = await api.practiceLimits(f.p, f.c.id); assert.equal(held.confirmedMs, 20000); assert.equal(held.reservedMs, 40000); assert.equal(held.availableMs, 0);
+  assert.equal(practiceInvitationDay(held, 'en').mayStart, false);
+  assert.match(practiceInvitationDay(held, 'en').message, /unfinished or unconfirmed/);
   const target = randomUUID(), recovery = await api.recoverySpace(f.p, f.c.id, { deviceId: target });
   await api.handover(f.p, f.c.id, s.session.id, { deviceId: target, acknowledged: true }, recovery.active!.etag, randomUUID());
   assert.equal((await api.practiceLimits(f.p, f.c.id)).reservedMs, 40000);
@@ -93,7 +100,7 @@ test('repeated starts, pauses and pending handovers do not reset or refund activ
 test('a pause blocks new Web and native practice after rollover but permits records and next-day resumption', async () => {
   const f = await fixture(); await set(f, 0); assert.equal((await api.practiceLimits(f.p, f.c.id)).currentMinutes, 8);
   clock = nextFamilyDay(clock, 'UTC'); f.p = await login(f);
-  assert.equal((await api.practiceLimits(f.p, f.c.id)).status, 'paused'); await assert.rejects(start(f), denied('PRACTICE_PAUSED'));
+  const paused = await api.practiceLimits(f.p, f.c.id); assert.equal(paused.status, 'paused'); assert.equal(practiceInvitationDay(paused, 'en').mayStart, false); await assert.rejects(start(f), denied('PRACTICE_PAUSED'));
   const native = (await api.authenticate((await api.login(f.credentials, 'native')).value, 'native'))!;
   await assert.rejects(api.start(native, f.c.id, { task: 'search', environment: { ...TEST_ENVIRONMENT, platform: 'ios', input: 'touch', deviceClass: 'phone' }, deviceId: randomUUID() }, randomUUID()), denied('PRACTICE_PAUSED'));
   assert.equal((await api.report(f.p, f.c.id)).child.id, f.c.id);

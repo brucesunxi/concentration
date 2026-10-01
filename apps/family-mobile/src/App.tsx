@@ -24,7 +24,8 @@ import { cleanupExportFiles } from './exports';
 import { LocalJournalWarning } from './LocalJournalWarning';
 import type { Me, Child, Session } from '../../../packages/contracts/models.ts';
 import { collectionStatusAllowsPractice, collectionStatusCopy } from '../../../packages/contracts/collection-status.ts';
-import { practiceInvitationCopy } from '../../../packages/contracts/practice-invitation.ts';
+import { practiceInvitationCopy, practiceInvitationDay } from '../../../packages/contracts/practice-invitation.ts';
+import type { PracticeLimits as PracticeLimitsSnapshot } from '../../../packages/contracts/practice-limits.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
 import type { AgeBand, Locale, TaskId } from '../../../packages/task-engine/index.ts';
 import { TASKS } from '../../../packages/task-engine/index.ts';
@@ -38,7 +39,7 @@ function FamilyApp() {
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'billing' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy'>('home');
   const [lifeSuggestion, setLifeSuggestion] = useState<GoalInput['templateId'] | undefined>();
   const [selected, setSelected] = useState<Child | null>(null), [covered, setCovered] = useState(false);
-  const [practiceInvitation, setPracticeInvitation] = useState<{childId:string;task:TaskId;identity:number}|null>(null);
+  const [practiceInvitation, setPracticeInvitation] = useState<{childId:string;task:TaskId;identity:number;day:ReturnType<typeof practiceInvitationDay>}|null>(null);
   const mounted = useRef(true), identityVersion = useRef(0);
   const owner = me?.role === 'parent' && me.member?.role === 'owner', support = me?.role === 'parent' && me.member?.role === 'support';
   const t = translate(locale);
@@ -127,7 +128,13 @@ function FamilyApp() {
   }
   function inviteToPractice(child: Child, task: TaskId) {
     if (!collectionStatusAllowsPractice(child.collectionStatus,child.consentActive)) { setError(collectionStatusCopy(child.collectionStatus,locale).detail); return; }
-    setError('');setPracticeInvitation({childId:child.id,task,identity:identityVersion.current});
+    const childId=child.id, identity=identityVersion.current;
+    void action(async()=>{
+      const limits=await client.request<PracticeLimitsSnapshot>(`/children/${childId}/practice-limits`);
+      if(!mounted.current||identity!==identityVersion.current)return;
+      if(limits.version!=='practice-limits-1'||limits.childId!==childId)throw new Error('PRACTICE_PLAN_MISMATCH');
+      setPracticeInvitation({childId,task,identity,day:practiceInvitationDay(limits,child.locale)});
+    });
   }
   if (session && (me || offlineOffer)) return <View style={{ flex: 1 }}><Practice key={session.id} session={session} familyId={me?.family.id ?? offlineOffer!.capsule.familyId} client={client} offline={!!offlineOffer} onExit={() => { setSession(null); void refresh(false); }} />{covered && <View style={{ position: 'absolute', inset: 0, backgroundColor: colors.background }}><Page title="Focus Island"><Text style={s.muted}>{t('回来后再继续。', 'Continue when you return.')}</Text></Page></View>}</View>;
   if (covered) return <Page title="Focus Island"><Text style={s.muted}>{t('回来后再继续。', 'Continue when you return.')}</Text></Page>;
@@ -147,15 +154,17 @@ function FamilyApp() {
       const invitationCopy=practiceInvitationCopy(invitedChild.ageBand,invitedChild.locale);
       return <Page title={invitationCopy.title} subtitle={taskContent(practiceInvitation.task,invitedChild.locale,invitedChild.ageBand).title}>
         <Text style={s.body}>{invitationCopy.body}</Text>
+        {!!practiceInvitation.day.message&&<Notice>{practiceInvitation.day.message}</Notice>}
         {me.role==='parent'&&<Text style={s.muted}>{invitationCopy.parentHint}</Text>}
         <Notice>{error}</Notice>
-        <Button title={invitationCopy.begin} disabled={busy} onPress={()=>{
+        <Button title={invitationCopy.begin} disabled={busy||!practiceInvitation.day.mayStart} onPress={()=>{
           const chosen=practiceInvitation;
           setPracticeInvitation(null);
           if(chosen.identity!==identityVersion.current){setError(t('家庭状态已更新，请重新选择练习。','Your family space changed. Choose the practice again.'));return;}
           void start(invitedChild,chosen.task);
         }}/>
         <Button quiet title={invitationCopy.later} disabled={busy} onPress={()=>setPracticeInvitation(null)}/>
+        {!practiceInvitation.day.mayStart&&<Button quiet title={invitedChild.locale==='zh-CN'?'查看今天的安排':'View today’s plan'} onPress={()=>{setPracticeInvitation(null);setSelected(invitedChild);setView('limits');}}/>}
       </Page>;
     }
   }
