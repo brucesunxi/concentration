@@ -119,7 +119,12 @@ def verify_mobile_entry(browser, base):
         size = page.evaluate("({body: document.body.scrollWidth, viewport: innerWidth})")
         assert size["body"] <= size["viewport"], f"Mobile horizontal overflow: {size}"
         page.get_by_role("button", name="Create our space").wait_for()
-        print("PASS mobile entry: 390px viewport without horizontal overflow")
+        page.get_by_role("button", name="Welcome back").click()
+        page.get_by_label("Family name").fill(FAMILY)
+        page.get_by_label("Parent password").fill("incorrect synthetic password")
+        page.get_by_role("button", name="Open family space").click()
+        page.get_by_text("The family name or password is incorrect, or sign-in is temporarily unavailable.").wait_for()
+        print("PASS mobile entry: 390px viewport without overflow; failed sign-in stays in English")
     finally:
         page.close()
 
