@@ -1,6 +1,6 @@
 # 家庭流程可重复浏览器验收
 
-2026-10-02。将此前的人工脚本固定为 `npm run test:browser`，并在 GitHub 的 `Family quality` 工作流中加入相同的检查。当前本机使用 Chrome 154 与 Playwright Python 1.47.0 跑通；云端工作流需以首次实际运行结果为准。
+2026-10-02。将此前的人工脚本固定为 `npm run test:browser`，并在 GitHub 的 `Family quality` 工作流中加入相同的检查。本机使用 Chrome 154 与 Playwright Python 1.47.0 跑通；云端 [运行 36908039325](https://github.com/brucesunxi/concentration/actions/runs/36908039325) 已通过。
 
 本机复验：浏览器两项断言通过；`npm test` 324/324、`npm run test:http` 18/18，脚本语法及工作流 YAML 解析通过。
 
@@ -18,4 +18,4 @@ npm run test:browser
 
 已有系统 Chrome 时可用 `FOCUS_BROWSER_PATH` 指向浏览器可执行文件；Python 不在默认路径时用 `FOCUS_BROWSER_PYTHON` 指定。脚本在启动测试服务前清除继承来的 `FOCUS_*`、`DATABASE_*` 和 `VERCEL*` 环境变量，避免误连线上资源或使用部署密钥。
 
-GitHub 工作流在 Ubuntu 24.04 镜像上使用预装的 Chrome，还运行类型检查、业务检查和真实本机 HTTP 检查；浏览器失败时上传虚构资料的失败截图。首轮云端尝试停在 Playwright 浏览器下载环节，故改用镜像浏览器。第二轮进入业务回归，321/324 通过，另 3 项音频素材检查因运行环境缺少 FFmpeg 而失败；现已在工作流中安装 FFmpeg，完整云端结果需重新核对。它不证明 iOS/Android 原生交互、语音听感、Safari/Firefox、正式数据库权限或真实家庭适龄性，这些仍按发布门槛单独验收。
+GitHub 工作流在 Ubuntu 24.04 镜像上使用预装的 Chrome，并安装 FFmpeg；还运行类型检查、324 项业务检查、18 项真实本机 HTTP 检查与浏览器家庭流程。浏览器失败时会上传虚构资料的失败截图。前两轮分别暴露出不必要的浏览器下载和缺少 FFmpeg，第三轮全部通过。它不证明 iOS/Android 原生交互、语音听感、Safari/Firefox、正式数据库权限或真实家庭适龄性，这些仍按发布门槛单独验收。
