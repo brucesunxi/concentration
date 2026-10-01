@@ -1,6 +1,6 @@
 # Neon PostgreSQL 数据库交接
 
-当前家庭服务使用 Neon PostgreSQL，schema 版本为 30。Vercel 运行时连接 `focus_family_runtime` 限权账号；数据库所有者只在受控迁移时使用。部署和运行不需要本地容器。
+当前家庭服务使用 Neon PostgreSQL，schema 版本为 31。Vercel 运行时连接 `focus_family_runtime` 限权账号；数据库所有者只在受控迁移时使用。部署和运行不需要本地容器。
 
 ## 账号边界
 
@@ -18,7 +18,7 @@
 2. 在本机私密环境设置 `DATABASE_MIGRATION_URL`（数据库所有者连接）、`FOCUS_DATABASE_ROLE`（运行角色名）、`FOCUS_DATA_DIR`（只供准备进程使用的私密目录）。
 3. 执行 `npm run db:prepare`。它迁移 schema、写入内置预览内容、建立签名身份，并向运行角色授予所需权限。成功时输出 schema 版本，不输出密码或连接串。
 4. 在 Vercel Sensitive 环境变量中设置运行角色的池化连接串 `DATABASE_URL` 和完整的 `FOCUS_SESSION_SIGNING_JWK`。不要把所有者连接串或私钥写进仓库。
-5. 部署后以受保护的地址核对 `/api/health`、家长注册与登录、图片、语音、家庭隔离和资料删除。流程见 [Vercel + Neon 交接](VERCEL-NEON.md)。
+5. 部署后以受保护的地址核对 `/api/health` 与实际检查数据库连接和迁移版本的 `/api/ready`，再核对家长注册与登录、图片、语音、家庭隔离和资料删除。流程见 [Vercel + Neon 交接](VERCEL-NEON.md)。
 
 `APP_MODE=production` 仍会拒绝启动；目前的 Vercel Production 域名承载的是受 Vercel Authentication 保护的内部预览，尚非面向真实家庭的正式版本。
 

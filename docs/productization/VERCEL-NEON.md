@@ -18,7 +18,7 @@
 2. 在本机私密环境中设置 `DATABASE_MIGRATION_URL`、`FOCUS_DATABASE_ROLE`、`FOCUS_DATA_DIR`，执行 `npm run db:prepare`。此命令仅供数据库所有者运行，迁移、安装内置内容、准备签名身份并授权运行账号。
 3. 将限权账号的池化 URL 作为 Vercel Preview 与 Production 的 Sensitive 变量 `DATABASE_URL`，把 `FOCUS_DATA_DIR/session-signing.jwk.json` 的完整 JSON 作为 `FOCUS_SESSION_SIGNING_JWK`。
 4. 确认 Vercel Authentication 保护所有部署后，执行 `vercel deploy --prod --archive=tgz`，或显式使用 `--target preview` 建立预览部署。运行 `npm run check`、`npm test`、`npm run test:http` 与 `npm run build:vercel`。
-5. 使用登录后的预览页检查家长注册、儿童空间、一次完整练习、静态图像和引导语音，确认不同家庭的数据隔离。
+5. 核对 `/api/ready` 返回 200 后，使用登录后的预览页检查家长注册、儿童空间、一次完整练习、静态图像和引导语音，确认不同家庭的数据隔离。`/api/health` 仅证明应用进程响应，不能单独证明数据库可用。
 
 部署与运行都不需要 Docker。Neon 所有者账号只参与受控迁移，不能作为应用运行账号。Vercel Preview 同时保留静态资源缓存，但 API、会话和家庭记录不得缓存。后续每次迁移先在隔离的 Neon 分支验证，再对目标库执行。正式公开前还需评估平台边缘防护和实际攻击流量，数据库限流不是完整的防滥用方案。
 

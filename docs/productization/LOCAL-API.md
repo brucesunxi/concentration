@@ -32,6 +32,7 @@
 | 方法与路径 | 请求/作用 | 响应概要 |
 |---|---|---|
 | `GET /health` | 无登录 | 本地模式、版本、状态、releaseScopeVersion |
+| `GET /ready` | 无登录；实际查询数据库 | 数据库可达且迁移版本匹配时 200；否则固定 503 / DATABASE_NOT_READY，不输出连接信息 |
 | `POST /auth/setup` | name、password、timezone、locale、residenceCountry、registrationPlatform、acknowledgedLocalUse=true；本地预览仅接受 ZZ | 会话 Cookie、csrf；未开放返回 MARKET_NOT_OPEN |
 | `POST /auth/login` | name、password、可选 memberLogin（省略为 owner） | 家长 Cookie、csrf |
 | `POST /auth/join` | code、loginName、displayName、password、acknowledgedLocalUse=true | 独立待确认账号的 Web Cookie/csrf 或原生 accessToken |

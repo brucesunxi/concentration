@@ -35,6 +35,8 @@ test('family deletion requires creator, password, exact name and CSRF, then surv
   const owner = { name: 'Synthetic deletion family', password: 'Synthetic-deletion-passphrase!' };
   try {
     await boot();
+    const ready = await call('/ready');
+    assert.equal(ready.response.status, 200); assert.equal(ready.body.status, 'ok');
     const original = web(await call('/auth/setup', {}, 'POST', { ...owner, timezone: 'UTC', locale: 'en', acknowledgedLocalUse: true }));
     const other = web(await call('/auth/setup', {}, 'POST', { name: 'Unrelated synthetic family', password: 'Unrelated-synthetic-password!', timezone: 'UTC', locale: 'en', acknowledgedLocalUse: true }));
     const profile = (await call('/children', original, 'POST', { alias: 'Synthetic child', ageBand: '9-11', locale: 'en', localConfirmation: true })).body;

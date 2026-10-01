@@ -13,6 +13,7 @@ import { createSessionAuthority } from './session-authority.ts';
 import { startStudioServer } from './studio-http.ts';
 import { createWebReleaseReader } from '../../packages/web-release/index.ts';
 import { verifyRuntimeRole } from './family-isolation.ts';
+import { databaseReady } from './readiness.ts';
 import { localReleaseScope } from './release-scope.ts';
 import { authClientFingerprint, authClientIp, authRateKind, takeAuthSlot } from './auth-rate-limit.ts';
 
@@ -70,6 +71,10 @@ const server = http.createServer(async (req, res) => {
       res.writeHead(200, { 'Content-Type': asset.mime, 'Cache-Control': asset.cacheControl, 'Content-Security-Policy': "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" }); res.end(method === 'HEAD' ? undefined : asset.bytes); return;
     }
     if (method === 'GET' && url.pathname === '/api/health') { json({ status: 'ok', mode: 'local-development', version: sourceVersion, releaseScopeVersion: localReleaseScope.version }); return; }
+    if (method === 'GET' && url.pathname === '/api/ready') {
+      if (!await databaseReady(db)) { json({ status: 'unavailable', code: 'DATABASE_NOT_READY', requestId }, 503); return; }
+      json({ status: 'ok', mode: 'local-development', version: sourceVersion, releaseScopeVersion: localReleaseScope.version }); return;
+    }
     const native = req.headers['x-focus-client'] === 'native-local-v1';
     if (native && (req.headers.origin || req.headers.cookie)) throw new ApiError(403, 'NATIVE_REQUEST_REJECTED', '原生请求不能混用浏览器身份。');
     if (!native && req.headers.authorization) throw new ApiError(403, 'TRANSPORT_REJECTED', '此身份只能通过其原有客户端使用。');
