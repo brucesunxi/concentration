@@ -18,6 +18,7 @@
     "voice:audit": "node scripts/audit-content-voice-assets.mjs",
     "test": "node --test tests/*.test.mjs tests/platform/*.test.ts",
     "test:http": "node --test --test-concurrency=2 tests/http/*.test.mjs",
+    "audit:preview": "node scripts/audit-protected-preview.mjs",
     "content:audit": "node scripts/audit-content.ts",
     "content:readiness": "node scripts/audit-content-readiness.ts",
     "mobile:start": "npm run start --workspace=@focus/family-mobile",
