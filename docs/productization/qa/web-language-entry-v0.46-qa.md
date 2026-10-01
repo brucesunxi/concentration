@@ -11,3 +11,9 @@
 ## 范围
 
 当前仍只有英语与简体中文内容；其他语言会落到已支持语言，不代表已完成当地母语、适龄或法规审查。此项不改变后端市场准入、监护许可和 Vercel Authentication 保护。
+
+## 受保护线上预览
+
+源码提交 `49256a9` 经 GitHub [Family quality](https://github.com/brucesunxi/concentration/actions/runs/36940286032) 业务与浏览器检查通过后，Vercel 部署 `dpl_7dsVENH5E9kEkDPs7XuQuC1U4jC5` 为 Ready，并将 `concentration-two.vercel.app` 指向本次构建。受保护请求读取到入口 `assets/index-B_FvOb9B.js`；未登录请求仍以 302 转往 Vercel 登录。线上虚构家庭验收完成服务就绪、创建、建档、读取、删除和旧会话失效，未留下待清理测试凭据。
+
+线上检查证明代码与服务在受保护环境可用；实际中英文与繁体中文首屏操作由上述隔离浏览器验收覆盖，没有把线上单次请求描述为真实家庭可用性研究。
