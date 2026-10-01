@@ -9,12 +9,12 @@ export type CollectionStatus =
 
 const copy: Record<CollectionStatus, Record<Locale, { short: string; detail: string }>> = {
   'local-preview-enabled': {
-    'zh-CN': { short: '允许本机试玩', detail: '本机试玩确认有效。它不等于可验证的监护人许可；当前版本尚未开放真实家庭使用。' },
-    en: { short: 'Local preview enabled', detail: 'Local preview confirmation is active. It is not verified guardian permission; this version is not open to real families.' },
+    'zh-CN': { short: '开发预览可体验', detail: '开发预览确认有效。它不等于可验证的监护人许可；当前版本尚未开放真实家庭使用。' },
+    en: { short: 'Development preview enabled', detail: 'Development preview confirmation is active. It is not verified guardian permission; this version is not open to real families.' },
   },
   'local-preview-required': {
-    'zh-CN': { short: '本机试玩未开放', detail: '本机试玩确认缺失或失效。新练习和新观察已暂停，已有记录仍可由家长导出或删除。' },
-    en: { short: 'Local preview unavailable', detail: 'Local preview confirmation is missing or invalid. New practice and observations are paused; a parent can still export or delete existing records.' },
+    'zh-CN': { short: '开发预览未开放', detail: '开发预览确认缺失或失效。新练习和新观察已暂停，已有记录仍可由家长导出或删除。' },
+    en: { short: 'Development preview unavailable', detail: 'Development preview confirmation is missing or invalid. New practice and observations are paused; a parent can still export or delete existing records.' },
   },
   'guardian-verified': {
     'zh-CN': { short: '监护核验有效', detail: '当前孩子、用途和开放范围的监护核验仍在有效期内。家长可以随时停止新数据采集。' },
