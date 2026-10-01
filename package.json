@@ -30,8 +30,7 @@
     "visuals:check": "node scripts/build-visuals.mjs --check",
     "visuals:proof": "node scripts/proof-visuals.mjs",
     "studio:build": "tsc --noEmit && vite build --config vite.studio.config.ts",
-    "db:prepare": "node scripts/prepare-postgres.ts",
-    "test:postgres": "node scripts/test-postgres.mjs"
+    "db:prepare": "node scripts/prepare-postgres.ts"
   },
   "engines": {
     "node": ">=24.14.0"

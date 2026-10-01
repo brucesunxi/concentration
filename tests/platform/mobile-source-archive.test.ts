@@ -11,6 +11,7 @@ const root = resolve(import.meta.dirname, '../..'), run = promisify(execFile);
 const sha256 = (bytes: Buffer) => createHash('sha256').update(bytes).digest('hex');
 
 test('mobile source archive preserves the exact build input and refuses changed files', async () => {
+  await mkdir(join(root, 'dist'), { recursive: true });
   const fixture = await mkdtemp(join(root, 'dist/.source-archive-test-'));
   const build = await mkdtemp(join(tmpdir(), 'focus-source-archive-test-'));
   try {
