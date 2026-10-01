@@ -126,7 +126,7 @@ test('upgrading schema 19 preserves original credentials, existing child access,
   try{
     // Run the real historical migrations while deferring only the new versions.
     const deferred:Database={...legacy,transaction:fn=>legacy.transaction(tx=>fn({query:<T>(sql:string,args?:unknown[])=>{
-      const version=sql.match(/^SELECT version FROM schema_migrations WHERE version=(20|21|22|23|24|25|26|27|28|29|30|31)$/)?.[1];
+      const version=sql.match(/^SELECT version FROM schema_migrations WHERE version=(20|21|22|23|24|25|26|27|28|29|30|31|32)$/)?.[1];
       return version?Promise.resolve({rows:[{version:Number(version)}] as T[]}):tx.query<T>(sql,args);
     }}))};
     await migrate(deferred);

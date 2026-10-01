@@ -21,6 +21,13 @@ export interface BillingLedger {
   renewal:{revision:number;enabled:boolean}|null;
   grace:{revision:number;productId:string;until:string|null}|null;
 }
+export const billingLedgerSchema:z.ZodType<BillingLedger>=z.object({
+  version:z.literal(1),source,seen:z.record(z.string(),z.string()),
+  periods:z.record(z.string(),z.object({transactionId:identifier,productId:identifier,startsAt:z.iso.datetime(),endsAt:z.iso.datetime()}).strict()),
+  refunded:z.record(z.string(),z.literal(true)),
+  renewal:z.object({revision:z.number().int().nonnegative(),enabled:z.boolean()}).strict().nullable(),
+  grace:z.object({revision:z.number().int().nonnegative(),productId:identifier,until:z.iso.datetime().nullable()}).strict().nullable(),
+}).strict();
 export class BillingConflict extends Error { readonly code:string;constructor(code:string){super(code);this.code=code;} }
 const key=(value:BillingSource)=>`${value.provider}:${value.originalTransactionId}`;
 export function emptyBillingLedger(raw:BillingSource):BillingLedger {return {version:1,source:source.parse(raw),seen:{},periods:{},refunded:{},renewal:null,grace:null};}

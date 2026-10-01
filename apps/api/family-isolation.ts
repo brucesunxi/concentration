@@ -1,9 +1,11 @@
 import type { Database, Queryable } from './database.ts';
-export const REQUIRED_SCHEMA_VERSION = 31;
+export const REQUIRED_SCHEMA_VERSION = 32;
 
 const LEGACY_FAMILY_TABLES = ['families', 'children', 'auth_sessions', 'local_confirmations', 'sessions', 'events', 'observations', 'life_goals', 'life_goal_actions', 'session_handovers'] as const;
 export const FAMILY_TABLES = [...LEGACY_FAMILY_TABLES, 'family_members', 'family_invitations', 'family_member_audit', 'guardian_consents'] as const;
 export const CONTENT_READ_TABLES = ['content_signers', 'content_releases', 'content_channels', 'session_authorities', 'content_media_objects', 'family_content_releases', 'family_content_channels'] as const;
+export const BILLING_READ_TABLES = ['billing_ledgers'] as const;
+export const BILLING_OPERATOR_TABLES = ['billing_events'] as const;
 export const STUDIO_TABLES = ['studio_users', 'studio_sessions', 'studio_drafts', 'studio_reviews', 'studio_audit', 'studio_commands', 'studio_write_guard', 'studio_previews', 'studio_media', 'content_media_sources', 'content_media_objects', 'content_signers', 'content_releases', 'content_channels', 'content_audit', 'family_content_releases', 'family_content_channels', 'support_drafts', 'support_reviews', 'support_commands', 'support_audit'] as const;
 const setting = (name: string) => `nullif(current_setting('focus.${name}',true),'')`;
 const mode = setting('mode'), family = `${setting('family_id')}::uuid`, child = `${setting('child_id')}::uuid`, scope = setting('scope');
@@ -77,6 +79,7 @@ export async function grantRuntimeRoles(db: Database, familyRole: string, studio
     await tx.query(`GRANT SELECT ON public.schema_migrations TO ${familyName}`);
     await tx.query(`GRANT SELECT,INSERT,UPDATE,DELETE ON ${FAMILY_TABLES.map(x => 'public.' + x).join(',')} TO ${familyName}`);
     await tx.query(`GRANT SELECT ON ${CONTENT_READ_TABLES.map(x => 'public.' + x).join(',')} TO ${familyName}`);
+    await tx.query(`GRANT SELECT ON public.billing_ledgers TO ${familyName}`);
     await tx.query(`GRANT EXECUTE ON FUNCTION public.focus_locked_release(text), public.focus_locked_family_content(text), public.focus_auth_take_slot(text,text,timestamptz) TO ${familyName}`);
     if (studioName) {
       await tx.query(`GRANT USAGE ON SCHEMA public TO ${studioName}`);
@@ -102,12 +105,21 @@ export async function verifyRuntimeRole(db: Database, kind: 'family' | 'studio')
     FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])`, [FAMILY_TABLES])).rows;
   if (tables.length !== FAMILY_TABLES.length || tables.some(row => row.owner_access || !row.protected || !row.expected ||
     (row.name === 'local_confirmations' ? row.policies !== 2 || !row.confirmation_read : row.policies !== 1 || row.confirmation_read))) throw new Error('DATABASE_FAMILY_ISOLATION_REQUIRED');
+  const billing = (await db.query<{ name: string; protected: boolean; owner_access: boolean; policies: number; expected: boolean }>(`SELECT c.relname AS name,c.relrowsecurity AS protected,pg_has_role(current_user,c.relowner,'MEMBER') AS owner_access,
+    (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policies,
+    EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_isolation_v1' AND p.polcmd='r') AS expected
+    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])`, [[...BILLING_READ_TABLES,...BILLING_OPERATOR_TABLES]])).rows;
+  if (billing.length !== 2 || billing.some(row => row.owner_access || !row.protected || (row.name === 'billing_ledgers' ? !row.expected || row.policies !== 1 : row.expected || row.policies !== 0))) throw new Error('DATABASE_BILLING_ISOLATION_REQUIRED');
   const canCreate = (await db.query<{ yes: boolean }>("SELECT has_schema_privilege(current_user,'public','CREATE') AS yes")).rows[0].yes;
   if (canCreate) throw new Error('DATABASE_RUNTIME_DDL_FORBIDDEN');
-  const crossTables = kind === 'family' ? STUDIO_TABLES.filter(x => !(CONTENT_READ_TABLES as readonly string[]).includes(x)) : FAMILY_TABLES;
+  const crossTables = kind === 'family' ? [...STUDIO_TABLES.filter(x => !(CONTENT_READ_TABLES as readonly string[]).includes(x)),...BILLING_OPERATOR_TABLES] : [...FAMILY_TABLES,...BILLING_READ_TABLES,...BILLING_OPERATOR_TABLES];
   const crossAccess = (await db.query<{ yes: boolean }>("SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')),false) AS yes FROM unnest($1::text[]) t", [crossTables])).rows[0];
   if (crossAccess.yes) throw new Error('DATABASE_CROSS_ROLE_PRIVILEGE');
   if (kind === 'family' && (await db.query<{ yes: boolean }>("SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')),false) AS yes FROM unnest($1::text[]) t", [CONTENT_READ_TABLES])).rows[0].yes) throw new Error('DATABASE_CONTENT_WRITE_FORBIDDEN');
+  if (kind === 'family') {
+    if (!(await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.billing_ledgers','SELECT') AS yes")).rows[0].yes) throw new Error('DATABASE_BILLING_READ_REQUIRED');
+    if ((await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.billing_ledgers','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS yes")).rows[0].yes) throw new Error('DATABASE_BILLING_WRITE_FORBIDDEN');
+  }
   const required = kind === 'family' ? FAMILY_TABLES : STUDIO_TABLES;
   if ((await db.query<{ yes: boolean }>("SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'TRUNCATE,REFERENCES,TRIGGER')),false) AS yes FROM unnest($1::text[]) t", [required])).rows[0].yes) throw new Error('DATABASE_RUNTIME_PRIVILEGE_UNSAFE');
   if ((await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.schema_migrations','INSERT,UPDATE,DELETE,TRUNCATE') AS yes")).rows[0].yes) throw new Error('DATABASE_MIGRATION_WRITE_FORBIDDEN');

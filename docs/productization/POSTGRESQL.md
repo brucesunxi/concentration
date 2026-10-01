@@ -1,6 +1,6 @@
 # Neon PostgreSQL 数据库交接
 
-当前家庭服务使用 Neon PostgreSQL，schema 版本为 31。Vercel 运行时连接 `focus_family_runtime` 限权账号；数据库所有者只在受控迁移时使用。部署和运行不需要本地容器。
+当前家庭服务使用 Neon PostgreSQL，schema 版本为 32。Vercel 运行时连接 `focus_family_runtime` 限权账号；数据库所有者只在受控迁移时使用。部署和运行不需要本地容器。新增家庭权益账本仅向运行账号授予按家庭隔离的读取权，渠道事件表不授予运行账号访问权。
 
 ## 账号边界
 

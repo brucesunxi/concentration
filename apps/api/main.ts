@@ -16,6 +16,7 @@ import { verifyRuntimeRole } from './family-isolation.ts';
 import { databaseReady } from './readiness.ts';
 import { localReleaseScope } from './release-scope.ts';
 import { authClientFingerprint, authClientIp, authRateKind, takeAuthSlot } from './auth-rate-limit.ts';
+import { databaseEntitlementReader } from './billing-access.ts';
 
 export async function createFamilyServer(options: { serverless?: boolean } = {}) {
 if (process.env.APP_MODE === 'production') throw new Error('Production release remains gated: verified guardian consent, OIDC, regional review, and operational validation are not yet complete.');
@@ -30,7 +31,7 @@ if (postgres) await verifyRuntimeRole(db, 'family'); else await migrate(db);
 const content = await createLocalContent(db, { dataDir, readOnly: postgres });
 const authority = await createSessionAuthority(db, { dataDir: options.serverless ? undefined : dataDir, readOnly: postgres });
 const authRateSecret = process.env.FOCUS_SESSION_SIGNING_JWK || await readFile(resolve(dataDir, 'session-signing.jwk.json'), 'utf8');
-const api = service(db, Date.now, content, authority, localReleaseScope);
+const api = service(db, Date.now, content, authority, localReleaseScope, undefined, databaseEntitlementReader());
 const port = Number(process.env.API_PORT || 4181);
 const allowedOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`, 'http://127.0.0.1:4180', 'http://localhost:4180']);
 const vercelHosts = options.serverless ? [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL].filter((host): host is string => !!host) : [];
