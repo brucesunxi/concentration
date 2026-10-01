@@ -27,6 +27,7 @@ import { collectionStatusAllowsPractice, collectionStatusCopy } from '../../../p
 import { practiceInvitationCopy, practiceInvitationDay } from '../../../packages/contracts/practice-invitation.ts';
 import type { PracticeLimits as PracticeLimitsSnapshot } from '../../../packages/contracts/practice-limits.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
+import { connectionErrorCopy, requestErrorCopy } from '../../../packages/contracts/request-error-copy.ts';
 import type { AgeBand, Locale, TaskId } from '../../../packages/task-engine/index.ts';
 import { TASKS } from '../../../packages/task-engine/index.ts';
 import { taskContent, translate, isTeen } from '../../../packages/content/copy.ts';
@@ -36,6 +37,7 @@ function FamilyApp() {
   const [me, setMe] = useState<Me | null>(null), [session, setSession] = useState<Session | null>(null);
   const [offlineOffer,setOfflineOffer]=useState<NonNullable<Awaited<ReturnType<typeof readOfflineSession>>>|null>(null);
   const [locale, setLocale] = useState<Locale>('zh-CN'), [familyName, setFamilyName] = useState('');
+  const localeRef = useRef(locale); localeRef.current = locale;
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'billing' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy'>('home');
   const [lifeSuggestion, setLifeSuggestion] = useState<GoalInput['templateId'] | undefined>();
   const [selected, setSelected] = useState<Child | null>(null), [covered, setCovered] = useState(false);
@@ -43,7 +45,11 @@ function FamilyApp() {
   const mounted = useRef(true), identityVersion = useRef(0);
   const owner = me?.role === 'parent' && me.member?.role === 'owner', support = me?.role === 'parent' && me.member?.role === 'support';
   const t = translate(locale);
-  const message = (e: unknown) => e instanceof MobileRequestError && e.code === 'PRACTICE_PAUSED' ? t('家庭已暂停新练习。可以休息，也可以看看生活小目标。', 'Your family has paused new practice. Rest or explore everyday goals.') : e instanceof MobileRequestError && e.code === 'SESSION_CONFLICT' ? t('这份档案在另一台设备有未结束的练习，可以在家长空间的「未结束练习与换设备」中处理。', 'This profile has an unfinished practice on another device. Use Unfinished practice & changing devices in the parent space.') : e instanceof MobileRequestError && e.code === 'DAILY_LIMIT' ? t('今天已经练习够了，去生活里试试小策略吧。', 'You have practiced enough today. Try a strategy in daily life.') : e instanceof MobileRequestError && e.code === 'LOGIN_FAILED' ? t('家庭名称或密码不正确。', 'The family name or password is incorrect.') : t('暂时无法完成。请确认本地家庭服务已启动后重试。', 'Unable to continue. Check that the local family service is running, then retry.');
+  const message = (e: unknown) => e instanceof MobileRequestError
+    ? requestErrorCopy(e.code, e.status, locale)
+    : isNetworkFailure(e)
+      ? connectionErrorCopy(locale)
+      : t('暂时无法完成，请重试。', 'Unable to complete. Please retry.');
   const refresh = useCallback(async (resume = true) => {
     const version = ++identityVersion.current;
     setBusy(true); setError('');setOfflineOffer(null);setPracticeInvitation(null);
@@ -102,7 +108,7 @@ function FamilyApp() {
   useEffect(() => {
     const subscription = AppState.addEventListener('change', state => {
       setCovered(state !== 'active');
-      if (state === 'active') { try { cleanupExportFiles(); } catch { setError('导出临时文件清理尚未完成，请重新打开后重试。 / Temporary export cleanup is pending. Reopen the app to retry.'); } }
+      if (state === 'active') { try { cleanupExportFiles(); } catch { setError(translate(localeRef.current)('导出临时文件清理尚未完成，请重新打开后重试。', 'Temporary export cleanup is pending. Reopen the app to retry.')); } }
       if (state !== 'active') {
         identityVersion.current++; client.lockParent();
         setMe(current => current?.role === 'parent' ? null : current); setSelected(null); setPracticeInvitation(null); setView('home'); setBusy(false);
