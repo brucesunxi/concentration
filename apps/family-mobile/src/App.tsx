@@ -2,6 +2,7 @@ import { useCallback, useEffect, useRef, useState } from 'react';
 import { AppState, Platform, Text, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
+import { getLocales } from 'expo-localization';
 import { MobileClient, MobileRequestError, unavailable } from './client';
 import { Page, Button, Choice, Field, CheckBox, Notice, MobileBoundary, s, colors } from './ui';
 import { Practice } from './Practice';
@@ -27,6 +28,7 @@ import { collectionStatusAllowsPractice, collectionStatusCopy } from '../../../p
 import { practiceInvitationCopy, practiceInvitationDay } from '../../../packages/contracts/practice-invitation.ts';
 import type { PracticeLimits as PracticeLimitsSnapshot } from '../../../packages/contracts/practice-limits.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
+import { supportedDeviceLocale } from '../../../packages/contracts/device-locale.ts';
 import { connectionErrorCopy, requestErrorCopy } from '../../../packages/contracts/request-error-copy.ts';
 import type { AgeBand, Locale, TaskId } from '../../../packages/task-engine/index.ts';
 import { TASKS } from '../../../packages/task-engine/index.ts';
@@ -36,7 +38,7 @@ const client = new MobileClient();
 function FamilyApp() {
   const [me, setMe] = useState<Me | null>(null), [session, setSession] = useState<Session | null>(null);
   const [offlineOffer,setOfflineOffer]=useState<NonNullable<Awaited<ReturnType<typeof readOfflineSession>>>|null>(null);
-  const [locale, setLocale] = useState<Locale>('zh-CN'), [familyName, setFamilyName] = useState('');
+  const [locale, setLocale] = useState<Locale>(() => supportedDeviceLocale(getLocales().map(item => item.languageTag))), [familyName, setFamilyName] = useState('');
   const localeRef = useRef(locale); localeRef.current = locale;
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'billing' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy'>('home');
   const [lifeSuggestion, setLifeSuggestion] = useState<GoalInput['templateId'] | undefined>();

@@ -13,6 +13,7 @@ const config: ExpoConfig = {
   },
   android: { package: 'dev.focusisland.family', versionCode: buildIdentity.androidVersionCode, allowBackup: false, blockedPermissions: ['android.permission.RECORD_AUDIO', 'android.permission.CAMERA', 'android.permission.ACCESS_FINE_LOCATION', 'android.permission.ACCESS_COARSE_LOCATION', 'android.permission.READ_EXTERNAL_STORAGE', 'android.permission.WRITE_EXTERNAL_STORAGE'] },
   plugins: [
+    ['expo-localization', { supportedLocales: { ios: ['en', 'zh-Hans'], android: ['en', 'zh-CN'] } }],
     ['expo-audio', { microphonePermission: false, recordAudioAndroid: false, enableBackgroundPlayback: false, enableBackgroundRecording: false }],
     ['expo-sqlite', { useSQLCipher: true, enableFTS: false }],
     ['expo-secure-store', { configureAndroidBackup: true, faceIDPermission: false }],
