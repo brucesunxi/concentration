@@ -135,6 +135,28 @@ def verify_mobile_entry(browser, base):
         page.close()
 
 
+def verify_first_language(browser, base):
+    for browser_language, expected_heading in [
+        ("zh-CN", "专注于眼前，"),
+        ("zh-TW", "Find your focus."),
+    ]:
+        page = browser.new_page(locale=browser_language)
+        try:
+            page.goto(base, wait_until="networkidle")
+            page.get_by_role("heading", name=re.compile(re.escape(expected_heading))).wait_for()
+            expected_locale = "zh-CN" if browser_language == "zh-CN" else "en"
+            assert page.evaluate("document.documentElement.lang") == expected_locale
+            if browser_language == "zh-TW":
+                page.get_by_role("button", name="简体中文").click()
+                page.get_by_role("heading", name=re.compile("专注于眼前")).wait_for()
+                page.reload(wait_until="networkidle")
+                page.get_by_role("heading", name=re.compile("专注于眼前")).wait_for()
+                assert page.evaluate("localStorage.getItem('focus-ui-locale')") == "zh-CN"
+        finally:
+            page.close()
+    print("PASS language entry: Simplified Chinese, Traditional Chinese fallback, saved manual choice")
+
+
 def main():
     port = free_port()
     base = f"http://127.0.0.1:{port}"
@@ -155,6 +177,7 @@ def main():
                 try:
                     verify_family_flow(browser, base)
                     verify_mobile_entry(browser, base)
+                    verify_first_language(browser, base)
                 finally:
                     browser.close()
         finally:

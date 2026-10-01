@@ -21,6 +21,7 @@ import { collectionStatusAllowsPractice, collectionStatusCopy } from '../../../p
 import { practiceInvitationCopy, practiceInvitationDay } from '../../../packages/contracts/practice-invitation.ts';
 import type { PracticeLimits } from '../../../packages/contracts/practice-limits.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
+import { supportedDeviceLocale } from '../../../packages/contracts/device-locale.ts';
 import './practice-invitation.css';
 import './child-data-visibility.css';
 
@@ -38,7 +39,7 @@ const PracticeLimits = lazy(() => import('./PracticeLimits.tsx'));
 const AgeReview = lazy(() => import('./AgeReview.tsx'));
 function preferredLocale():Locale {
   try{const saved=localStorage.getItem('focus-ui-locale');if(saved==='zh-CN'||saved==='en')return saved;}catch{}
-  return navigator.language.toLowerCase().startsWith('zh')?'zh-CN':'en';
+  return supportedDeviceLocale(navigator.languages?.length ? navigator.languages : [navigator.language]);
 }
 function Dialog({ title, children, onClose, locale, navigation = false }: { title: string; children: ReactNode; onClose: () => void; locale: Locale; navigation?: boolean }) {
   const ref = useRef<HTMLDialogElement>(null);
