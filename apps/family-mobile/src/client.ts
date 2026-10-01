@@ -119,11 +119,11 @@ export class MobileClient {
     const epoch = ++this.authEpoch;
     let forget = false;
     try {
-      const result = await this.request<T>(action === 'password' ? '/auth/change-password' : '/auth/logout-all', 'POST', data);
+      const result = await this.request<T>(action === 'password' ? '/auth/change-password' : action === 'delete' ? '/family' : '/auth/logout-all', action === 'delete' ? 'DELETE' : 'POST', data);
       forget = true; return result;
     } catch (error) {
       // Unknown outcomes must not leave this installation using an old credential.
-      forget = !(error instanceof MobileRequestError && ['PASSWORD_REJECTED', 'ACCOUNT_LOCKED', 'PASSWORD_UNCHANGED', 'INVALID_REQUEST'].includes(error.code));
+      forget = !(error instanceof MobileRequestError && ['PASSWORD_REJECTED', 'ACCOUNT_LOCKED', 'PASSWORD_UNCHANGED', 'FAMILY_NAME_MISMATCH', 'INVALID_REQUEST'].includes(error.code));
       throw error;
     } finally {
       if (forget && epoch === this.authEpoch) {

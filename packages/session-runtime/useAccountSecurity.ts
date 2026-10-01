@@ -10,5 +10,5 @@ export function useAccountSecurity(familyId: string, request: Request) {
     const client = new AccountSecurityClient(familyId, request, setState); current.current = client; setState(client.state); void client.load();
     return () => { client.dispose(); if (current.current === client) current.current = null; };
   }, [familyId, request]);
-  return { state, reload: () => current.current?.load(), submit: (action: AccountAction, input: { currentPassword: string; newPassword?: string; acknowledged: true }) => current.current?.submit(action, input) };
+  return { state, reload: () => current.current?.load(), submit: (action: AccountAction, input: { currentPassword: string; newPassword?: string; familyName?: string; acknowledged: true }) => current.current?.submit(action, input) };
 }

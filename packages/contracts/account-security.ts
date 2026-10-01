@@ -7,9 +7,10 @@ export const newPasswordSchema = z.string().max(128).refine(value => {
 }, 'Use 15–128 characters.');
 export const confirmPasswordSchema = z.object({ currentPassword: z.string().min(1).max(128), acknowledged: z.literal(true) }).strict();
 export const changePasswordSchema = confirmPasswordSchema.extend({ newPassword: newPasswordSchema });
+export const deleteFamilySchema = confirmPasswordSchema.extend({ familyName: z.string().min(1).max(40) });
 export interface AccountSecurity {
   version: 'account-security-1'; familyId: string; passwordChangedAt: string | null;
   memberRole?: 'owner' | 'support';
   active: { parent: { web: number; native: number }; child: { web: number; native: number } };
 }
-export type AccountAction = 'password' | 'signout';
+export type AccountAction = 'password' | 'signout' | 'delete';

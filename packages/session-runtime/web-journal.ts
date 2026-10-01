@@ -163,4 +163,23 @@ export class WebJournal {
       done();
     },fail));
   }
+  /** Remove one family's recoverable data on a browser shared by several families. */
+  async clearFamily(familyId:string,childIds:string[]) {
+    const children=new Set(childIds);
+    await this.transaction<void>(stores,'readwrite',(tx,done,fail)=>reads(tx,[['meta',singleton],['offline',singleton]],([meta,resume]:[any,Resume|undefined])=>{
+      const generation=meta.generation+1;
+      tx.objectStore('meta').put({...meta,generation});
+      if(resume){
+        if(resume.capsule.familyId===familyId||children.has(resume.capsule.session.child_id))tx.objectStore('offline').clear();
+        else if(resume.generation===meta.generation)tx.objectStore('offline').put({...resume,generation});
+      }
+      for(const id of children)tx.objectStore('blocked').put({id});
+      const cursor=tx.objectStore('sessions').openCursor();
+      cursor.onerror=()=>{fail(cursor.error);tx.abort();};
+      cursor.onsuccess=()=>{const row=cursor.result;if(!row)return;const journal=row.value as Journal;
+        if(journal.familyId===familyId||children.has(journal.childId))row.delete();
+        row.continue();};
+      done();
+    },fail));
+  }
 }

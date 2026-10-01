@@ -105,6 +105,11 @@ const server = http.createServer(async (req, res) => {
       if (!native) res.setHeader('Set-Cookie', cookie('', false).replace(/Max-Age=\d+/, 'Max-Age=0'));
       json(result); return;
     }
+    if (url.pathname === '/api/family' && method === 'DELETE') {
+      const result = await api.deleteFamily(principal, await body(req));
+      if (!native) res.setHeader('Set-Cookie', cookie('', false).replace(/Max-Age=\d+/, 'Max-Age=0'));
+      json(result); return;
+    }
     if (url.pathname === '/api/session-authorities' && method === 'GET') { json({ mode: 'local-development', keys: await api.sessionAuthorities() }); return; }
     const statusRoute = url.pathname.match(/^\/api\/sessions\/([a-f0-9-]{36})\/status$/);
     if (statusRoute && method === 'GET') { json(await api.sessionStatus(principal, statusRoute[1])); return; }

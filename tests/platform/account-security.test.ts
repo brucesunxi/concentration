@@ -74,6 +74,44 @@ test('sign out everywhere requires the current password and does not change it o
   assert.equal((await api.accountSecurity(p)).passwordChangedAt, null);
 });
 
+test('only a recently authenticated creator can delete the whole family and every server-side child record', async () => {
+  const f = await fixture(), other = await fixture();
+  await api.observe(f.p, f.c.id, { task: 'search', context: 'packing', prompts: 1, childChoice: true }, randomUUID());
+  const childAccess = await api.start(f.p, f.c.id, { task: 'search', environment: TEST_ENVIRONMENT, deviceId: randomUUID() }, randomUUID());
+  const child = (await api.authenticate(childAccess.auth.value))!;
+  const creator = (await api.authenticate((await api.login(f.credentials)).value))!;
+  const invite = await api.inviteMember(creator, { childIds: [f.c.id], acknowledged: true }, randomUUID());
+  const joined = await api.join({ code: invite.code, loginName: 'helper', displayName: 'Synthetic helper', password: 'Synthetic-helper-passphrase!', acknowledgedLocalUse: true });
+  const helper = (await api.authenticate(joined.value))!;
+  await db.query(`INSERT INTO guardian_consents(id,family_id,child_id,owner_member_id,provider,verification_ref_hash,country,age_band,locale,purpose,notice_version,notice_sha256,release_scope_identity,verified_at,granted_at,expires_at)
+    VALUES($1,$2,$3,$4,'synthetic-provider',$5,'ZZ','9-11','en','family-practice','synthetic-1',$6,'synthetic-scope',$7,$7,$8)`,
+    [randomUUID(),f.p.family_id,f.c.id,creator.member_id,'a'.repeat(64),'b'.repeat(64),new Date(clock).toISOString(),new Date(clock+3600_000).toISOString()]);
+  const input = { currentPassword: f.credentials.password, familyName: f.credentials.name, acknowledged: true };
+  await assert.rejects(api.deleteFamily(child, input), denied('PARENT_REQUIRED'));
+  await assert.rejects(api.deleteFamily(helper, input), denied('OWNER_REQUIRED'));
+  await assert.rejects(api.deleteFamily(creator, { ...input, familyName: 'another family' }), denied('FAMILY_NAME_MISMATCH'));
+  await assert.rejects(api.deleteFamily(creator, { ...input, currentPassword: 'wrong password' }), denied('PASSWORD_REJECTED'));
+  clock += 11 * 60_000;
+  await assert.rejects(api.deleteFamily(creator, input), denied('REAUTH_REQUIRED'));
+  clock -= 11 * 60_000;
+  assert.equal((await api.me(creator)).children.length, 1);
+  assert.deepEqual(await api.deleteFamily(creator, input), { ok: true, signInRequired: true });
+  assert.equal(await api.authenticate(childAccess.auth.value), null);
+  assert.equal(await api.authenticate(joined.value), null);
+  assert.equal(await api.authenticate(f.auth.value), null);
+  for (const [table, column, id] of [
+    ['families','id',f.p.family_id], ['children','family_id',f.p.family_id],
+    ['auth_sessions','family_id',f.p.family_id], ['local_confirmations','family_id',f.p.family_id],
+    ['family_members','family_id',f.p.family_id], ['observations','child_id',f.c.id],
+    ['sessions','child_id',f.c.id], ['guardian_consents','family_id',f.p.family_id],
+  ]) {
+    const rows = await db.query<{ n: number }>(`SELECT count(*)::int n FROM ${table} WHERE ${column}=$1`, [id]);
+    assert.equal(rows.rows[0].n, 0, table);
+  }
+  assert.equal((await api.me(other.p)).children.length, 1);
+  await assert.rejects(api.login(f.credentials), denied('LOGIN_FAILED'));
+});
+
 test('revoked principals cannot perform deferred reads, writes or child credential rotation', async () => {
   const f = await fixture(); await api.logout(f.p);
   for (const action of [() => api.me(f.p), () => api.report(f.p, f.c.id), () => api.parentGuide(f.p, f.c.id), () => api.enterChild(f.p, f.c.id),
@@ -134,4 +172,26 @@ test('a disposed account view ignores a late response while a successful live vi
   const pending = stale.load(); stale.dispose(); const before = updates; done(overview); await pending; assert.equal(updates, before);
   const client = new AccountSecurityClient(overview.familyId, async <T>(_path: string, method?: string) => (method ? { ok: true, signInRequired: true } : overview) as T, () => {});
   await client.load(); await client.submit('signout', { currentPassword: 'secret', acknowledged: true }); assert.equal(client.state.outcome, 'signout'); assert.equal(client.state.data, null);
+});
+
+test('family deletion client uses DELETE, preserves access for correctable errors and treats lost results as uncertain', async () => {
+  const calls: { path: string; method?: string }[] = [];
+  let failure: string | null = 'FAMILY_NAME_MISMATCH';
+  const make = () => new AccountSecurityClient(overview.familyId, async <T>(path: string, method?: string) => {
+    calls.push({ path, method });
+    if (!method) return overview as T;
+    if (failure) throw { code: failure };
+    return { ok: true, signInRequired: true } as T;
+  }, () => {});
+  const client = make(); await client.load();
+  const input = { currentPassword: 'synthetic-passphrase', familyName: 'Synthetic family', acknowledged: true as const };
+  await client.submit('delete', input);
+  assert.equal(client.state.error, 'FAMILY_NAME_MISMATCH'); assert.ok(client.state.data);
+  failure = null; await client.submit('delete', input);
+  assert.equal(client.state.outcome, 'delete'); assert.equal(client.state.data, null);
+  assert.deepEqual(calls.filter(call => call.method), [{ path: '/family', method: 'DELETE' }, { path: '/family', method: 'DELETE' }]);
+  const uncertain = make(); await uncertain.load(); failure = 'NETWORK_UNAVAILABLE';
+  await uncertain.submit('delete', input);
+  assert.equal(uncertain.state.outcome, 'delete-uncertain'); assert.equal(uncertain.state.data, null);
+  assert.ok(!JSON.stringify(uncertain.state).includes(input.currentPassword));
 });

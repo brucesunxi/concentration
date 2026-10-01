@@ -2,25 +2,40 @@ import type { Environment } from '../../../packages/task-engine/index.ts';
 import { NetworkUnavailable } from '../../../packages/session-runtime/offline-session.ts';
 import { journal } from './journal.ts';
 export type { Child, Me, Session, Result, Report } from '../../../packages/contracts/models.ts';
+export type DeletedFamily = { id: string; childIds: string[] };
+export type AccountAccessOutcome = 'password' | 'signout' | 'uncertain' | 'delete-uncertain' | 'signin' | 'deleted' | 'deleted-local-pending';
+export type AccountAccessEvent = { outcome: AccountAccessOutcome; deletingFamily?: DeletedFamily };
 let csrf = '';
 export const accessSender=crypto.randomUUID();
 export function setCsrf(value: string) { csrf = value; }
-function accountAccessEnded(outcome: 'password' | 'signout' | 'uncertain' | 'signin') {
+function accountAccessEnded(outcome: AccountAccessOutcome, deletingFamily?: DeletedFamily) {
   csrf = '';
-  window.dispatchEvent(new CustomEvent('focus-account-access', { detail: outcome }));
+  window.dispatchEvent(new CustomEvent<AccountAccessEvent>('focus-account-access', { detail: { outcome, deletingFamily } }));
   if (typeof BroadcastChannel !== 'undefined') {
-    const channel = new BroadcastChannel('focus-family-access'); channel.postMessage({ source: accessSender, reason: 'account-security', outcome }); channel.close();
+    const channel = new BroadcastChannel('focus-family-access'); channel.postMessage({ source: accessSender, reason: 'account-security', outcome, deletingFamily }); channel.close();
   }
 }
 export class RequestError extends Error { code: string; status: number; constructor(message: string, code: string, status: number) { super(message); this.code = code; this.status = status; } }
-export async function request<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}): Promise<T> {
-  const accountChange=method==='POST' && /^\/auth\/(change-password|logout-all)$/.test(path);
+export async function request<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}, options?: { deletingFamily?: DeletedFamily }): Promise<T> {
+  const accountChange=(method==='POST' && /^\/auth\/(change-password|logout-all)$/.test(path)) || (method==='DELETE' && path==='/family');
+  if(method==='DELETE'&&path==='/family'&&!options?.deletingFamily)throw new Error('LOCAL_DELETION_CONTEXT_REQUIRED');
   const identityChange=accountChange||(method==='POST'&&(/^\/auth\/(login|setup|join|logout)$/.test(path)||/^\/children\/[^/]+\/(enter|sessions|withdraw)$/.test(path)||/^\/children\/[^/]+\/recovery\/[^/]+\/(resume|handover)$/.test(path)))||(method==='DELETE'&&/^\/children\/[^/]+$/.test(path));
-  if(identityChange)await journal().invalidate();
+  if(identityChange) {
+    // A broken browser store must not prevent a parent from deleting records
+    // on the server. The confirmed response separately reports local cleanup.
+    if(path==='/family')await journal().invalidate().catch(()=>undefined);
+    else await journal().invalidate();
+  }
   if(method!=='GET'&&!csrf&&!/^\/auth\/(login|setup|join)$/.test(path))await request('/me');
-  const res = await fetch('/api' + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal: AbortSignal.timeout(12000) }).catch(()=>{if(accountChange)accountAccessEnded('uncertain');throw new NetworkUnavailable();});
-  const value = await res.json().catch(error=>{if(accountChange)accountAccessEnded('uncertain');throw error;});
-  if(accountChange && (res.status>=500 || res.ok)) accountAccessEnded(res.ok && value?.ok && value?.signInRequired ? path.endsWith('change-password') ? 'password' : 'signout' : 'uncertain');
+  const res = await fetch('/api' + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal: AbortSignal.timeout(12000) }).catch(()=>{if(accountChange)accountAccessEnded(path==='/family'?'delete-uncertain':'uncertain');throw new NetworkUnavailable();});
+  const value = await res.json().catch(error=>{if(accountChange)accountAccessEnded(path==='/family'?'delete-uncertain':'uncertain');throw error;});
+  if(accountChange && (res.status>=500 || res.ok)) {
+    if (res.ok && value?.ok && value?.signInRequired && path==='/family') {
+      let outcome: 'deleted' | 'deleted-local-pending' = 'deleted';
+      try { await journal().clearFamily(options!.deletingFamily!.id,options!.deletingFamily!.childIds); } catch { outcome = 'deleted-local-pending'; }
+      accountAccessEnded(outcome,options!.deletingFamily);
+    } else accountAccessEnded(res.ok && value?.ok && value?.signInRequired ? path.endsWith('change-password') ? 'password' : 'signout' : path==='/family' ? 'delete-uncertain' : 'uncertain');
+  }
   if (res.status === 401 && path !== '/me' && !/^\/auth\/(login|setup|join)$/.test(path)) accountAccessEnded('signin');
   if (!res.ok) throw new RequestError(value.message || 'Unable to complete request', value.code, res.status);
   if (value?.csrf) csrf = value.csrf;

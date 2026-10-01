@@ -1,6 +1,6 @@
 import type { AccountSecurity, AccountAction } from '../contracts/account-security.ts';
 type Request = <T>(path: string, method?: string, data?: unknown) => Promise<T>;
-export interface SecurityState { data: AccountSecurity | null; busy: boolean; error: string; outcome: 'password' | 'signout' | 'uncertain' | 'signin' | null }
+export interface SecurityState { data: AccountSecurity | null; busy: boolean; error: string; outcome: 'password' | 'signout' | 'delete' | 'uncertain' | 'delete-uncertain' | 'signin' | null }
 export class AccountSecurityClient {
   state: SecurityState = { data: null, busy: false, error: '', outcome: null };
   private disposed = false;
@@ -19,17 +19,17 @@ export class AccountSecurityClient {
       this.update({ error: code, outcome: ['UNAUTHENTICATED', 'PARENT_REQUIRED'].includes(code) ? 'signin' : null });
     } finally { this.update({ busy: false }); }
   }
-  async submit(action: AccountAction, input: { currentPassword: string; newPassword?: string; acknowledged: true }) {
+  async submit(action: AccountAction, input: { currentPassword: string; newPassword?: string; familyName?: string; acknowledged: true }) {
     if (this.disposed || this.state.busy || !this.state.data || this.state.outcome) return;
     this.update({ busy: true, error: '' });
     try {
-      const result = await this.request<{ ok: boolean; signInRequired: boolean }>(action === 'password' ? '/auth/change-password' : '/auth/logout-all', 'POST', input);
+      const result = await this.request<{ ok: boolean; signInRequired: boolean }>(action === 'password' ? '/auth/change-password' : action === 'delete' ? '/family' : '/auth/logout-all', action === 'delete' ? 'DELETE' : 'POST', input);
       if (!result.ok || !result.signInRequired) throw new Error('Unconfirmed account result');
       this.update({ data: null, outcome: action });
     } catch (error) {
       const code = (error as { code?: string }).code;
-      if (['PASSWORD_REJECTED', 'ACCOUNT_LOCKED', 'PASSWORD_UNCHANGED', 'INVALID_REQUEST'].includes(code ?? '')) this.update({ error: code });
-      else this.update({ data: null, error: code ?? 'RESULT_UNCONFIRMED', outcome: ['UNAUTHENTICATED', 'PARENT_REQUIRED'].includes(code ?? '') ? 'signin' : 'uncertain' });
+      if (['PASSWORD_REJECTED', 'ACCOUNT_LOCKED', 'PASSWORD_UNCHANGED', 'FAMILY_NAME_MISMATCH', 'INVALID_REQUEST'].includes(code ?? '')) this.update({ error: code });
+      else this.update({ data: null, error: code ?? 'RESULT_UNCONFIRMED', outcome: ['UNAUTHENTICATED', 'PARENT_REQUIRED'].includes(code ?? '') ? 'signin' : action === 'delete' ? 'delete-uncertain' : 'uncertain' });
     } finally { this.update({ busy: false }); }
   }
   dispose() { this.disposed = true; }

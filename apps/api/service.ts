@@ -3,7 +3,7 @@ import { promisify } from 'node:util';
 import type { Database, Queryable } from './database.ts';
 import type { DatabaseContext } from './database-context.ts';
 import { transactionScope } from './transaction-scope.ts';
-import { changePasswordSchema, confirmPasswordSchema } from '../../packages/contracts/account-security.ts';
+import { changePasswordSchema, confirmPasswordSchema, deleteFamilySchema } from '../../packages/contracts/account-security.ts';
 import type { AccountSecurity } from '../../packages/contracts/account-security.ts';
 import { createPlan, replay, metrics, adapt, DAILY_LIMIT, courseUnit, POLICY_VERSION } from '../../packages/task-engine/index.ts';
 import type { AgeBand, Locale, TaskId, Plan, EngineEvent, Evidence } from '../../packages/task-engine/index.ts';
@@ -275,6 +275,23 @@ export function service(source: Database, now: () => number = Date.now, content?
     },
     changePassword: (p: Principal, raw: unknown) => accountCommand(p, raw, true),
     logoutAll: (p: Principal, raw: unknown) => accountCommand(p, raw, false),
+    async deleteFamily(p: Principal, raw: unknown) {
+      owner(p);
+      const input = deleteFamilySchema.parse(raw);
+      const result = await authenticated(p, async (current, tx) => {
+        owner(current);
+        const family = await one<Family>(tx, 'SELECT id,name FROM families WHERE id=$1 FOR UPDATE', [current.family_id]);
+        if (!family) fail(401, 'UNAUTHENTICATED', '家庭空间已不存在。');
+        if (family.name !== input.familyName) return 'FAMILY_NAME_MISMATCH' as const;
+        const member = (await one<MemberRow>(tx, 'SELECT * FROM family_members WHERE family_id=$1 AND id=$2', [current.family_id, current.member_id]))!;
+        const error = await passwordCheck(tx, member, input.currentPassword);
+        if (error) return error;
+        await tx.query('DELETE FROM families WHERE id=$1', [current.family_id]);
+        return null;
+      });
+      if (result) fail(result === 'ACCOUNT_LOCKED' ? 429 : 403, result, result === 'FAMILY_NAME_MISMATCH' ? '请完整输入家庭名称。' : result === 'ACCOUNT_LOCKED' ? '密码尝试过于频繁，请在十五分钟后再试。' : '当前密码不正确，请重新输入。');
+      return { ok: true as const, signInRequired: true as const };
+    },
     async accountSecurity(p: Principal): Promise<AccountSecurity> {
       parent(p);
       const f = (await one<MemberRow>(db, 'SELECT password_changed_at FROM family_members WHERE family_id=$1 AND id=$2', [p.family_id,p.member_id]))!;
@@ -671,7 +688,7 @@ export function service(source: Database, now: () => number = Date.now, content?
   };
   // Public authentication methods establish their narrower context above. Every
   // other operation receives a server-authenticated Principal, never body fields.
-  const selfScopedMethods = new Set(['setup', 'login', 'join', 'authenticate', 'sessionAuthorities', 'changePassword', 'logoutAll', 'grantGuardianConsent']);
+  const selfScopedMethods = new Set(['setup', 'login', 'join', 'authenticate', 'sessionAuthorities', 'changePassword', 'logoutAll', 'deleteFamily', 'grantGuardianConsent']);
   const ownerMethods = new Set(['addChild','withdraw','deleteChild','exportChild','setPracticeLimit','handover','lifeSpace','lifeHistory','createLifeGoal','actLifeGoal','inviteMember','cancelInvitation','actMember','requestAgeReview','applyAgeReview']);
   const pendingMethods = new Set(['me','logout','accountSecurity','familyMembers']);
   return Object.fromEntries(Object.entries(operations).map(([name, action]) => [name,

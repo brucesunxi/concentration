@@ -77,6 +77,33 @@ test('revoked profiles cannot reappear after clearing, even with a fresh generat
   await assert.rejects(reopened.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,generation),OfflinePreparationChanged);
 });
 
+test('deleting a family clears its browser recovery data without erasing another family',async()=>{
+  const {factory,store,generation}=await prepared();
+  const other={familyId:randomUUID(),childId:randomUUID(),sessionId:randomUUID()};
+  await store.write(other.sessionId,other.childId,other.familyId,events,generation,checkpoint);
+  await new WebJournal(factory).clearFamily(capsule.familyId,[capsule.session.child_id]);
+  const reopened=new WebJournal(factory),nextGeneration=await reopened.generation();
+  assert.equal(await reopened.resume(),null);
+  assert.deepEqual(await reopened.read(capsule.session.id,capsule.session.child_id,capsule.familyId),[]);
+  assert.deepEqual(await reopened.read(other.sessionId,other.childId,other.familyId),events);
+  await assert.rejects(reopened.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,nextGeneration),OfflinePreparationChanged);
+  await reopened.write(other.sessionId,other.childId,other.familyId,events,nextGeneration);
+});
+
+test('deleting a family preserves a different family’s active browser recovery',async()=>{
+  const factory=new IDBFactory(),store=new WebJournal(factory),generation=await store.generation();
+  const other={familyId:randomUUID(),childId:randomUUID(),sessionId:randomUUID()};
+  const otherCapsule=structuredClone(capsule);
+  otherCapsule.familyId=other.familyId;otherCapsule.session.id=other.sessionId;otherCapsule.session.child_id=other.childId;
+  await store.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,generation);
+  await store.write(other.sessionId,other.childId,other.familyId,events,generation);
+  await store.prepare(otherCapsule,generation,checkpoint,events);
+  await store.clearFamily(capsule.familyId,[capsule.session.child_id]);
+  const restored=await new WebJournal(factory).resume();
+  assert.equal(restored?.capsule.familyId,other.familyId);
+  assert.deepEqual(restored?.events,events);
+});
+
 test('expired or handed-over preparation remains closed while honest closure can save; final confirmation seals all late writes',async()=>{
   const {store,generation}=await prepared();await store.close(capsule.session.id);
   assert.equal(await store.resume(),null);await assert.rejects(store.prepare(capsule,generation,checkpoint,events),OfflinePreparationChanged);
