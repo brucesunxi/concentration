@@ -1,6 +1,6 @@
 # 家庭流程可重复浏览器验收
 
-2026-10-02。将此前的人工脚本固定为 `npm run test:browser`，并在 GitHub 的 `Family quality` 工作流中加入相同的检查。本机使用 Chrome 154 与 Playwright Python 1.47.0 跑通；云端 [运行 36908039325](https://github.com/brucesunxi/concentration/actions/runs/36908039325) 已通过。
+2026-10-02。将此前的人工脚本固定为 `npm run test:browser`，并在 GitHub 的 `Family quality` 工作流中加入相同的检查。本机使用 Chrome 154 与 Playwright Python 1.47.0 跑通；云端 [运行 36915235739](https://github.com/brucesunxi/concentration/actions/runs/36915235739) 已通过。随后补入 320px 已登录家庭首页、孩子建档弹窗和练习入口的宽度检查，本机浏览器通过；新检查的云端结果应以其对应提交的运行记录为准。
 
 本机复验：浏览器两项断言通过；`npm test` 324/324、`npm run test:http` 18/18，脚本语法及工作流 YAML 解析通过。
 

@@ -80,13 +80,19 @@ def verify_family_flow(browser, base):
         page.get_by_label(re.compile("I understand this is a local development preview")).check()
         page.get_by_role("button", name="Create our space").click()
         page.get_by_role("heading", name="Meet your first explorer").wait_for(timeout=10000)
+        page.set_viewport_size({"width": 320, "height": 780})
+        assert page.evaluate("document.body.scrollWidth <= innerWidth"), "Family home overflows a 320px viewport"
         page.get_by_role("button", name="Add a child").first.click()
+        dialog_bounds = page.get_by_role("dialog").evaluate("el => ({left: el.getBoundingClientRect().left, right: el.getBoundingClientRect().right})")
+        assert dialog_bounds["left"] >= -1 and dialog_bounds["right"] <= 321, f"Child profile dialog overflows a 320px viewport: {dialog_bounds}"
         page.get_by_label("Child’s nickname").fill(CHILD)
         page.get_by_label("Age band").select_option("6-8")
         page.get_by_label("Practice language").select_option("en")
         page.get_by_label(re.compile("I agree to save local test records")).check()
         page.get_by_role("button", name="Prepare their space").click()
         page.get_by_role("button", name="Start today’s practice").wait_for(timeout=10000)
+        assert page.evaluate("document.body.scrollWidth <= innerWidth"), "Practice selection overflows a 320px viewport"
+        page.set_viewport_size({"width": 1440, "height": 900})
 
         play_one_formal_step(page)
         page.get_by_role("button", name="Start today’s practice").click()
@@ -101,7 +107,7 @@ def verify_family_flow(browser, base):
         }""")
         assert snapshot["confirmedMs"] > 0, "The service did not confirm active practice time"
         assert snapshot["status"] == "available", "A short practice should leave voluntary time"
-        print("PASS family flow: voluntary start, formal step, server confirmation, same-day rest cue")
+        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, server confirmation, same-day rest cue")
     except Exception:
         artifact = ROOT / "dist/browser-qa/failure.png"
         artifact.parent.mkdir(parents=True, exist_ok=True)

@@ -5,6 +5,7 @@
 ## 架构
 
 - Vercel CDN 提供 `dist/web` 页面、内置图片和预录语音；`api/index.ts` 承接 `/api/*` 及非内置的动态素材。内置素材在构建时以内容哈希复制到静态目录。
+- 已验证内置哈希素材由 CDN 直接返回，未知哈希素材进入 API 并返回 404。内置静态字节不会经过动态素材的发布状态查询，召回内容包可阻止新计划使用，却不能从已部署 CDN 或设备缓存撤回这些字节。正式发布前须为可召回素材定义对象存储、CDN 失效与旧会话处理策略；当前只适用于受保护的内部预览。
 - Neon 托管 PostgreSQL，schema 版本 31。准备过程使用数据库所有者身份；Vercel 只使用 `focus_family_runtime` 限权身份。
 - 会话签名私钥仅放在 Vercel Preview 与 Production 的 Sensitive 环境变量 `FOCUS_SESSION_SIGNING_JWK`；本地准备副本保存在被忽略的 `.focus-data/neon/`，不可提交。
 - Preview 与受保护的 Production 域名共用内部预览数据库。`DATABASE_URL` 是带连接池的应用运行账号 URL。所有者 URL 不进入 Vercel。公开商用前须拆分环境。
