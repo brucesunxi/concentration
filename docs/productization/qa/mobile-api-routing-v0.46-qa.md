@@ -14,6 +14,7 @@
 - 用不指向真实服务的 `https://family.example.test` 导出 iOS/Android Hermes 运行包，两个包都包含该公开域名；构建变量不包含密钥。用远端 HTTP 执行 Expo 配置被 `MOBILE_API_ORIGIN_HTTPS_REQUIRED` 拒绝。
 - 在隔离的预生成原生工程中核对远端设置：Android manifest 为 `android:usesCleartextTraffic="false"`，iOS Info.plist 的 `NSAllowsLocalNetworking` 为 `false`。本机默认配置仍保留相应本地连接许可。
 - `APP_MODE=production` 加远端地址仍被现有发布门槛拒绝，不会因这项连接配置自动开放市场。
+- 使用提交 `0863142` 的独立源码副本，iOS 26.5 / iPhone 17e arm64 Release 整包编译成功，本地签名严格校验通过，安装并启动后显示[正常的中文家长登录首屏](mobile-api-routing-ios-v0.46.png)。内置 `main.jsbundle` SHA-256 为 `855e8f9ca4fdff8f655a22015dcca225adb4ba68fe2b359ad9138302ff5f4356`。本机可复查的模拟器包与源码清单保留在被忽略的 `dist/mobile-native/v0.46/ios-simulator/`；它不是商店包。
 
 ## 仍需完成
 
