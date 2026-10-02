@@ -51,6 +51,19 @@ test('weekly metrics aggregate actual independent steps, exclude practice/help a
   assert.equal(report.strategies[0].independentSteps, 24);
   assert.equal(report.coverage.completed, 3);
 });
+test('screen reader steps remain separate and never produce a week-to-week performance difference', () => {
+  const standard = row('2026-09-22T12:00:00Z', 'memory');
+  const assistive = row('2026-09-22T13:00:00Z', 'memory', { environment: { platform: 'ios', deviceClass: 'phone', input: 'assistive', modality: 'visual' } });
+  const report = build([standard, assistive]);
+  assert.equal(report.groups.length, 2);
+  assert.equal(report.groups.find(group => group.environment?.input === 'assistive')?.comparison.status, 'assistive-mode-unvalidated');
+  assert.equal(report.groups.find(group => group.environment?.input === 'assistive')?.comparison.changePoints, null);
+  assert.equal(report.strategies[0].independentSteps, 8);
+  assert.equal(report.strategies[0].assistiveSteps, 8);
+  const view = weeklyPresentation(report, 'en');
+  assert.match(JSON.stringify(view), /Screen reader|screen reader/);
+  assert.match(JSON.stringify(view), /kept separately/);
+});
 
 test('levels, input, device, language and content identity create separate groups even with a reused condition string', () => {
   const base = row('2026-09-22T12:00:00Z');

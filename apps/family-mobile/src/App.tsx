@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { AppState, Platform, Text, View, ActivityIndicator } from 'react-native';
+import { AccessibilityInfo, AppState, Platform, Text, View, ActivityIndicator } from 'react-native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { StatusBar } from 'expo-status-bar';
 import { getLocales } from 'expo-localization';
@@ -47,6 +47,7 @@ function FamilyApp() {
   const mounted = useRef(true), identityVersion = useRef(0);
   const owner = me?.role === 'parent' && me.member?.role === 'owner', support = me?.role === 'parent' && me.member?.role === 'support';
   const t = translate(locale);
+  const timedScreenReaderMessage = t('读屏模式下，限时看图题目前不适合可靠计分。可以选无单题倒计时的找一找或记一记；今天不练也可以。', 'Timed visual tasks cannot be scored reliably with a screen reader yet. You can choose untimed Search or Memory, or stop for today.');
   const message = (e: unknown) => e instanceof MobileRequestError
     ? requestErrorCopy(e.code, e.status, locale)
     : isNetworkFailure(e)
@@ -126,9 +127,14 @@ function FamilyApp() {
   async function action(fn: () => Promise<void>) { setBusy(true); setError(''); try { await fn(); } catch (e) { if (mounted.current) setError(message(e)); } finally { if (mounted.current) setBusy(false); } }
   async function start(child: Child, task: TaskId) {
     if (!collectionStatusAllowsPractice(child.collectionStatus,child.consentActive)) { setError(collectionStatusCopy(child.collectionStatus,locale).detail); return; }
+    const identity = identityVersion.current;
+    const screenReader = await AccessibilityInfo.isScreenReaderEnabled().catch(() => null);
+    if (!mounted.current || identity !== identityVersion.current) return;
+    if (screenReader === null) { setError(t('暂时无法确认读屏设置，请重新打开后再试。', 'Unable to check the screen reader setting. Reopen the app and try again.')); return; }
+    if (screenReader && ['stop', 'sustain'].includes(task)) { setError(timedScreenReaderMessage); return; }
     const version = ++identityVersion.current;
     await action(async () => {
-      const active = await client.start(child.id, task);
+      const active = await client.start(child.id, task, screenReader ? 'assistive' : 'touch');
       if (!mounted.current || version !== identityVersion.current) return;
       setSession(active); setSelected(null); setView('home');
       setMe(current => current && ({ ...current, role: 'child', children: [child] }));
@@ -138,6 +144,10 @@ function FamilyApp() {
     if (!collectionStatusAllowsPractice(child.collectionStatus,child.consentActive)) { setError(collectionStatusCopy(child.collectionStatus,locale).detail); return; }
     const childId=child.id, identity=identityVersion.current;
     void action(async()=>{
+      const screenReader = await AccessibilityInfo.isScreenReaderEnabled().catch(() => null);
+      if(!mounted.current||identity!==identityVersion.current)return;
+      if(screenReader === null){setError(t('暂时无法确认读屏设置，请重新打开后再试。', 'Unable to check the screen reader setting. Reopen the app and try again.'));return;}
+      if(screenReader && ['stop', 'sustain'].includes(task)){setError(timedScreenReaderMessage);return;}
       const limits=await client.request<PracticeLimitsSnapshot>(`/children/${childId}/practice-limits`);
       if(!mounted.current||identity!==identityVersion.current)return;
       if(limits.version!=='practice-limits-1'||limits.childId!==childId)throw new Error('PRACTICE_PLAN_MISMATCH');

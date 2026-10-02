@@ -30,6 +30,7 @@ export function Practice({ session, familyId, client, offline = false, onExit }:
   const [content, setContent] = useState<MobileContent | null>(null), [state, setState] = useState<Replay | null>(null);
   const [phase, setPhase] = useState<Phase>('loading'), [error, setError] = useState(''), [status, setStatus] = useState('');
   const [audioReady, setAudioReady] = useState(false), [audioError, setAudioError] = useState('');
+  const [screenReaderEnabled, setScreenReaderEnabled] = useState<boolean | null>(null);
   const [busy, setBusy] = useState(false), [locked, setLocked] = useState(false), [sync, setSync] = useState<'saved' | 'syncing' | 'pending' | 'synced'>('saved');
   const [result, setResult] = useState<Result | null>(null), [visible, setVisible] = useState(false);
   const runtime = useRef<SessionRuntime | null>(null), live = useRef(true), locking = useRef(false), queued = useRef(0), pausing = useRef(false);
@@ -142,6 +143,8 @@ export function Practice({ session, familyId, client, offline = false, onExit }:
   }
   function next() {
     const current = runtime.current; if (!current || locking.current || queued.current || AppState.currentState !== 'active') return;
+    if (screenReaderEnabled === null) { setStatus(t('正在确认辅助操作设置，请稍等。', 'Checking accessibility settings. One moment.')); return; }
+    if ((plan.environment?.input === 'assistive') !== screenReaderEnabled) { pause('input_changed', t('读屏设置改变了。这一步未计分。切回原操作方式可重试，也可以重新选练习。', 'Screen reader settings changed. This step was not scored. Return to the original input mode to retry, or choose another practice.')); return; }
     lifecycle.retire();
     if (current.state.ended) { setPhase('summary'); return; }
     if (!mayContinue() || offerCheckIn()) return;
@@ -157,6 +160,17 @@ export function Practice({ session, familyId, client, offline = false, onExit }:
     setPhase('settling');
     await act([{ type: 'interrupt', reason: 'pause' }, { type: 'end', reason }], 'summary');
   }
+  useEffect(() => {
+    let active = true;
+    const changed = (enabled: boolean) => {
+      if (!active) return;
+      setScreenReaderEnabled(enabled);
+      if ((plan.environment?.input === 'assistive') !== enabled && ['arming', 'active'].includes(phaseRef.current)) pause('input_changed', t('读屏设置改变了。这一步未计分。切回原操作方式可重试，也可以重新选练习。', 'Screen reader settings changed. This step was not scored. Return to the original input mode to retry, or choose another practice.'));
+    };
+    void AccessibilityInfo.isScreenReaderEnabled().then(changed).catch(() => { if (active) setScreenReaderEnabled(null); });
+    const subscription = AccessibilityInfo.addEventListener('screenReaderChanged', changed);
+    return () => { active = false; subscription.remove(); };
+  }, [session.id]);
   useEffect(() => {
     live.current = true; const abort = new AbortController(); let unsubscribe: (() => void) | undefined;
     void setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false, playsInSilentMode: false, interruptionMode: 'doNotMix' }).catch(() => undefined);
@@ -280,13 +294,14 @@ export function Practice({ session, familyId, client, offline = false, onExit }:
     return () => { clearTimeout(trialTimer); clearTimeout(budgetTimer); cancelAnimationFrame(frame); };
   }, [phase]);
   useEffect(() => { if (phase !== 'gap') return; const revision = lifecycle.revision; const timer = setTimeout(() => { if (lifecycle.isCurrent(revision)) next(); }, TIMING.intervalMs); return () => clearTimeout(timer); }, [phase, state?.nextIndex]);
-  const choose = (index: number) => { const at = runtime.current?.now(); if (at !== undefined && AppState.currentState === 'active' && lifecycle.acceptsInput(at)) void act([{ type: 'choose', index, input: 'touch' }], undefined, at); };
+  const choose = (index: number) => { const at = runtime.current?.now(); if (at !== undefined && AppState.currentState === 'active' && screenReaderEnabled !== null && (plan.environment?.input === 'assistive') === screenReaderEnabled && lifecycle.acceptsInput(at)) void act([{ type: 'choose', index, input: plan.environment?.input === 'assistive' ? 'assistive' : 'touch' }], undefined, at); };
   const imageFailed = () => pause('asset_failure', t('图片暂时无法显示，这一步没有计分。', 'The picture could not load. This step was not scored.'));
   const formal = state ? metrics(state.results) : null, done = state?.results.filter(r => !r.practice).length ?? 0, total = plan.trials.filter(r => !r.practice).length;
   const formalTrials = formal?.trials ?? 0, assistedTrials = formal?.assisted ?? 0;
   return <Page title={copy?.title ?? t('正在准备…', 'Getting ready…')} subtitle={teen ? 'FOCUS STUDIO' : t('每次一小步。你可以随时停下来。', 'One small step. You can stop at any time.')}>
     <View style={s.row}>{phase !== 'summary' && phase !== 'loading' && <Button quiet title={t('休息一下', 'Take a break')} disabled={locked} onPress={() => pause()} />}<Text accessibilityLiveRegion="polite" style={s.muted}>{busy ? t('正在记录', 'Recording') : sync === 'pending' ? t('本机已保存 · 等待同步', 'Saved here · Pending sync') : sync === 'syncing' ? t('正在同步', 'Syncing') : sync === 'synced' ? t('已同步', 'Synced') : t('本机保存', 'Saved here')}</Text></View><Notice>{error}</Notice><Notice>{authorizationNotice}</Notice>{offline && <Text style={s.muted}>{t('从本机恢复 · 新记录先保存在此设备，联网后再确认。','Restored on this device · New records are saved here first and confirmed when connected.')}</Text>}
     {phase === 'intro' && windowCopy && <Text style={s.muted}>{windowCopy.intro}</Text>}
+    {phase === 'intro' && plan.environment?.input === 'assistive' && <Notice>{t('这是读屏操作的无单题倒计时练习。完成的步骤会单独保留，暂不推进基础课程或自动调难度。', 'This screen reader practice has no per-step countdown. Completed steps are kept separately; they do not advance the foundation course or automatically change difficulty yet.')}</Notice>}
     {phase === 'check-in' && windowCopy && <View style={s.card}><Text accessibilityRole="header" style={s.heading}>{windowCopy.title}</Text><Text style={s.body}>{windowCopy.body}</Text><Button title={windowCopy.stop} disabled={busy || locked} onPress={() => void end('child_stopped')} /><Button quiet title={windowCopy.proceed} disabled={busy || locked} onPress={continueAfterCheckIn} /></View>}
     {phase === 'loading' && <ActivityIndicator color={colors.accent} />}
     {phase === 'settling' && <View style={[s.center, { minHeight: 220 }]}><Text accessibilityLiveRegion="polite" style={s.muted}>{t('这一步结束了，稍等一下。', 'This step is finished. One moment.')}</Text></View>}

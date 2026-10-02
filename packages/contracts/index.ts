@@ -15,14 +15,14 @@ export const loginSchema = z.object({ name: z.string().trim().min(1).max(40), pa
 export const profileSchema = z.object({ alias: z.string().trim().min(1).max(24), ageBand: ageBandSchema, locale: localeSchema, localConfirmation: z.literal(true).optional() }).strict();
 export const ageReviewRequestSchema = z.object({ targetAgeBand: ageBandSchema.or(z.literal('18+')), acknowledged: z.literal(true) }).strict();
 export const ageReviewApplySchema = z.object({ acknowledged: z.literal(true), localConfirmation: z.literal(true).optional() }).strict();
-export const environmentSchema = z.object({ platform: z.enum(['web', 'ios', 'android']), deviceClass: z.enum(['desktop', 'tablet', 'phone']), input: z.enum(['pointer', 'touch', 'keyboard']), modality: z.literal('visual') }).strict();
+export const environmentSchema = z.object({ platform: z.enum(['web', 'ios', 'android']), deviceClass: z.enum(['desktop', 'tablet', 'phone']), input: z.enum(['pointer', 'touch', 'keyboard', 'assistive']), modality: z.literal('visual') }).strict();
 export const startSchema = z.object({ task: taskSchema, deviceId: z.string().uuid(), environment: environmentSchema }).strict();
 export const recoverySchema = z.object({ deviceId: z.string().uuid() }).strict();
 export const handoverSchema = recoverySchema.extend({ acknowledged: z.literal(true) }).strict();
 const common = { id: z.string().uuid(), seq: z.number().int().min(1).max(3000), at: z.number().min(0).max(86400000) };
 export const eventSchema = z.discriminatedUnion('type', [
   z.object({ ...common, type: z.literal('present'), trialId: z.string().max(100), presentation: z.object({ frameDeltaMs: z.number().min(0).max(10000), assetsReady: z.boolean(), method: z.enum(['raf-pair', 'native-frame']) }).strict().optional() }).strict(),
-  z.object({ ...common, type: z.literal('choose'), index: z.number().int().min(0).max(99), input: z.enum(['pointer', 'touch', 'keyboard']).optional() }).strict(),
+  z.object({ ...common, type: z.literal('choose'), index: z.number().int().min(0).max(99), input: z.enum(['pointer', 'touch', 'keyboard', 'assistive']).optional() }).strict(),
   z.object({ ...common, type: z.literal('undo') }).strict(),
   z.object({ ...common, type: z.literal('encode_end') }).strict(),
   z.object({ ...common, type: z.literal('help') }).strict(),

@@ -8,7 +8,7 @@ export const TASKS: TaskId[] = ['search', 'stop', 'memory', 'sustain'];
 export const ENGINE_VERSION = '2.0.0';
 export const POLICY_VERSION = 'conservative-2';
 export const TIMING = Object.freeze({ intervalMs: 1000, maxFrameGapMs: 100, maxTimerLatenessMs: 250, minimumResponseMs: 100 });
-export interface Environment { platform: 'web' | 'ios' | 'android'; deviceClass: 'desktop' | 'tablet' | 'phone'; input: 'pointer' | 'touch' | 'keyboard'; modality: 'visual' }
+export interface Environment { platform: 'web' | 'ios' | 'android'; deviceClass: 'desktop' | 'tablet' | 'phone'; input: 'pointer' | 'touch' | 'keyboard' | 'assistive'; modality: 'visual' }
 export interface ContentReference { id: string; version: string; sha256: string }
 export interface Presentation { frameDeltaMs: number; assetsReady: boolean; method: 'raf-pair' | 'native-frame' }
 export const TEST_ENVIRONMENT: Environment = { platform: 'web', deviceClass: 'desktop', input: 'pointer', modality: 'visual' };
@@ -76,7 +76,8 @@ function constrainedDeck(goCount: number, noCount: number, random: () => number)
 export function createPlan(input: Pick<Plan, 'id' | 'task' | 'ageBand' | 'locale' | 'level' | 'seed'> & { environment: Environment; content: ContentReference }): Plan {
   requireThat(TASKS.includes(input.task) && Object.hasOwn(DAILY_LIMIT, input.ageBand), 'Unsupported task or age');
   requireThat(Number.isInteger(input.level) && input.level >= 1 && input.level <= 3, 'Invalid level');
-  requireThat(['web', 'ios', 'android'].includes(input.environment.platform) && ['desktop', 'tablet', 'phone'].includes(input.environment.deviceClass) && ['pointer', 'touch', 'keyboard'].includes(input.environment.input) && input.environment.modality === 'visual', 'Unsupported environment');
+  requireThat(['web', 'ios', 'android'].includes(input.environment.platform) && ['desktop', 'tablet', 'phone'].includes(input.environment.deviceClass) && ['pointer', 'touch', 'keyboard', 'assistive'].includes(input.environment.input) && input.environment.modality === 'visual', 'Unsupported environment');
+  requireThat(input.environment.input !== 'assistive' || (input.environment.platform !== 'web' && ['search', 'memory'].includes(input.task)), 'Timed or web assistive protocol is not available');
   requireThat(/^[a-f0-9]{64}$/.test(input.content.sha256), 'Invalid content reference');
   const random = randomFrom(input.seed);
   const teen = ['12-14', '15-17'].includes(input.ageBand);
@@ -165,7 +166,7 @@ export function replay(plan: Plan, events: EngineEvent[], budgetMs = Infinity): 
         requireThat(active.recalled, 'Memory material is still visible');
         requireThat(Number.isInteger(event.index) && event.index >= 0 && event.index < active.trial.items.length, 'Invalid target');
         requireThat(!active.trial.windowMs || elapsed <= active.trial.windowMs, 'Response after window');
-        requireThat(event.input && ['pointer', 'touch', 'keyboard'].includes(event.input), 'Input method required');
+        requireThat(event.input && ['pointer', 'touch', 'keyboard', 'assistive'].includes(event.input), 'Input method required');
         active.responseCount++;
         if (active.firstResponseMs === null) active.firstResponseMs = elapsed;
         if (event.input !== plan.environment.input) active.invalidReason = 'input_changed';
@@ -224,6 +225,7 @@ export function wilsonLower(k: number, n: number): number | null {
 export interface Evidence { condition: string; completedAt: string; results: TrialResult[]; invalidations?: Invalidation[] }
 export function adapt(plan: Plan, history: Evidence[], nowMs: number): { level: number; reason: string } {
   if (plan.version === '1.0.0') return adaptLegacy(plan, history, nowMs);
+  if (plan.environment?.input === 'assistive') return { level: plan.level, reason: 'HOLD_ASSISTIVE_MODE_UNVALIDATED' };
   const recent = history.filter(x => x.condition === plan.condition && nowMs - Date.parse(x.completedAt) <= 14 * 86400000 && Date.parse(x.completedAt) <= nowMs).slice(-3);
   const hold = (reason: string) => ({ level: plan.level, reason });
   const last = recent.at(-1);

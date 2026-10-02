@@ -58,11 +58,11 @@ export async function prepareBrowserIdentity(){
   else deviceId();
 }
 
-export function environmentFor(input: Environment['input']): Environment {
+export function environmentFor(input: Exclude<Environment['input'], 'assistive'>): Environment {
   const coarse = matchMedia('(pointer: coarse)').matches;
   return { platform: 'web', modality: 'visual', deviceClass: coarse ? matchMedia('(min-width: 768px)').matches ? 'tablet' : 'phone' : 'desktop', input };
 }
-export function inputForClick(event: { detail: number; nativeEvent: unknown }): Environment['input'] {
+export function inputForClick(event: { detail: number; nativeEvent: unknown }): Exclude<Environment['input'], 'assistive'> {
   if (event.detail === 0) return 'keyboard';
   return (event.nativeEvent as PointerEvent).pointerType === 'touch' ? 'touch' : 'pointer';
 }

@@ -7,15 +7,16 @@ import { service, ApiError } from '../../apps/api/service.ts';
 import type { Principal, FocusService } from '../../apps/api/service.ts';
 import { TEST_ENVIRONMENT } from '../../packages/task-engine/index.ts';
 import { completeEvents } from './fixtures.ts';
+import type { Result } from '../../packages/contracts/models.ts';
 
 let db: Database, api: FocusService;
 let clock = Date.parse('2026-09-30T12:00:00Z');
 before(async () => { db = await openDatabase('memory://'); await migrate(db); api = service(db, () => clock); });
 after(async () => { await db.close(); });
-async function family() {
+async function family(transport: 'web' | 'native' = 'web') {
   const name = 'Test-' + randomUUID().slice(0, 8), password = 'test-only-parent-password';
-  const auth = await api.setup({ name, password, timezone: 'Asia/Shanghai', locale: 'zh-CN', acknowledgedLocalUse: true });
-  const p = (await api.authenticate(auth.value))!;
+  const auth = await api.setup({ name, password, timezone: 'Asia/Shanghai', locale: 'zh-CN', acknowledgedLocalUse: true }, transport);
+  const p = (await api.authenticate(auth.value, transport))!;
   const c = await api.addChild(p, { alias: 'Test explorer', ageBand: '6-8', locale: 'zh-CN', localConfirmation: true });
   return { p, c, name, password, auth };
 }
@@ -76,6 +77,22 @@ test('free-choice practice is recorded without skipping the recommended curricul
   assert.equal(report.child.course.unit, 0); assert.equal(report.child.course.weekDone, 0);
   assert.equal(report.child.course.task, 'search');
 });
+test('assistive native sessions reject timed tasks and keep valid untimed records without adaptation', async () => {
+  const f = await family('native'), deviceId = randomUUID();
+  const environment = { platform: 'ios' as const, deviceClass: 'phone' as const, input: 'assistive' as const, modality: 'visual' as const };
+  await assert.rejects(api.start(f.p, f.c.id, { environment, task: 'stop', deviceId }, randomUUID()), status('ASSISTIVE_TIMED_UNAVAILABLE'));
+  const { session, auth } = await api.start(f.p, f.c.id, { environment, task: 'search', deviceId }, randomUUID());
+  const parentBeforeFinish = (await api.authenticate((await api.login({ name: f.name, password: f.password }, 'native')).value, 'native'))!;
+  await assert.rejects(api.start(parentBeforeFinish, f.c.id, { environment: { ...environment, input: 'touch' }, task: 'search', deviceId }, randomUUID()), status('INPUT_CONDITION_CHANGED'));
+  const child = (await api.authenticate(auth.value, 'native'))!;
+  const events = completeEvents(session.plan);
+  await api.append(child, session.id, { events });
+  const result = await api.finalize(child, session.id, { lastSeq: events.length }) as Result;
+  assert.equal(result.decision.reason, 'HOLD_ASSISTIVE_MODE_UNVALIDATED');
+  assert.equal(result.environment?.input, 'assistive');
+  const parent = (await api.authenticate((await api.login({ name: f.name, password: f.password }, 'native')).value, 'native'))!;
+  assert.equal((await api.me(parent)).children[0].course.unit, 0);
+});
 test('malformed protocol writes roll back and client correctness flags cannot be injected', async () => {
   const f = await family(); const { session: s, auth } = await api.start(f.p, f.c.id, { environment: TEST_ENVIRONMENT, task: 'memory', deviceId: randomUUID() }, randomUUID());
   const cp = (await api.authenticate(auth.value))!;
@@ -89,6 +106,7 @@ test('idempotency keys bind request content and another device cannot take over 
   const p = await relogin(f);
   assert.equal((await api.start(p, f.c.id, { environment: TEST_ENVIRONMENT, task: 'search', deviceId }, key)).session.id, s.id);
   await assert.rejects(api.start(await relogin(f), f.c.id, { environment: TEST_ENVIRONMENT, task: 'stop', deviceId }, key), status('IDEMPOTENCY_CONFLICT'));
+  await assert.rejects(api.start(await relogin(f), f.c.id, { environment: { ...TEST_ENVIRONMENT, input: 'keyboard' }, task: 'search', deviceId }, randomUUID()), status('INPUT_CONDITION_CHANGED'));
   await assert.rejects(api.start(await relogin(f), f.c.id, { environment: TEST_ENVIRONMENT, task: 'stop', deviceId: randomUUID() }, randomUUID()), status('SESSION_CONFLICT'));
 });
 test('withdrawal blocks old uploads before deduplication and revokes child credentials', async () => {

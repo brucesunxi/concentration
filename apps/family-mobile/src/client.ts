@@ -59,12 +59,12 @@ export class MobileClient {
   setup(name: string, password: string, locale: 'zh-CN' | 'en') {
     return this.parentAuth('/auth/setup', { name, password, locale, residenceCountry: 'ZZ', registrationPlatform: Platform.OS, timezone: Intl.DateTimeFormat().resolvedOptions().timeZone || 'UTC', acknowledgedLocalUse: true });
   }
-  async start(childId: string, task: TaskId) {
+  async start(childId: string, task: TaskId, input: 'touch' | 'assistive') {
     const epoch = ++this.authEpoch;
     await invalidateOffline();
     const deviceId = await this.deviceId();
     if (epoch !== this.authEpoch) throw new CredentialInterrupted();
-    const environment = { platform: Platform.OS, deviceClass: Math.min(Dimensions.get('screen').width, Dimensions.get('screen').height) >= 600 ? 'tablet' : 'phone', input: 'touch', modality: 'visual' };
+    const environment = { platform: Platform.OS, deviceClass: Math.min(Dimensions.get('screen').width, Dimensions.get('screen').height) >= 600 ? 'tablet' : 'phone', input, modality: 'visual' };
     if (!['ios', 'android'].includes(environment.platform)) throw new Error('Native client only');
     const response = await this.request<Session & { accessToken: string }>(`/children/${childId}/sessions`, 'POST', { task, deviceId, environment }, { 'Idempotency-Key': randomUUID() });
     const { accessToken, ...session } = response;

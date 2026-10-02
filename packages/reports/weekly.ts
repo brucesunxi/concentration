@@ -10,7 +10,7 @@ export interface ReportSession { id: string; plan: Plan; state: string; result: 
 export interface ReportObservation { id: string; task: TaskId; context: string; prompts: number; child_choice: boolean; created_at: Timestamp }
 export interface WeekRange { start: string; end: string; previousStart: string; previousEnd: string; today: string; inProgress: boolean; previous: string | null; next: string | null }
 export interface WeekStats { sessions: number; completed: number; stoppedEarly: number; interruptions: number; excluded: number; metrics: Metrics }
-export type ComparisonStatus = 'available' | 'week-in-progress' | 'missing-metadata' | 'interrupted-or-assisted' | 'insufficient-records' | 'incomplete-data';
+export type ComparisonStatus = 'available' | 'week-in-progress' | 'missing-metadata' | 'interrupted-or-assisted' | 'insufficient-records' | 'incomplete-data' | 'assistive-mode-unvalidated';
 export interface WeeklyGroup {
   key: string; task: TaskId; level: number; ageBand: AgeBand; locale: Locale;
   engineVersion: string; policyVersion: string | null; environment: Environment | null;
@@ -22,7 +22,7 @@ export interface WeeklyReport {
   schemaVersion: 1; ruleVersion: 'weekly-descriptive-2'; childId: string; generatedAt: string; timezone: string; range: WeekRange;
   coverage: { finalized: number; completed: number; stoppedEarly: number; unfinalized: number; previousUnfinalized: number; unclassified: number; daysWithoutConfirmedPractice: number; historyOnly?: number; previousHistoryOnly?: number };
   days: { date: string; finalized: number; observations: number; future: boolean }[];
-  strategies: { task: TaskId; sessions: number; independentSteps: number; assistedSteps: number }[];
+  strategies: { task: TaskId; sessions: number; independentSteps: number; assistedSteps: number; assistiveSteps: number }[];
   groups: WeeklyGroup[];
   life: { task: TaskId; context: string; current: LifeStats; previous: LifeStats }[];
 }
@@ -69,7 +69,7 @@ export function buildWeeklyReport(childId: string, timezone: string, now: number
     coverage: { finalized: 0, completed: 0, stoppedEarly: 0, unfinalized: 0, previousUnfinalized: 0, unclassified: 0, daysWithoutConfirmedPractice: 0 },
     days: Array.from({ length: 7 }, (_, index) => { const date = shiftDay(range.start, index); return { date, finalized: 0, observations: 0, future: date > range.today }; }), strategies: [], groups: [], life: [] };
   const groups = new Map<string, { plan: Plan; current: ReportSession[]; previous: ReportSession[] }>();
-  const strategies = new Map<TaskId, { sessions: number; trials: TrialResult[] }>();
+  const strategies = new Map<TaskId, { sessions: number; trials: TrialResult[]; assistiveSteps: number }>();
   for (const row of sessions) {
     const at = row.completed_at ?? row.created_at; if (new Date(at).getTime() > now) continue;
     const date = localDay(at), current = within(date, range.start, range.end), previous = within(date, range.previousStart, range.previousEnd);
@@ -83,7 +83,7 @@ export function buildWeeklyReport(childId: string, timezone: string, now: number
     }
     if (row.window_policy && (!practiceWindowSchema.safeParse(row.window_policy).success || canonical(row.window_policy) !== canonical(practiceWindowPolicy(p.ageBand)))) { report.coverage.unclassified++; continue; }
     if (r.task !== p.task || r.condition !== p.condition || !Array.isArray(r.trials)) { report.coverage.unclassified++; continue; }
-    if (current) { const strategy = strategies.get(p.task) ?? { sessions: 0, trials: [] }; strategy.sessions++; strategy.trials.push(...r.trials); strategies.set(p.task, strategy); }
+    if (current) { const strategy = strategies.get(p.task) ?? { sessions: 0, trials: [], assistiveSteps: 0 }; strategy.sessions++; if (p.environment?.input === 'assistive') strategy.assistiveSteps += r.trials.filter(trial => !trial.practice).length; else strategy.trials.push(...r.trials); strategies.set(p.task, strategy); }
     // Metadata is included explicitly; a legacy or inconsistent condition string cannot merge cohorts.
     const key = JSON.stringify([p.condition, p.task, p.version, p.policyVersion ?? null, p.level, p.ageBand, p.locale,
       p.environment?.platform ?? null, p.environment?.deviceClass ?? null, p.environment?.input ?? null, p.environment?.modality ?? null,
@@ -92,12 +92,13 @@ export function buildWeeklyReport(childId: string, timezone: string, now: number
     const group = groups.get(key) ?? { plan: p, current: [], previous: [] };
     group[current ? 'current' : 'previous'].push(row); groups.set(key, group);
   }
-  for (const [task, value] of strategies) { const m = metrics(value.trials); report.strategies.push({ task, sessions: value.sessions, independentSteps: m.trials, assistedSteps: m.assisted }); }
+  for (const [task, value] of strategies) { const m = metrics(value.trials); report.strategies.push({ task, sessions: value.sessions, independentSteps: m.trials, assistedSteps: m.assisted, assistiveSteps: value.assistiveSteps }); }
   report.strategies.sort((a, b) => a.task.localeCompare(b.task));
   for (const [key, group] of groups) {
     const p = group.plan, current = summarize(group.current), previous = summarize(group.previous);
     let status: ComparisonStatus = 'available';
     if (p.version !== '2.0.0' || !p.environment || !p.content || !p.policyVersion) status = 'missing-metadata';
+    else if (p.environment.input === 'assistive') status = 'assistive-mode-unvalidated';
     else if (range.inProgress) status = 'week-in-progress';
     else if (report.coverage.unfinalized || report.coverage.previousUnfinalized || report.coverage.unclassified || report.coverage.historyOnly || report.coverage.previousHistoryOnly) status = 'incomplete-data';
     // Do not skip interrupted/assisted attempts in order to select only clean successes.

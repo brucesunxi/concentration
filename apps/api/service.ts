@@ -495,6 +495,7 @@ export function service(source: Database, now: () => number = Date.now, content?
       await contentReady(); await authorityReady();
       const input = startSchema.parse(raw);
       if ((p.transport === 'native') !== (input.environment.platform !== 'web')) fail(400, 'ENVIRONMENT_TRANSPORT_MISMATCH', '练习平台与登录方式不一致。');
+      if (input.environment.input === 'assistive' && (input.environment.platform === 'web' || ['stop', 'sustain'].includes(input.task))) fail(422, 'ASSISTIVE_TIMED_UNAVAILABLE', '读屏模式暂不提供限时看图练习；可以选择无单题倒计时的找一找或记一记。');
       if (!key || key.length < 16 || key.length > 128) fail(400, 'INVALID_IDEMPOTENCY_KEY', '需要有效的请求标识。');
       const requestHash = digest(canonical(input));
       return db.transaction(async tx => {
@@ -516,7 +517,11 @@ export function service(source: Database, now: () => number = Date.now, content?
           active = undefined;
         }
         if (previous?.continuation_grant && (previous.closed_reason === 'upload_expired' || now() >= Date.parse(previous.continuation_grant.body.uploadUntil))) fail(409, 'SESSION_UPLOAD_EXPIRED', '原请求的补传期限已结束，请开始新练习。');
-        if (!result && active) { if (active.device_id !== input.deviceId || (active.continuation_grant && active.continuation_grant.body.transport !== p.transport)) fail(409, 'SESSION_CONFLICT', '另一台设备有未结束的练习。'); result = active; }
+        if (!result && active) {
+          if (active.device_id !== input.deviceId || (active.continuation_grant && active.continuation_grant.body.transport !== p.transport)) fail(409, 'SESSION_CONFLICT', '另一台设备有未结束的练习。');
+          if (active.plan.environment?.input !== input.environment.input) fail(409, 'INPUT_CONDITION_CHANGED', '这台设备有另一种操作方式的未结束练习，请先完成或处理原练习。');
+          result = active;
+        }
         if (!result) {
           const f = await one<Family>(tx, 'SELECT timezone FROM families WHERE id=$1', [p.family_id]);
           const issued = now(), budgetDay = day(f!.timezone, issued);
@@ -592,7 +597,7 @@ export function service(source: Database, now: () => number = Date.now, content?
         await tx.query('UPDATE sessions SET state=$2,used_ms=$3,result=$4,completed_at=$5 WHERE id=$1', [id, completed && !historyOnly ? 'completed' : 'aborted', Math.ceil(Math.min(s.budget_ms, state.activeMs)), result, completedAt]);
         if (completed && !historyOnly) {
           const course = courseUnit(c.course_units);
-          const advance = !course.complete && s.plan.task === course.task ? 1 : 0;
+          const advance = !course.complete && s.plan.environment?.input !== 'assistive' && s.plan.task === course.task ? 1 : 0;
           await tx.query('UPDATE children SET completed_sessions=completed_sessions+1,levels=$2,course_units=course_units+$3 WHERE id=$1', [c.id, { ...c.levels, [s.plan.task]: decision.level }, advance]);
         }
         return result;

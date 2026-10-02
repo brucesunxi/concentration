@@ -1,4 +1,4 @@
-import type { AgeBand, Locale, TaskId, Plan, EngineEvent, Metrics, TrialResult } from '../task-engine/index.ts';
+import type { AgeBand, Locale, TaskId, Plan, EngineEvent, Metrics, TrialResult, Environment } from '../task-engine/index.ts';
 import type { ContinuationGrant } from '../session-runtime/authorization.ts';
 import type { MemberIdentity } from './family-members.ts';
 import type { HistoryInfo } from './history.ts';
@@ -6,5 +6,5 @@ import type { CollectionStatus } from './collection-status.ts';
 export interface Child { id: string; alias: string; ageBand: AgeBand; locale: Locale; levels: Record<TaskId, number>; completedSessions: number; consentActive: boolean; collectionStatus: CollectionStatus; localPreviewConfirmation: boolean; verifiedGuardianConsent: boolean; ageReview: { version: number; state: 'current' | 'due' | 'pending' | 'adult-pending'; reviewedAt: string; dueAt: string; targetAgeBand: AgeBand | '18+' | null }; course: { week: number; unit: number; task: TaskId; complete: boolean; weekDone: number } }
 export interface Me { family: { id: string; name: string; timezone: string; locale: Locale; residenceCountry: string }; role: 'parent' | 'child'; member?: MemberIdentity; csrf: string; children: Child[]; mode: string; releaseScopeVersion?: string }
 export interface Session { id: string; child_id: string; plan: Plan; budget_ms: number; state: string; created_at: string; events?: EngineEvent[]; continuation_grant?: ContinuationGrant | null; closed_reason?: string | null }
-export interface Result { sessionId: string; task: TaskId; condition: string; completed: boolean; completedAt: string; metrics: Metrics; trials: TrialResult[]; interruptions: number; invalidations?: { reason: string; practice: boolean }[]; activeMs: number; decision: { level: number; reason: string }; historyOnly?: boolean }
+export interface Result { sessionId: string; task: TaskId; condition: string; completed: boolean; completedAt: string; metrics: Metrics; trials: TrialResult[]; interruptions: number; invalidations?: { reason: string; practice: boolean }[]; activeMs: number; decision: { level: number; reason: string }; environment?: Environment; historyOnly?: boolean }
 export interface Report { child: Child; observationCount: number; history: HistoryInfo; sessions: { id: string; state: string; result: Result; created_at: string }[]; observations: { id: string; task: TaskId; context: string; prompts: number; child_choice: boolean; created_at: string }[] }
