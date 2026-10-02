@@ -6,6 +6,7 @@ import type { Session, Me, Child } from '../../../packages/contracts/models.ts';
 import type { TaskId } from '../../../packages/task-engine/index.ts';
 import { invalidateOffline } from './storage';
 import { NetworkUnavailable } from '../../../packages/session-runtime/offline-session.ts';
+import { readMobileResponseJson } from '../../../packages/session-runtime/mobile-response.ts';
 import { CredentialInterrupted, CredentialStore } from '../../../packages/session-runtime/credential-store.ts';
 import type { AccountAction } from '../../../packages/contracts/account-security.ts';
 import { mobileApiOrigin } from '../../../packages/contracts/mobile-api-origin.ts';
@@ -34,7 +35,7 @@ export class MobileClient {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 12000);
     try {
       const response = await fetch(API_ORIGIN + '/api' + path, { method, credentials: 'omit', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'X-Focus-Client': 'native-local-v1', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) }).catch(() => { throw new NetworkUnavailable(); });
-      const body = await response.json();
+      const body = await readMobileResponseJson<{ code?: string }>(response, controller.signal);
       if (!response.ok) throw new MobileRequestError(body.code ?? 'REQUEST_FAILED', response.status);
       return body as T;
     } finally { clearTimeout(timer); }
