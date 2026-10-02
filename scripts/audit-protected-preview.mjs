@@ -1,9 +1,11 @@
 import { spawn } from 'node:child_process';
-import { randomUUID } from 'node:crypto';
+import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { verifyAsset, verifyRelease } from '../packages/content/index.ts';
+import { completeEvents } from '../tests/platform/fixtures.ts';
 
 // Synthetic data only. This fixed target remains behind Vercel Authentication.
 const origin = 'https://concentration-two.vercel.app';
@@ -14,11 +16,23 @@ if (process.argv.length > (cleanupOnly ? 3 : 2)) throw new Error('UNEXPECTED_ARG
 const temporary = await mkdtemp(join(tmpdir(), 'focus-preview-audit-'));
 let credentials;
 
-async function call(path, method = 'GET', body, auth) {
+async function runCurl(args) {
+  return new Promise((done, reject) => {
+    const child = spawn('vercel', args, { cwd: root, signal: AbortSignal.timeout(45000), stdio: ['ignore', 'pipe', 'pipe'] });
+    const parts = [];
+    child.stdout.on('data', chunk => parts.push(chunk));
+    child.stderr.on('data', () => {}); // Never echo auth headers or response details.
+    child.once('error', reject);
+    child.once('close', code => code === 0 ? done(Buffer.concat(parts).toString('utf8')) : reject(new Error('PROTECTED_PREVIEW_REQUEST_FAILED')));
+  });
+}
+
+async function call(path, method = 'GET', body, auth, options = {}) {
   const requestId = randomUUID(), headerFile = join(temporary, requestId + '.headers');
   const args = ['curl', '/api' + path, '--deployment', origin, '--', '--silent', '--show-error', '--dump-header', headerFile,
     '--write-out', '\n__FOCUS_HTTP_STATUS__%{http_code}', '--request', method];
   if (method !== 'GET') args.push('--header', `Origin: ${origin}`, '--header', 'Content-Type: application/json');
+  if (options.idempotencyKey) args.push('--header', `Idempotency-Key: ${options.idempotencyKey}`);
   if (auth) {
     if (!/^focus_session=[a-f0-9]{64}$/.test(auth.cookie) || !/^[A-Za-z0-9_-]{20,200}$/.test(auth.csrf)) throw new Error('SYNTHETIC_AUTH_FORMAT_INVALID');
     const configFile = join(temporary, requestId + '.curlrc');
@@ -30,14 +44,7 @@ async function call(path, method = 'GET', body, auth) {
     await writeFile(dataFile, JSON.stringify(body), { mode: 0o600 });
     args.push('--data-binary', '@' + dataFile);
   }
-  const output = await new Promise((done, reject) => {
-    const child = spawn('vercel', args, { cwd: root, signal: AbortSignal.timeout(45000), stdio: ['ignore', 'pipe', 'pipe'] });
-    let stdout = '';
-    child.stdout.on('data', chunk => { stdout += chunk; });
-    child.stderr.on('data', () => {}); // Never echo auth headers or response details.
-    child.once('error', reject);
-    child.once('close', code => code === 0 ? done(stdout) : reject(new Error('PROTECTED_PREVIEW_REQUEST_FAILED')));
-  });
+  const output = await runCurl(args);
   const marker = '\n__FOCUS_HTTP_STATUS__', position = output.lastIndexOf(marker);
   if (position < 0) throw new Error('PROTECTED_PREVIEW_STATUS_MISSING');
   const status = Number(output.slice(position + marker.length).trim());
@@ -46,6 +53,17 @@ async function call(path, method = 'GET', body, auth) {
   const headers = await readFile(headerFile, 'utf8');
   await unlink(headerFile);
   return { status, value, headers };
+}
+
+async function contentAsset(path) {
+  if (!/^\/content-assets\/[a-f0-9]{64}\.(png|mp3)$/.test(path)) throw new Error('SYNTHETIC_ASSET_PATH_INVALID');
+  const requestId = randomUUID(), headerFile = join(temporary, requestId + '.headers'), bodyFile = join(temporary, requestId + '.body');
+  const output = await runCurl(['curl', path, '--deployment', origin, '--', '--silent', '--show-error', '--dump-header', headerFile,
+    '--output', bodyFile, '--write-out', '__FOCUS_HTTP_STATUS__%{http_code}']);
+  const status = Number(output.match(/__FOCUS_HTTP_STATUS__(\d{3})\s*$/)?.[1]);
+  const headers = await readFile(headerFile, 'utf8'), bytes = await readFile(bodyFile);
+  await Promise.all([unlink(headerFile), unlink(bodyFile)]);
+  return { status, headers, bytes };
 }
 
 function webAuth(result) {
@@ -83,10 +101,43 @@ try {
     if (viewed.status !== 200 || viewed.value?.children?.[0]?.id !== child.value.id) throw new Error('SYNTHETIC_READ_FAILED');
     const billing = await call('/family/billing', 'GET', undefined, original);
     if (billing.status !== 200 || billing.value?.state !== 'preview' || billing.value?.familyId !== viewed.value.family?.id || 'productId' in billing.value) throw new Error('SYNTHETIC_BILLING_STATUS_FAILED');
+    const started = await call(`/children/${child.value.id}/sessions`, 'POST', {
+      task: 'memory', deviceId: randomUUID(), environment: { platform: 'web', deviceClass: 'desktop', input: 'pointer', modality: 'visual' },
+    }, original, { idempotencyKey: randomUUID() });
+    if (started.status !== 201 || started.value?.plan?.version !== '2.0.0') throw new Error(`SYNTHETIC_PRACTICE_START_FAILED_${started.status}`);
+    const childAuth = webAuth(started), plan = started.value.plan;
+    const trust = await call('/content/trust', 'GET', undefined, childAuth);
+    const release = await call(`/content/releases/${plan.content.sha256}`, 'GET', undefined, childAuth);
+    if (trust.status !== 200 || release.status !== 200) throw new Error('SYNTHETIC_CONTENT_FETCH_FAILED');
+    const pack = await verifyRelease(release.value, trust.value.keys, { mode: 'local', market: 'LOCAL' });
+    if (pack.id !== plan.content.id || pack.version !== plan.content.version) throw new Error('SYNTHETIC_CONTENT_MISMATCH');
+    for (const asset of pack.assets) {
+      const media = await contentAsset(asset.path);
+      if (media.status !== 200 || !/^cache-control:\s*no-store\s*$/im.test(media.headers) || !/^x-request-id:\s*[^\r\n]+$/im.test(media.headers)) throw new Error('SYNTHETIC_ASSET_ROUTING_FAILED');
+      await verifyAsset(asset, new Uint8Array(media.bytes));
+    }
+    const recalledBytes = await readFile(join(root, 'packages/visuals/archive/objects-sheet-512-preview.png'));
+    const recalledHash = createHash('sha256').update(recalledBytes).digest('hex');
+    const recalled = await contentAsset(`/content-assets/${recalledHash}.png`);
+    if (recalled.status !== 404 || !/^x-request-id:\s*[^\r\n]+$/im.test(recalled.headers)) throw new Error('SYNTHETIC_RECALLED_ASSET_AVAILABLE');
+    const events = completeEvents(plan);
+    for (let offset = 0; offset < events.length; offset += 100) {
+      const saved = await call(`/sessions/${started.value.id}/events`, 'POST', { events: events.slice(offset, offset + 100) }, childAuth);
+      if (saved.status !== 200 || saved.value?.highestContiguousSeq !== Math.min(offset + 100, events.length)) throw new Error(`SYNTHETIC_PRACTICE_UPLOAD_FAILED_${saved.status}`);
+    }
+    const finalized = await call(`/sessions/${started.value.id}/finalize`, 'POST', { lastSeq: events.length }, childAuth);
+    if (finalized.status !== 200 || finalized.value?.completed !== true || finalized.value?.engineVersion !== plan.version) throw new Error(`SYNTHETIC_PRACTICE_FINALIZE_FAILED_${finalized.status}`);
+    const parentAgain = await call('/auth/login', 'POST', credentials);
+    if (parentAgain.status !== 200) throw new Error('SYNTHETIC_PARENT_RELOGIN_FAILED');
+    const report = await call(`/children/${child.value.id}/report`, 'GET', undefined, webAuth(parentAgain));
+    if (report.status !== 200 || !report.value?.sessions?.some(item => item.id === started.value.id && item.result?.completed === true)) {
+      const rows = Array.isArray(report.value?.sessions) ? report.value.sessions : [];
+      throw new Error(`SYNTHETIC_REPORT_MISSING_${report.status}_${report.value?.code ?? 'NO_CODE'}_ROWS_${rows.length}_MATCH_${rows.some(item => item.id === started.value.id)}_COMPLETE_${rows.some(item => item.result?.completed === true)}`);
+    }
     if (await removeSyntheticFamily()) await unlink(pending);
     const revoked = await call('/me', 'GET', undefined, original);
     if (revoked.status !== 401 || revoked.value?.code !== 'UNAUTHENTICATED') throw new Error('SYNTHETIC_SESSION_STILL_ACTIVE');
-    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', databaseReady: true, familyCreated: true, childRead: true, billingPreviewRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
+    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', databaseReady: true, familyCreated: true, childRead: true, billingPreviewRead: true, signedMediaVerified: true, recalledMediaRejected: true, practiceFinalized: true, parentReportRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
   }
 } catch (error) {
   if (credentials && !cleanupOnly) {

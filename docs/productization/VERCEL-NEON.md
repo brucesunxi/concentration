@@ -6,7 +6,7 @@
 
 - Vercel CDN 提供 `dist/web` 页面；`api/index.ts` 承接 `/api/*` 与所有签名内容包的 `/content-assets/*` 图片及预录语音。构建不把签名素材复制到静态目录，防止静态文件优先于 Vercel API 重写规则返回。
 - 素材响应查询当前有效的内容包引用；内置 `local-preview` 与经审核发布的素材各遵守对应渠道规则。最后一个引用它的内容包召回后，在线 `/content-assets/*` 请求返回 404，响应为 `no-store`。相同哈希被另一个有效内容包引用时仍可读取。网页界面仍可能把相同图片作为界面图形打包进 `/assets/*`，旧 Vercel 部署也可能保留先前的静态副本，设备离线缓存可留存至授权失效。因此召回目前约束练习和正式素材地址，不能保证已分发的原始图像字节被删除；正式发布前仍须清理旧部署、区分界面与可召回素材、验证 CDN 失效与旧会话处置。
-- Neon 托管 PostgreSQL，schema 版本 31。准备过程使用数据库所有者身份；Vercel 只使用 `focus_family_runtime` 限权身份。
+- Neon 托管 PostgreSQL，schema 版本 32。准备过程使用数据库所有者身份；Vercel 只使用 `focus_family_runtime` 限权身份。
 - 会话签名私钥仅放在 Vercel Preview 与 Production 的 Sensitive 环境变量 `FOCUS_SESSION_SIGNING_JWK`；本地准备副本保存在被忽略的 `.focus-data/neon/`，不可提交。
 - Preview 与受保护的 Production 域名共用内部预览数据库。`DATABASE_URL` 是带连接池的应用运行账号 URL。所有者 URL 不进入 Vercel。公开商用前须拆分环境。
 - Vercel 项目 `concentration` 的 `ssoProtection.deploymentType` 必须保持 `all`。
@@ -26,9 +26,9 @@
 
 ## 受保护预览的合成家庭验收
 
-已登录 Vercel CLI 且项目保持 Authentication 保护时，执行 `npm run audit:preview`。脚本只连接固定的 `concentration-two.vercel.app`，使用随机虚构家庭与孩子，依次检查数据库就绪、Web 注册与 Cookie、建档与读取、创建者注销及旧会话失效。成功后删除测试家庭，不输出密码、Cookie、CSRF 或连接串。临时请求文件使用本机受限权限并在退出时移除。
+已登录 Vercel CLI 且项目保持 Authentication 保护时，执行 `npm run audit:preview`。脚本只连接固定的 `concentration-two.vercel.app`，使用随机虚构家庭与孩子，依次检查数据库就绪、Web 注册与 Cookie、建档、有效签名图片和固定语音的字节摘要、已召回图片的 404、完整合成练习、家长报告，以及创建者注销及旧会话失效。成功后删除测试家庭，不输出密码、Cookie、CSRF 或连接串。临时请求文件使用本机受限权限并在退出时移除。
 
-如果网络在创建与注销之间中断，脚本会尝试自动清理；无法确认时，将仅供恢复使用的随机测试凭据保存在被忽略的 `.focus-data/neon/protected-preview-audit-pending.json`。恢复连接后执行 `npm run audit:preview -- --cleanup`，确认清理完成再重新验收。此项只证明受保护预览的一条实际 HTTP 路径，不能代替独立 Neon 测试分支的权限并发、备份恢复或真机检查。
+如果网络在创建与注销之间中断，脚本会尝试自动清理；无法确认时，将仅供恢复使用的随机测试凭据保存在被忽略的 `.focus-data/neon/protected-preview-audit-pending.json`。恢复连接后执行 `npm run audit:preview -- --cleanup`，确认清理完成再重新验收。合成事件由程序生成，不等于孩子实际完成练习；此项也不能代替独立 Neon 测试分支的权限并发、备份恢复或真机检查。
 
 ## 正式开放前
 

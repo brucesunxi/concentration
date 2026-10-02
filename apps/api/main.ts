@@ -17,6 +17,7 @@ import { databaseReady } from './readiness.ts';
 import { localReleaseScope } from './release-scope.ts';
 import { authClientFingerprint, authClientIp, authRateKind, takeAuthSlot } from './auth-rate-limit.ts';
 import { databaseEntitlementReader } from './billing-access.ts';
+import { requestQuery } from './request-query.ts';
 
 export async function createFamilyServer(options: { serverless?: boolean } = {}) {
 if (process.env.APP_MODE === 'production') throw new Error('Production release remains gated: verified guardian consent, OIDC, regional review, and operational validation are not yet complete.');
@@ -149,9 +150,7 @@ const server = http.createServer(async (req, res) => {
     }
     const goalHistoryRoute = url.pathname.match(/^\/api\/children\/([a-f0-9-]{36})\/life-goals\/history$/);
     if (goalHistoryRoute && method === 'GET') {
-      const query: Record<string, unknown> = Object.fromEntries(url.searchParams);
-      for (const key of url.searchParams.keys()) if (url.searchParams.getAll(key).length > 1) query[key] = url.searchParams.getAll(key);
-      json(await api.lifeHistory(principal, goalHistoryRoute[1], query)); return;
+      json(await api.lifeHistory(principal, goalHistoryRoute[1], requestQuery(url, options.serverless))); return;
     }
     const goalRoute = url.pathname.match(/^\/api\/children\/([a-f0-9-]{36})\/life-goals(?:\/([a-f0-9-]{36}))?$/);
     if (goalRoute) {
@@ -169,19 +168,13 @@ const server = http.createServer(async (req, res) => {
       }
       if (operation === 'sessions' && method === 'POST') { const r = await api.start(principal, id, await body(req), String(req.headers['idempotency-key'] || '')); if (native) json({ ...r.session, accessToken: r.auth.value }, 201); else { res.setHeader('Set-Cookie', cookie(r.auth.value, true)); json({ ...r.session, csrf: r.auth.csrf }, 201); } return; }
       if (operation === 'report' && method === 'GET') {
-        const query: Record<string, unknown> = Object.fromEntries(url.searchParams);
-        for(const key of url.searchParams.keys())if(url.searchParams.getAll(key).length>1)query[key]=url.searchParams.getAll(key);
-        json(await api.report(principal, id, query)); return;
+        json(await api.report(principal, id, requestQuery(url, options.serverless))); return;
       }
       if (operation === 'strategy-history' && method === 'GET') {
-        const query: Record<string, unknown> = Object.fromEntries(url.searchParams);
-        if (url.searchParams.getAll('cursor').length > 1) query.cursor = url.searchParams.getAll('cursor');
-        json(await api.teenStrategyHistory(principal, id, query)); return;
+        json(await api.teenStrategyHistory(principal, id, requestQuery(url, options.serverless))); return;
       }
       if (operation === 'weekly' && method === 'GET') {
-        const query: Record<string, unknown> = Object.fromEntries(url.searchParams);
-        if (url.searchParams.getAll('weekStart').length > 1) query.weekStart = url.searchParams.getAll('weekStart');
-        json(await api.weekly(principal, id, query)); return;
+        json(await api.weekly(principal, id, requestQuery(url, options.serverless))); return;
       }
       if (operation === 'observations' && method === 'POST') { json(await api.observe(principal, id, await body(req), String(req.headers['idempotency-key'] ?? '')), 201); return; }
       if (operation === 'withdraw' && method === 'POST') { json(await api.withdraw(principal, id)); return; }
