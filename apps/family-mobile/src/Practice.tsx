@@ -161,21 +161,26 @@ export function Practice({ session, familyId, client, offline = false, onExit }:
     live.current = true; const abort = new AbortController(); let unsubscribe: (() => void) | undefined;
     void setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false, playsInSilentMode: false, interruptionMode: 'doNotMix' }).catch(() => undefined);
     void (async () => {
+      let preparationStage = 'local-storage';
       try {
         const generation=await offlineGeneration(),deviceId=await client.deviceId();
         let proof:AuthorizationProof|undefined,loaded:MobileContent;
         if(offline){
+          preparationStage = 'offline-authorization';
           const saved=await readOfflineSession();
           if(!saved || saved.capsule.session.id!==session.id || saved.capsule.familyId!==familyId)throw new Error('OFFLINE_PREPARATION_CHANGED');
           const verified=await verifyOfflineSession(saved,deviceId,Platform.OS as 'ios'|'android',saved.events,nativeVerifier);
           authorization.current=verified.clock;
           loaded=await prepareContent(plan,client,abort.signal,verified.capsule.content);
         } else {
+          preparationStage = 'online-authorization';
           authorization.current=await prepareAuthorization(session,deviceId,path=>client.request(path),nativeVerifier,value=>{proof=value});
           if(!live.current)return;
+          preparationStage = 'content';
           loaded=await prepareContent(plan,client,abort.signal);
         }
         if(!live.current)return;
+        preparationStage = 'event-journal';
         const current = new SessionRuntime(session, { now: () => performance.now(), uuid: randomUUID, authorize: actions => authorization.current?.assert(actions), journal: journalFor(familyId, session.child_id, session.id, () => authorization.current?.checkpoint() ?? {highest:Date.now(),fault:null}), send: events => client.request(`/sessions/${session.id}/events`, 'POST', { events }), finalize: lastSeq => client.request(`/sessions/${session.id}/finalize`, 'POST', { lastSeq }) });
         await current.initialize(); if (!live.current) { current.stop(); return; }
         let savedForOffline=offline;
@@ -211,6 +216,11 @@ export function Practice({ session, familyId, client, offline = false, onExit }:
         }
         if (current.state.ended || mayContinue()) { if (current.events.length) void synchronize(); }
       } catch (failure) {
+        // Stage and error code are safe for diagnostics; never log family data,
+        // server response bodies, signed URLs, or credential-bearing messages.
+        if (live.current) console.error('PRACTICE_PREPARATION_FAILED', preparationStage,
+          failure instanceof Error ? failure.name : 'UnknownError',
+          typeof failure === 'object' && failure !== null && 'code' in failure && typeof failure.code === 'string' ? failure.code : 'UNKNOWN');
         if(unavailable(failure)){await accessFailure(failure);return;}
         if(live.current && !isNetworkFailure(failure))await dropOfflineSession(session.id).catch(()=>undefined);
         if (live.current) { locking.current = true; setLocked(true); setPhase('pause'); setError(t('练习材料或加密记录尚未准备好。请回到家庭空间后重试。', 'Practice materials or encrypted storage are not ready. Return to your family space and retry.')); }
