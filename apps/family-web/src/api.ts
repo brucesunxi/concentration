@@ -58,7 +58,7 @@ export async function prepareBrowserIdentity(){
   else deviceId();
 }
 
-export function environmentFor(input: Exclude<Environment['input'], 'assistive'>): Environment {
+export function environmentFor(input: Environment['input']): Environment {
   const coarse = matchMedia('(pointer: coarse)').matches;
   return { platform: 'web', modality: 'visual', deviceClass: coarse ? matchMedia('(min-width: 768px)').matches ? 'tablet' : 'phone' : 'desktop', input };
 }

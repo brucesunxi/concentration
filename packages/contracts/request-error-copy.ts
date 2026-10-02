@@ -23,6 +23,8 @@ const byCode: Record<string, readonly [string, string]> = {
   DAILY_LIMIT: ['今天的练习安排已足够，可以先休息。', 'Today’s practice allowance is complete. Take a break.'],
   SESSION_CONFLICT: ['这份档案在另一台设备有未结束的练习，请家长查看。', 'Another device has an unfinished practice. Ask a parent to review it.'],
   INPUT_CONDITION_CHANGED: ['这台设备有另一种操作方式的未结束练习，请先完成或处理原练习。', 'This device has unfinished practice in another input mode. Finish or review that practice first.'],
+  SESSION_TASK_CHANGED: ['这台设备有另一项未结束的练习，请先完成或处理原练习。', 'This device has another unfinished practice. Finish or review it first.'],
+  ASSISTIVE_TIMED_UNAVAILABLE: ['读屏操作暂不提供限时看图题，可以选“找一找”或“记一记”。', 'Timed visual tasks are not available in screen reader mode yet. Choose Search or Memory.'],
   SESSION_REPLACED: ['家长已结束原设备上的练习，请查看保存的记录。', 'A parent ended this practice on the original device. Review its saved record.'],
   SESSION_UPLOAD_EXPIRED: ['这次练习的同步期限已结束，请家长查看。', 'The time to sync this practice has ended. Ask a parent to review it.'],
   ENTITLEMENT_REQUIRED: ['这项练习需要有效的家庭权益，请家长查看家庭空间。', 'This practice needs an active family plan. Ask a parent to check family access.'],

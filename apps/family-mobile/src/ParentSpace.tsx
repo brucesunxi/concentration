@@ -122,7 +122,7 @@ export function ParentSpace({ child, family, mode, locale, client, onBack, onCha
       {report?.sessions.map(({ id, result, created_at }) => <View key={id} style={s.card}>
         <Text style={s.heading}>{taskContent(result.task, locale, child.ageBand).title}</Text>
         <Text style={s.muted}>{new Date(created_at).toLocaleString(locale)}</Text>
-        <Text style={s.body}>{result.metrics.trials ? t(`独立正确 ${result.metrics.correct} / ${result.metrics.trials} 个步骤`, `${result.metrics.correct} / ${result.metrics.trials} independent steps correct`) : t('尚无独立有效步骤', 'No valid independent steps yet')}</Text>
+        <Text style={s.body}>{result.environment?.input === 'assistive' ? t(`读屏方式完成正式步骤 ${result.metrics.trials + result.metrics.assisted} 个，单独保留，不做正确率或能力判断。`, `${result.metrics.trials + result.metrics.assisted} formal screen reader steps, kept separately without an accuracy or ability rating.`) : result.metrics.trials ? t(`独立正确 ${result.metrics.correct} / ${result.metrics.trials} 个步骤`, `${result.metrics.correct} / ${result.metrics.trials} independent steps correct`) : t('尚无独立有效步骤', 'No valid independent steps yet')}</Text>
         <Text style={s.muted}>{t(`帮助 ${result.metrics.assisted} 次 · 中断 ${result.interruptions} 次`, `${result.metrics.assisted} assisted · ${result.interruptions} interrupted`)}</Text>
         <Text style={s.muted}>{result.historyOnly ? t('换设备前的独立记录 · 不计入课程', 'Previous-device record · Not counted in the course') : result.completed ? t('完整完成', 'Completed') : result.metrics.trials + result.metrics.assisted === 0 ? t('提前结束 · 尚无正式步骤', 'Stopped early · No formal step completed') : t('提前结束', 'Stopped early')}</Text>
       </View>)}

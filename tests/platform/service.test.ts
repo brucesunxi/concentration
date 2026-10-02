@@ -93,6 +93,19 @@ test('assistive native sessions reject timed tasks and keep valid untimed record
   const parent = (await api.authenticate((await api.login({ name: f.name, password: f.password }, 'native')).value, 'native'))!;
   assert.equal((await api.me(parent)).children[0].course.unit, 0);
 });
+test('explicit browser screen reader input creates separate untimed records without advancing the course', async () => {
+  const f = await family(), environment = { ...TEST_ENVIRONMENT, input: 'assistive' as const }, deviceId = randomUUID();
+  await assert.rejects(api.start(f.p, f.c.id, { environment, task: 'sustain', deviceId }, randomUUID()), status('ASSISTIVE_TIMED_UNAVAILABLE'));
+  const { session, auth } = await api.start(f.p, f.c.id, { environment, task: 'memory', deviceId }, randomUUID());
+  assert.equal(session.plan.environment?.input, 'assistive');
+  const child = (await api.authenticate(auth.value))!, events = completeEvents(session.plan);
+  await api.append(child, session.id, { events });
+  const result = await api.finalize(child, session.id, { lastSeq: events.length }) as Result;
+  assert.equal(result.decision.reason, 'HOLD_ASSISTIVE_MODE_UNVALIDATED');
+  assert.equal(result.environment?.input, 'assistive');
+  const report = await api.report(await relogin(f), f.c.id);
+  assert.equal(report.child.course.unit, 0);
+});
 test('malformed protocol writes roll back and client correctness flags cannot be injected', async () => {
   const f = await family(); const { session: s, auth } = await api.start(f.p, f.c.id, { environment: TEST_ENVIRONMENT, task: 'memory', deviceId: randomUUID() }, randomUUID());
   const cp = (await api.authenticate(auth.value))!;
@@ -107,6 +120,7 @@ test('idempotency keys bind request content and another device cannot take over 
   assert.equal((await api.start(p, f.c.id, { environment: TEST_ENVIRONMENT, task: 'search', deviceId }, key)).session.id, s.id);
   await assert.rejects(api.start(await relogin(f), f.c.id, { environment: TEST_ENVIRONMENT, task: 'stop', deviceId }, key), status('IDEMPOTENCY_CONFLICT'));
   await assert.rejects(api.start(await relogin(f), f.c.id, { environment: { ...TEST_ENVIRONMENT, input: 'keyboard' }, task: 'search', deviceId }, randomUUID()), status('INPUT_CONDITION_CHANGED'));
+  await assert.rejects(api.start(await relogin(f), f.c.id, { environment: TEST_ENVIRONMENT, task: 'memory', deviceId }, randomUUID()), status('SESSION_TASK_CHANGED'));
   await assert.rejects(api.start(await relogin(f), f.c.id, { environment: TEST_ENVIRONMENT, task: 'stop', deviceId: randomUUID() }, randomUUID()), status('SESSION_CONFLICT'));
 });
 test('withdrawal blocks old uploads before deduplication and revokes child credentials', async () => {

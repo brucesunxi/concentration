@@ -495,7 +495,7 @@ export function service(source: Database, now: () => number = Date.now, content?
       await contentReady(); await authorityReady();
       const input = startSchema.parse(raw);
       if ((p.transport === 'native') !== (input.environment.platform !== 'web')) fail(400, 'ENVIRONMENT_TRANSPORT_MISMATCH', '练习平台与登录方式不一致。');
-      if (input.environment.input === 'assistive' && (input.environment.platform === 'web' || ['stop', 'sustain'].includes(input.task))) fail(422, 'ASSISTIVE_TIMED_UNAVAILABLE', '读屏模式暂不提供限时看图练习；可以选择无单题倒计时的找一找或记一记。');
+      if (input.environment.input === 'assistive' && ['stop', 'sustain'].includes(input.task)) fail(422, 'ASSISTIVE_TIMED_UNAVAILABLE', '读屏模式暂不提供限时看图练习；可以选择无单题倒计时的找一找或记一记。');
       if (!key || key.length < 16 || key.length > 128) fail(400, 'INVALID_IDEMPOTENCY_KEY', '需要有效的请求标识。');
       const requestHash = digest(canonical(input));
       return db.transaction(async tx => {
@@ -520,6 +520,7 @@ export function service(source: Database, now: () => number = Date.now, content?
         if (!result && active) {
           if (active.device_id !== input.deviceId || (active.continuation_grant && active.continuation_grant.body.transport !== p.transport)) fail(409, 'SESSION_CONFLICT', '另一台设备有未结束的练习。');
           if (active.plan.environment?.input !== input.environment.input) fail(409, 'INPUT_CONDITION_CHANGED', '这台设备有另一种操作方式的未结束练习，请先完成或处理原练习。');
+          if (active.plan.task !== input.task) fail(409, 'SESSION_TASK_CHANGED', '这台设备有另一项未结束的练习，请先完成或处理原练习。');
           result = active;
         }
         if (!result) {

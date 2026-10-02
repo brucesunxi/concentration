@@ -45,6 +45,7 @@ def play_one_formal_step(page):
     page.get_by_role("button", name="Start today’s practice").click()
     invitation = page.get_by_role("dialog")
     assert "Please hand the screen to your child" in invitation.inner_text()
+    invitation.get_by_label("Touch, mouse or keyboard").check()
     page.get_by_role("button", name="I want to start").click()
     page.get_by_role("button", name="I want to try").click()
 
@@ -66,6 +67,48 @@ def play_one_formal_step(page):
     page.get_by_role("button", name="That is enough for today").click()
     page.get_by_text("You completed 1 independent step.").wait_for(timeout=10000)
     page.get_by_text("Your record has been checked and saved for your family.").wait_for(timeout=15000)
+    page.get_by_role("button", name="Done, time for a break").click()
+
+
+def play_assistive_search(page):
+    page.locator(".task-card").first.click()
+    invitation = page.get_by_role("dialog")
+    begin = invitation.get_by_role("button", name="I want to start")
+    assert begin.is_disabled(), "Input mode must be chosen explicitly"
+    invitation.get_by_label("Screen reader (recorded separately)").check()
+    assert begin.is_enabled()
+    begin.click()
+    page.get_by_text("This screen reader practice has no per-step countdown", exact=False).wait_for()
+    page.get_by_role("button", name="I want to try").click()
+    for step in range(3):
+        page.get_by_role("button", name="All found").wait_for(timeout=15000)
+        assert page.evaluate("document.activeElement?.classList.contains('task-heading')"), "New screen reader step should focus its heading"
+        for rabbit in page.locator('button.stimulus-tile[aria-label^="Rabbit"]').all():
+            rabbit.focus()
+            page.keyboard.press("Enter")
+        page.get_by_role("button", name="All found").click()
+        page.locator(".feedback-stage").wait_for(timeout=15000)
+        if step < 2:
+            page.locator(".feedback-stage button.primary").click()
+    page.get_by_role("button", name="Take a break").click()
+    page.get_by_role("button", name="That is enough for today").click()
+    page.get_by_text("formal screen reader steps, kept separately", exact=False).wait_for(timeout=10000)
+    page.get_by_text("Your record has been checked and saved for your family.").wait_for(timeout=15000)
+    page.get_by_role("button", name="Done, time for a break").click()
+
+
+def check_assistive_memory_focus(page):
+    page.locator(".task-card").nth(2).click()
+    invitation = page.get_by_role("dialog")
+    invitation.get_by_label("Screen reader (recorded separately)").check()
+    invitation.get_by_role("button", name="I want to start").click()
+    page.get_by_role("button", name="I want to try").click()
+    page.get_by_role("button", name="Ready, hide them").wait_for(timeout=15000)
+    page.get_by_role("button", name="Ready, hide them").click()
+    page.locator(".memory-options button").first.wait_for(timeout=15000)
+    page.wait_for_function("document.activeElement === document.querySelector('.memory-options button')")
+    page.get_by_role("button", name="Take a break").click()
+    page.get_by_role("button", name="That is enough for today").click()
     page.get_by_role("button", name="Done, time for a break").click()
 
 
@@ -94,11 +137,27 @@ def verify_family_flow(browser, base):
         assert page.evaluate("document.body.scrollWidth <= innerWidth"), "Practice selection overflows a 320px viewport"
         page.set_viewport_size({"width": 1440, "height": 900})
 
+        page.locator(".task-card").nth(1).click()
+        timed_invitation = page.get_by_role("dialog")
+        assert timed_invitation.get_by_label("Screen reader (recorded separately)").is_disabled()
+        assert "This timed visual task is not available with a screen reader yet" in timed_invitation.inner_text()
+        timed_invitation.get_by_role("button", name="Close").click()
         play_one_formal_step(page)
         page.get_by_role("button", name="Start today’s practice").click()
         invitation = page.get_by_role("dialog").inner_text()
         assert "You have already practised today" in invitation
         assert "there is no need to use the remaining time" in invitation
+        page.get_by_role("dialog").get_by_role("button", name="Close").click()
+        play_assistive_search(page)
+        check_assistive_memory_focus(page)
+        page.get_by_role("button", name="Parent access").click()
+        parent_dialog = page.get_by_role("dialog")
+        parent_dialog.get_by_label("Family name").fill(FAMILY)
+        parent_dialog.get_by_label("Parent password").fill(PASSWORD)
+        parent_dialog.get_by_role("button", name="Open family space").click()
+        page.get_by_role("button", name="Progress").first.click()
+        page.get_by_text("Screen reader · separate record").first.wait_for(timeout=15000)
+        page.get_by_text("Kept separately; no accuracy or ability change calculated").first.wait_for(timeout=15000)
         assert not errors, f"Browser runtime errors: {errors}"
 
         snapshot = page.evaluate("""async () => {
@@ -107,7 +166,7 @@ def verify_family_flow(browser, base):
         }""")
         assert snapshot["confirmedMs"] > 0, "The service did not confirm active practice time"
         assert snapshot["status"] == "available", "A short practice should leave voluntary time"
-        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, server confirmation, same-day rest cue")
+        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, separate keyboard-operated screen reader condition, server confirmation, same-day rest cue")
     except Exception:
         artifact = ROOT / "dist/browser-qa/failure.png"
         artifact.parent.mkdir(parents=True, exist_ok=True)

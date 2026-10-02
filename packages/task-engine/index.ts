@@ -77,7 +77,7 @@ export function createPlan(input: Pick<Plan, 'id' | 'task' | 'ageBand' | 'locale
   requireThat(TASKS.includes(input.task) && Object.hasOwn(DAILY_LIMIT, input.ageBand), 'Unsupported task or age');
   requireThat(Number.isInteger(input.level) && input.level >= 1 && input.level <= 3, 'Invalid level');
   requireThat(['web', 'ios', 'android'].includes(input.environment.platform) && ['desktop', 'tablet', 'phone'].includes(input.environment.deviceClass) && ['pointer', 'touch', 'keyboard', 'assistive'].includes(input.environment.input) && input.environment.modality === 'visual', 'Unsupported environment');
-  requireThat(input.environment.input !== 'assistive' || (input.environment.platform !== 'web' && ['search', 'memory'].includes(input.task)), 'Timed or web assistive protocol is not available');
+  requireThat(input.environment.input !== 'assistive' || ['search', 'memory'].includes(input.task), 'Timed assistive protocol is not available');
   requireThat(/^[a-f0-9]{64}$/.test(input.content.sha256), 'Invalid content reference');
   const random = randomFrom(input.seed);
   const teen = ['12-14', '15-17'].includes(input.ageBand);
@@ -150,7 +150,7 @@ export function replay(plan: Plan, events: EngineEvent[], budgetMs = Infinity): 
       const trial = plan.trials[state.nextIndex];
       requireThat(event.presentation && Number.isFinite(event.presentation.frameDeltaMs) && event.presentation.frameDeltaMs > 0 && event.presentation.method === (plan.environment.platform === 'web' ? 'raf-pair' : 'native-frame'), 'Presentation evidence required');
       if (previousSubmit && trial.windowMs && !trial.practice && !previousSubmit.trial.practice && previousSubmit.trial.block === trial.block) requireThat(event.at - previousSubmit.at >= TIMING.intervalMs, 'Stimulus interval too short');
-      state.active = { trial, onset: event.at, selected: [], recalled: trial.task !== 'memory', assisted: false, responseCount: 0, firstResponseMs: null, invalidReason: !event.presentation.assetsReady ? 'asset_failure' : event.presentation.frameDeltaMs > TIMING.maxFrameGapMs ? 'render_failure' : null };
+      state.active = { trial, onset: event.at, selected: [], recalled: trial.task !== 'memory', assisted: false, responseCount: 0, firstResponseMs: null, invalidReason: !event.presentation.assetsReady ? 'asset_failure' : plan.environment.input !== 'assistive' && event.presentation.frameDeltaMs > TIMING.maxFrameGapMs ? 'render_failure' : null };
       continue;
     }
     if (event.type === 'end') {

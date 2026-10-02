@@ -53,7 +53,7 @@ test('small samples, modality mismatches, and help do not earn an unsupported up
   assert.equal(adapt(plan, [evidence, evidence, { ...evidence, results: replay(plan, completeEvents(plan, { help: true })).results }], now).level, 1);
   assert.equal(wilsonLower(0, 0), null); assert.ok(wilsonLower(18, 20)! > .7);
 });
-test('screen reader input is a separate untimed native condition and cannot drive difficulty', () => {
+test('screen reader input is a separate untimed condition on native and web and cannot drive difficulty', () => {
   const environment = { platform: 'ios' as const, deviceClass: 'phone' as const, input: 'assistive' as const, modality: 'visual' as const };
   const plan = createPlan({ id: 'assistive-plan', task: 'search', ageBand: '6-8', locale: 'en', seed: 'assistive-seed', level: 1, environment, content: TEST_CONTENT });
   assert.ok(plan.trials.every(trial => trial.windowMs === 0));
@@ -63,8 +63,12 @@ test('screen reader input is a separate untimed native condition and cannot driv
   const now = Date.parse('2026-09-30T12:00:00Z');
   const evidence = { condition: plan.condition, completedAt: new Date(now).toISOString(), results };
   assert.deepEqual(adapt(plan, [evidence, evidence, evidence], now), { level: 1, reason: 'HOLD_ASSISTIVE_MODE_UNVALIDATED' });
-  assert.throws(() => createPlan({ ...plan, task: 'stop', environment, content: TEST_CONTENT }), /Timed or web assistive/);
-  assert.throws(() => createPlan({ ...plan, task: 'memory', environment: { ...environment, platform: 'web' }, content: TEST_CONTENT }), /Timed or web assistive/);
+  assert.throws(() => createPlan({ ...plan, task: 'stop', environment, content: TEST_CONTENT }), /Timed assistive/);
+  const browser = createPlan({ ...plan, task: 'memory', environment: { ...environment, platform: 'web', deviceClass: 'desktop' }, content: TEST_CONTENT });
+  const browserEvents = completeEvents(browser);
+  const firstPresentation = browserEvents.find(event => event.type === 'present')!;
+  if (firstPresentation.type === 'present') firstPresentation.presentation!.frameDeltaMs = 250;
+  assert.equal(replay(browser, browserEvents).invalidations.length, 0, 'untimed assistive input does not exclude a step because screen reader speech delayed an animation frame');
   const wrongInput = completeEvents(plan);
   const choice = wrongInput.find(event => event.type === 'choose')!;
   (choice as Extract<EngineEvent, { type: 'choose' }>).input = 'touch';
