@@ -12,6 +12,7 @@ import { ParentSpace } from './ParentSpace';
 import { FamilyArtwork } from './FamilyArtwork';
 import { Recovery } from './Recovery';
 import type { GoalInput } from '../../../packages/family-support/model.ts';
+import { lifeTemplateForTask } from '../../../packages/family-support/model.ts';
 import { ParentGuide } from './ParentGuide';
 import { AccountSecurity } from './AccountSecurity';
 import { FamilyBilling } from './FamilyBilling';
@@ -154,7 +155,10 @@ function FamilyApp() {
       setPracticeInvitation({childId,task,identity,day:practiceInvitationDay(limits,child.locale)});
     });
   }
-  if (session && (me || offlineOffer)) return <View style={{ flex: 1 }}><Practice key={session.id} session={session} familyId={me?.family.id ?? offlineOffer!.capsule.familyId} client={client} offline={!!offlineOffer} onExit={() => { setSession(null); void refresh(false); }} />{covered && <View style={{ position: 'absolute', inset: 0, backgroundColor: colors.background }}><Page title="Focus Island"><Text style={s.muted}>{t('回来后再继续。', 'Continue when you return.')}</Text></Page></View>}</View>;
+  if (session && (me || offlineOffer)) return <View style={{ flex: 1 }}><Practice key={session.id} session={session} familyId={me?.family.id ?? offlineOffer!.capsule.familyId} client={client} offline={!!offlineOffer} onExit={() => { setSession(null); void refresh(false); }} onExploreLife={me?.role==='child'&&me.children.some(c=>c.id===session.child_id)?()=>{
+    const child=me.children.find(c=>c.id===session.child_id)!;
+    setSelected(child);setLifeSuggestion(lifeTemplateForTask[session.plan.task]);setView('life');setSession(null);void refresh(false);
+  }:undefined} />{covered && <View style={{ position: 'absolute', inset: 0, backgroundColor: colors.background }}><Page title="Focus Island"><Text style={s.muted}>{t('回来后再继续。', 'Continue when you return.')}</Text></Page></View>}</View>;
   if (covered) return <Page title="Focus Island"><Text style={s.muted}>{t('回来后再继续。', 'Continue when you return.')}</Text></Page>;
   if(offlineOffer && !me) return <Page title={t('继续已准备的练习','Continue your prepared practice')} subtitle={taskContent(offlineOffer.capsule.session.plan.task,locale,offlineOffer.capsule.session.plan.ageBand).title}>
     <Text style={s.body}>{t('现在连不上家庭服务。可以恢复这台设备已经准备好的一份练习，不会开始新的课程。','The family service is unavailable. You can restore the practice already prepared on this device; this does not start a new course session.')}</Text>

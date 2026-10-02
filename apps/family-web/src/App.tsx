@@ -6,6 +6,7 @@ import type { TaskId, Locale, AgeBand } from '../../../packages/task-engine/inde
 import { request, RequestError, deviceId, environmentFor, inputForClick, accessSender, prepareBrowserIdentity } from './api.ts';
 import type { Me, Child, Session, AccountAccessEvent, AccountAccessOutcome, DeletedFamily } from './api.ts';
 import type { GoalInput } from '../../../packages/family-support/model.ts';
+import { lifeTemplateForTask } from '../../../packages/family-support/model.ts';
 import { translate, taskContent, isTeen } from './content.ts';
 import { Play } from './Play.tsx';
 import { clearChildJournals, journal } from './journal.ts';
@@ -232,7 +233,11 @@ export function App() {
       const a = document.createElement('a'); a.href = url; a.download = 'focus-family-records.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
-  if (session && (me||offlineOffer)) return <Play key={session.id} session={session} familyId={me?.family.id??offlineOffer!.capsule.familyId} offline={!!offlineOffer} onExit={() => { setSession(null); void refresh(false).catch(e => setError(familyErrorCopy(e,localeRef.current))); }} />;
+  if (session && (me||offlineOffer)) return <Play key={session.id} session={session} familyId={me?.family.id??offlineOffer!.capsule.familyId} offline={!!offlineOffer} onExit={() => { setSession(null); void refresh(false).catch(e => setError(familyErrorCopy(e,localeRef.current))); }} onExploreLife={me?.role==='child'&&me.children.some(c=>c.id===session.child_id)?()=>{
+    const childId=session.child_id,templateId=lifeTemplateForTask[session.plan.task],identity=accessVersion.current;
+    setLoading(true);setSession(null);
+    void refresh(false).then(next=>{if(identity!==accessVersion.current||next?.role!=='child'||!next.children.some(c=>c.id===childId))return;setSelected(childId);navigate('life');setLifeSuggestion({childId,templateId});});
+  }:undefined} />;
   if (loading) return <div className="loading-screen"><Leaf size={32} /><p role="status">{t('正在打开家庭空间…', 'Opening your family space…')}</p></div>;
   if(offlineOffer&&!me)return <main className="offline-recovery"><section className="family-card stack-form"><span className="eyebrow">{isTeen(offlineOffer.capsule.session.plan.ageBand)?'FOCUS STUDIO':'FOCUS ISLAND'}</span><h1>{t('继续已准备的练习','Continue your prepared practice')}</h1><h2>{taskContent(offlineOffer.capsule.session.plan.task,locale,offlineOffer.capsule.session.plan.ageBand).title}</h2><p>{t('现在连接不上家庭服务。这里只恢复此浏览器已准备的练习，不会创建新的课程。','The family service is unavailable. Restore only the practice prepared in this browser; no new course session is created.')}</p><p>{t('可继续至：','Available until: ')}{new Date(offlineOffer.capsule.session.continuation_grant.body.recordUntil).toLocaleString(locale)}</p><p className="notice">{t('家长停止采集或换设备的通知，联网后才能收到。当前仍是未审核的本地开发内容。','Parent collection or device changes arrive when you reconnect. These remain unreviewed local preview materials.')}</p>{error&&<p className="notice error" role="alert">{error}</p>}<button className="primary" disabled={pending} onClick={()=>setSession(offlineOffer.capsule.session)}>{t('恢复这份练习','Restore this practice')}</button><button className="quiet" disabled={pending} onClick={()=>void safely(async()=>{await refresh();})}>{t('重新连接家庭服务','Reconnect to the family service')}</button><button className="quiet" disabled={pending} onClick={()=>void safely(async()=>{await journal().invalidate();setOfflineOffer(null);setSession(null);})}>{t('退出离线入口','Leave offline access')}</button></section></main>;
 

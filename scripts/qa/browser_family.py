@@ -67,7 +67,15 @@ def play_one_formal_step(page):
     page.get_by_role("button", name="That is enough for today").click()
     page.get_by_text("You completed 1 independent step.").wait_for(timeout=10000)
     page.get_by_text("Your record has been checked and saved for your family.").wait_for(timeout=15000)
-    page.get_by_role("button", name="Done, time for a break").click()
+    page.get_by_role("button", name="If you like, explore an everyday goal").click()
+    page.get_by_role("heading", name="One small goal. You can stop at any time.").wait_for(timeout=10000)
+    assert page.get_by_role("radio", name=re.compile("Find two little things")).is_checked()
+    goals = page.evaluate("""async () => {
+      const me = await (await fetch('/api/me')).json();
+      return (await (await fetch(`/api/children/${me.children[0].id}/life-goals`)).json()).goals;
+    }""")
+    assert goals == [], "Opening a related activity must not save a goal without the child's choice"
+    page.get_by_role("button", name="Today", exact=True).first.click()
 
 
 def play_assistive_search(page):

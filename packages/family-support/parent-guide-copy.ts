@@ -21,7 +21,7 @@ export const guideCopy = {
   beforeStart: w('先商量好，再选择一件生活小事。所有章节都可以随时查看。', 'Talk together first, then choose an everyday activity. All sections are available at any time.'),
   stopped: w('此档案已停止采集。仍可阅读陪伴内容；不能新增生活记录。', 'Collection has stopped for this profile. You can still read the guide; new everyday records cannot be added.'),
   loading: w('正在读取陪伴内容…', 'Loading the parent guide…'),
-  selectedSuggestion: w('已选中本节的生活建议，可以更换。确认保存前，它还不是家庭目标。', 'This section’s everyday suggestion is selected. You can change it. It is not a saved family goal until you confirm.'),
+  selectedSuggestion: w('已选中一个相关的生活建议，可以更换或离开。由你确认前，它还不是家庭目标。', 'A related everyday idea is selected. You can change it or leave. It is not a saved family goal until you confirm.'),
 };
 export function guideProgress(data: ParentGuide, locale: Locale) {
   return locale === 'en'

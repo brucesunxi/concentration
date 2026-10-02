@@ -10,9 +10,14 @@ import {createSessionAuthority} from '../../apps/api/session-authority.ts';
 import { initialFamilyPack } from '../../apps/api/family-content.ts';
 import { hashObject } from '../../packages/content/index.ts';
 import { lifeTemplates } from '../../packages/family-support/catalogue.ts';
+import { lifeTemplateForTask } from '../../packages/family-support/model.ts';
 import { serializeChildExport } from '../../packages/session-runtime/profile-actions.ts';
 
 let db: Database, api: FocusService;
+test('each practice task opens the matching age-specific activity without changing its content',()=>{
+  for(const age of ['6-8','9-11','12-14','15-17'] as const)for(const template of lifeTemplates(age))
+    assert.equal(lifeTemplateForTask[template.task],template.id);
+});
 let localContent:Awaited<ReturnType<typeof createLocalContent>>,sessionAuthority:Awaited<ReturnType<typeof createSessionAuthority>>;
 const now = Date.parse('2026-09-30T12:00:00Z');
 before(async () => { db = await openDatabase('memory://'); await migrate(db); localContent=await createLocalContent(db,{now:()=>now});sessionAuthority=await createSessionAuthority(db);api = service(db, () => now,localContent,sessionAuthority); });

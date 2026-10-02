@@ -16,6 +16,8 @@ export const goalActionSchema = z.union([
   z.object({ action: z.literal('unshare') }).strict(),
 ]);
 export type GoalInput = z.infer<typeof createGoalSchema>;
+/** Preselects a related off-screen activity without creating a goal for the child. */
+export const lifeTemplateForTask: Readonly<Record<TaskId, GoalInput['templateId']>> = Object.freeze({ search:'find', stop:'turns', memory:'steps', sustain:'return' });
 export type GoalAction = z.infer<typeof goalActionSchema>;
 export type Words = Record<Locale, string>;
 export type GoalState = 'proposed' | 'active' | 'reflected' | 'declined' | 'stopped';
