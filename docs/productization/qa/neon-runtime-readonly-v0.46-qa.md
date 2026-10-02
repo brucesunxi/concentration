@@ -11,3 +11,5 @@
 当前驱动曾对连接串中的 `sslmode=require` 给出未来语义变化警告。现在 Neon 连接在传给 `pg` 前统一为 `sslmode=verify-full`，保留原有 `channel_binding` 等参数，并拒绝明确关闭证书校验的 Neon URL。先用相同限权账号验证过该模式能够建立连接、客户端 TLS 已加密且证书获验证，再运行上述完整只读检查通过。[node-postgres 的连接串说明](https://github.com/brianc/node-postgres/blob/master/packages/pg-connection-string/README.md)列明了两种 SSL 语义下的差异。
 
 同日对受保护别名执行完整[虚构家庭预览验收](protected-preview-v0.46-qa.md)通过；无凭据访问 `/api/ready` 返回 HTTP 302，而不是数据库就绪内容。只读检查不能证明真实家庭之间的并发隔离、备份恢复、连接耗尽或正式市场准入；这些破坏性与故障演练必须在独立 Neon 测试分支进行。此批没有采用 Docker。
+
+提交 `950cc93` 的 GitHub `Family quality` 检查通过后，受保护别名切换到 `READY` 部署 `dpl_3kfLfY37LhwQ46efzAzJWGzYZ7nK`。再次运行 `npm run audit:preview` 返回数据库就绪、签名素材、合成练习结算、家长报告、家庭删除和旧会话失效均为 `true`；退出码为 0，清理恢复文件不存在。Vercel 公开的部署摘要未提供可独立核对的提交 SHA，因此这里记录的是部署后该别名的实际行为，不把部署 ID 单独当成源码身份凭据。
