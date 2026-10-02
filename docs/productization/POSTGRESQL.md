@@ -26,4 +26,6 @@
 
 本机运行 `npm run check`、`npm test`、`npm run test:http` 和 `npm run build:vercel`。对真实 PostgreSQL 的破坏性隔离与并发验证，应在**单独的 Neon 测试分支或专用测试库**执行，严禁指向现有家庭数据库。当前没有自动化的 Neon 分支测试启动器；上线前仍需补齐该项验证、备份恢复、慢查询和连接耗尽演练。
 
+现有受保护预览可执行非破坏性的运行账号审计：`npm run db:audit:runtime -- --url-file .focus-data/neon/runtime-url`。连接文件必须只允许本人读取；脚本要求 Neon 限权账号、验证客户端 TLS 对端证书，并在 PostgreSQL `READ ONLY` 事务内复查 schema 32、行级隔离与跨角色权限。当前结果见[Neon 只读验收](qa/neon-runtime-readonly-v0.46-qa.md)。应用代码会把 Neon 连接串的 SSL 模式固定为 `verify-full`，防止驱动升级后 `sslmode=require` 的证书验证语义变弱；非 Neon 数据库连接保持其原有配置。这个审计不能替代独立测试分支的故障与恢复演练。
+
 旧版本验收记录中提到的测试容器属于历史执行证据，不是当前的部署依赖。

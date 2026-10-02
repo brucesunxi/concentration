@@ -12,13 +12,14 @@ import { migratePracticeLimits } from './practice-limits.ts';
 import { migrateMembers, migrateMemberAudit, migrateMemberAuthGuard, migrateMemberWriteGuard, migrateMemberLifeGuard, migrateLocalConfirmationRead } from './member-schema.ts';
 import { migrateAuthRateLimit } from './auth-rate-limit.ts';
 import { migrateBilling } from './billing-schema.ts';
+import { verifiedPostgresUrl } from '../../packages/database/neon-tls.ts';
 
 export interface Queryable { query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> }
 export interface Database extends Queryable { transaction<T>(fn: (tx: Queryable) => Promise<T>): Promise<T>; close(): Promise<void>; context?<T>(context: DatabaseContext, action: () => Promise<T>): Promise<T> }
 
 export async function openDatabase(location: string, postgresUrl?: string): Promise<Database> {
   if (postgresUrl) {
-    const pool = new pg.Pool({ connectionString: postgresUrl, max: 8, connectionTimeoutMillis: 20000 });
+    const pool = new pg.Pool({ connectionString: verifiedPostgresUrl(postgresUrl), max: 8, connectionTimeoutMillis: 20000 });
     const context = databaseContext();
     pool.on('error', () => console.error(JSON.stringify({ event: 'DATABASE_IDLE_CONNECTION_LOST' })));
     const database: Database = {

@@ -5,6 +5,7 @@ import { grantRuntimeRoles, verifyRuntimeRole, REQUIRED_SCHEMA_VERSION } from '.
 import { databaseEntitlementReader, recordVerifiedBillingFact } from '../apps/api/billing-access.ts';
 import { service } from '../apps/api/service.ts';
 import type { Database } from '../apps/api/database.ts';
+import { verifiedPostgresUrl } from '../packages/database/neon-tls.ts';
 
 const ownerUrl = process.env.DATABASE_MIGRATION_URL, runtimeUrl = process.env.DATABASE_URL;
 if (!ownerUrl || !runtimeUrl) throw new Error('BILLING_AUDIT_DATABASE_CONFIG_REQUIRED');
@@ -12,7 +13,7 @@ const owner = new URL(ownerUrl), runtime = new URL(runtimeUrl);
 if (owner.hostname !== runtime.hostname || owner.pathname !== runtime.pathname || owner.username === runtime.username) throw new Error('BILLING_AUDIT_DATABASE_PAIR_INVALID');
 const name = `focus_billing_audit_${randomBytes(5).toString('hex')}`;
 const databaseUrl = (base: URL) => { const copy = new URL(base); copy.pathname = `/${name}`; return copy.toString(); };
-const admin = new pg.Client({ connectionString: ownerUrl, connectionTimeoutMillis: 20000 });
+const admin = new pg.Client({ connectionString: verifiedPostgresUrl(ownerUrl), connectionTimeoutMillis: 20000 });
 let created = false, ownerDb: Database | undefined, runtimeDb: Database | undefined;
 try {
   await admin.connect();
