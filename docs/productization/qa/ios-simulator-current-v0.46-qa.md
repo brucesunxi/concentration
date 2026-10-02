@@ -40,3 +40,5 @@ Mac 解锁后，用仅供成人验收的虚构家庭和孩子在 iPhone 17 / iOS
 - 曾安装诊断包的 iPhone 17e 在更新后显示[安全存储不可读的保护页](ios-current-keychain-17e-v0.46.png)，已有数据库文件保留。模拟器 `securityd` 明确报告 `NSOSStatusErrorDomain -34018`：应用缺少 `application-identifier` 与 `keychain-access-groups` entitlement。无签名编译产物、手动补本机 ad-hoc 签名、Xcode 默认 `Sign to Run Locally` 都没有使这台设备恢复；后者的签名 entitlement 字典仍为空。同一构建在另外两台设备能到登录页，不能据此把 iPhone 17e 的失败当作业务代码或密钥损坏，也不能忽略这个环境差异。
 
 本机模拟器构建的 Keychain entitlement 未兑现为可检查的最终签名，是发行门槛。需要使用正式开发/分发签名与配置文件，在独立设备上核验实际 entitlement、SecureStore 写入及重启读回、旧包覆盖安装、断网强退重开与补传；目前桌面操作接口仍报告 Mac 已锁定，无法完成本批界面交互。任何安装测试均未清除 iPhone 17e 的加密文件或录入真实家庭资料。
+
+后续增加 `npm run mobile:verify:ios-keychain -- --app <候选包路径>` 作为签名预检。本批本机包在该检查中明确失败：`MISSING_SIGNING_TEAM`、`MISSING_APPLICATION_IDENTIFIER`、`MISSING_KEYCHAIN_ACCESS_GROUP`；预检不会把两台模拟器的正常首屏误判为可发行的 Keychain 签名，也不能替代后续运行测试。

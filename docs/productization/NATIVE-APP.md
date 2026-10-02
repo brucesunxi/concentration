@@ -139,6 +139,8 @@ xcodebuild -workspace FocusIslandDev.xcworkspace -scheme FocusIslandDev \
 
 本机若存在外部 GCC 配置，构建命令还需显式将 `CC`、`LD` 设为 Xcode 的 Clang，`CXX`、`LDPLUSPLUS` 设为 Xcode 的 Clang++；用 `xcrun --find clang` 获取安装路径，勿修改全局环境。
 
+上述 `CODE_SIGNING_ALLOWED=NO` 仅用于编译诊断，不满足 Keychain 设备验收。得到团队签名的候选 `.app` 后，先运行 `npm run mobile:verify:ios-keychain -- --app /absolute/path/to/FocusIsland.app`：脚本检查代码签名、App 标识、签名团队、展开后的 `application-identifier` 与对应 `keychain-access-groups`，缺一项即返回失败。静态通过后还必须在新装、覆盖安装、重启及断网场景实测安全存储；当前本机模拟器包运行该预检会以 `MISSING_SIGNING_TEAM`、`MISSING_APPLICATION_IDENTIFIER`、`MISSING_KEYCHAIN_ACCESS_GROUP` 拒绝，见[最新 iOS 验收](qa/ios-simulator-current-v0.46-qa.md)。
+
 刷新依赖目录后必须重新执行 Pods 配置：Expo SQLite 在该步骤按配置生成 SQLCipher 的 C 源码与头文件。不能仅复制新的依赖后直接复用旧编译缓存。若出现 `exsqlite3_*` 接口缺失，先核对 Pods 配置和生成头文件，再用新的专用 DerivedData 目录复验，不能通过关闭加密绕过错误。本机旧 Ruby 需要先加载锁定的 Bundler，再加载对应的 logger；团队 CI 仍应使用受支持 Ruby。
 
 Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 API，在用于编译的同一隔离目录运行 `npm run mobile:start`，端口 4183。未配置时原生 API 指向 `http://localhost:4181`，支持 iOS 模拟器；Android 模拟器需本机开发端口转发（4181 和 4183）。真机上的 `localhost` 是手机自身，不能用它连接开发机。

@@ -26,6 +26,7 @@
     "mobile:check": "npm run check --workspace=@focus/family-mobile",
     "mobile:bundle": "npm run bundle --workspace=@focus/family-mobile",
     "mobile:prepare-build": "node scripts/prepare-mobile-build.mjs",
+    "mobile:verify:ios-keychain": "node scripts/verify-ios-keychain-signing.mjs",
     "check": "tsc --noEmit && node --check src/app.js && node --check src/core.js && node --check legacy-server.mjs",
     "build:vercel": "node scripts/build-vercel-web.mjs",
     "visuals:build": "node scripts/build-visuals.mjs",

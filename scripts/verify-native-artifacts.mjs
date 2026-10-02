@@ -101,7 +101,7 @@ const report = {
   android: { path: relative(root, apk), ...summary(await readFile(apk)), applicationId: 'dev.focusisland.family', abis: [...new Set(apkFiles.map(p => p.match(/^lib\/([^/]+)\//)?.[1]).filter(Boolean))], permissions, allowBackup: false, usesCleartextTraffic: true, signatureVerified: true, certificateSha256, embeddedBundle: summary(androidBundle) },
   embeddedMarkers: markers,
   deviceVerification: { performedByThisVerifier: false, uiVerified: false, runtimeEncryptionVerified: false, offlineColdStartVerified: false },
-  limitations: ['Simulator and arm64 local test artifacts only', ...(keychainEntitlementPresent ? [] : ['iOS simulator app lacks a Keychain entitlement; secure storage cannot initialize in the observed simulator']), 'Filename checks do not certify absence of all possible secrets', 'Source and bundle markers do not attest a trusted compiler', 'No complete runtime, real-device, store or effectiveness approval']
+  limitations: ['Simulator and arm64 local test artifacts only', ...(keychainEntitlementPresent ? [] : ['iOS simulator signature lacks a Keychain entitlement; secure storage may fail on some simulator states, so every target device needs a runtime check']), 'Filename checks do not certify absence of all possible secrets', 'Source and bundle markers do not attest a trusted compiler', 'No complete runtime, real-device, store or effectiveness approval']
 };
 await writeFile(args.get('--output'), JSON.stringify(report, null, 2) + '\n');
 console.log(JSON.stringify({ sourceVersion: version, appVersion: source.appVersion, sourceFiles: unique.size, iosFiles: iosFiles.length, androidSignatureVerified: true, output: args.get('--output') }));
