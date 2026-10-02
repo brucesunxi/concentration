@@ -22,6 +22,7 @@ import { practiceInvitationCopy, practiceInvitationDay } from '../../../packages
 import type { PracticeLimits } from '../../../packages/contracts/practice-limits.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
 import { supportedDeviceLocale } from '../../../packages/contracts/device-locale.ts';
+import { serializeChildExport } from '../../../packages/session-runtime/profile-actions.ts';
 import './practice-invitation.css';
 import './child-data-visibility.css';
 
@@ -222,7 +223,12 @@ export function App() {
       catch{setError(t('本浏览器的恢复日志无法读取或核对。导出文件只包含家庭服务中的记录；请检查原设备后重试。','This browser’s recovery logs could not be read or verified. The downloaded file contains server records only; check the original device and retry.'));}
       if(identity!==accessVersion.current)throw new Error(t('家庭状态已改变，请重新打开档案后导出。','The family space changed. Reopen this profile before exporting.'));
       const combined={...data,localRecovery:{scope:'this-browser-only',capturedAt:new Date().toISOString(),status:records===null?'unavailable':records.length?'included':'none',records:records??[]}};
-      const url = URL.createObjectURL(new Blob([JSON.stringify(combined, null, 2)], { type: 'application/json' }));
+      let serialized:string;
+      try{serialized=serializeChildExport(combined,childId);}
+      catch(error){throw new Error(error instanceof Error&&error.message==='EXPORT_TOO_LARGE'
+        ?t('记录超过单次导出大小限制，文件尚未生成。请保留原设备资料，待支持分批导出后再试。','The records exceed the single-export size limit. No file was created. Keep the original device data until split exports are available.')
+        :t('档案导出未通过完整性或隐私检查，文件尚未生成。请稍后再试。','The export failed its format or privacy check. No file was created. Please retry later.'));}
+      const url = URL.createObjectURL(new Blob([serialized], { type: 'application/json' }));
       const a = document.createElement('a'); a.href = url; a.download = 'focus-family-records.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
   }
