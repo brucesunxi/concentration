@@ -4,6 +4,8 @@
 
 Android 16 / ARM64 模拟器已实际通过当前源码包的首装、虚构家庭、预录语音控件、断网强退重开、离线步骤、重新联网同步、家长报告和丢密钥保留；修复首次安装时 SQLite 普通路径被误当文件 URI 的阻断。详见 [Android 模拟器验收](qa/android-emulator-offline-v0.46-qa.md)。真机、系统中断、主观听审和正式签名仍待完成。
 
+最新提交的完整 iOS 源码包已重新完成 Release 编译；全新 iPhone 17 Pro 首装后显示正常登录页并创建非明文 SQLCipher 文件，iPhone 17 更新后也能启动。曾安装诊断包的 iPhone 17e 则在 Keychain 返回 `-34018` 时保护性停止，最终本机模拟器签名不含所需 entitlement；原因和正式签名验证仍待解决。详见 [当前 iOS 验收](qa/ios-simulator-current-v0.46-qa.md)。
+
 家庭 Web 与原生 App 已共用双语服务错误提示，区分登录、账号限制、练习冲突、权益和网络中断；Web 英文错误登录已在隔离浏览器通过，原生代码通过两平台导出，但设备画面仍待验证。见[双语错误提示验收](qa/family-error-copy-v0.46-qa.md)。
 
 家庭网页首次打开也按浏览器语言优先顺序选择已支持的英语或简体中文；繁体中文不被误当成简体中文，手动选择继续保存在本浏览器。隔离浏览器已验证中文、繁体中文回退及刷新后偏好保持，见[网页语言入口验收](qa/web-language-entry-v0.46-qa.md)。
@@ -209,7 +211,7 @@ v0.23 的浏览器检查覆盖中文待确认、创建者确认前界面、英�
 - 工作台仅能发布 `reviewed-preview / LOCAL`；本地账号不证明自然人独立性，文件权限不等于生产密钥托管，追加审计不等于不可篡改日志。已接通 Web 候选试玩；已支持受限 PNG/MP3 上传；尚无完整生产媒体处理、正式市场发布、原生候选试玩、密码恢复或编辑交接，详见 [工作台设计](CONTENT-STUDIO.md)。
 
 - 原生目前接入本机服务。历史 v0.29 内置代码包曾安装到 iPhone 17 / iOS 26.5 模拟器，因测试签名缺 Keychain 权限停在安全存储重试页；SQLCipher 配置与适配已实现，但构建结果不能证明运行时文件加密通过。
-- 2026-10-02 以当前 v0.46 源码重新完成 iOS 26.5 / iPhone 17 和全新 iPhone 17e 模拟器的 Release 编译、安装和首屏检查；后续本机签名包已补验 SecureStore 写入/重启读回、登录、练习、声音控件、同步、报告和 SQLCipher 文件初查，完整当前源码包另只完成构建、安装和启动。详见[当前 iOS 模拟器验收](qa/ios-simulator-current-v0.46-qa.md)。Android 后续已通过 [ARM64 模拟器纵向流程](qa/android-emulator-offline-v0.46-qa.md)；真实设备仍待验。
+- 2026-10-02 较早 v0.46 包已在 iOS 26.5 / iPhone 17 和当时全新 iPhone 17e 完成 Release 编译、安装和首屏检查；后续本机签名包补验了 SecureStore 写入/重启读回、登录、练习、声音控件、同步、报告和 SQLCipher 文件初查。再从最新提交重建的包在全新 iPhone 17 Pro 和 iPhone 17 可启动，曾安装诊断包的 iPhone 17e 则报告 Keychain `-34018`；这批最新包仍未重做整条练习。详见[当前 iOS 模拟器验收](qa/ios-simulator-current-v0.46-qa.md)。Android 后续已通过 [ARM64 模拟器纵向流程](qa/android-emulator-offline-v0.46-qa.md)；真实设备仍待验。
 - 2026-10-02 使用当前打包 Web、隔离本机服务和 Chrome 实际走通英文虚构家庭首次建档、孩子档案、开始前自主选择、规则页及主动退出后的休息页；390px 手机入口没有横向溢出。此轮没有完成正式训练、语音听感或线上环境验收，详见[浏览器家庭流程验收](qa/browser-family-v0.46-qa.md)。
 - 2026-10-02 再走通两道示范题、一件正式步骤、主动结束、服务确认与同日再次邀请；后者提示可以先离开屏幕，不需用完余额。修正两端英文单数步骤文案；Web/原生类型检查、Web 构建与 iOS/Android 运行代码导出通过。详见[正式步骤与休息提示验收](qa/browser-formal-rest-v0.46-qa.md)。
 - 2026-10-02 将上述家庭流程做成可重复的隔离浏览器验收，并加入 GitHub `Family quality` 检查；本机和云端运行均通过，包含 324 项业务、18 项真实 HTTP 与浏览器家庭流程。详见[浏览器自动验收](qa/browser-automation-v0.46-qa.md)。

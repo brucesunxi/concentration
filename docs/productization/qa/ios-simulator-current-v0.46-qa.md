@@ -30,3 +30,13 @@ Mac 解锁后，用仅供成人验收的虚构家庭和孩子在 iPhone 17 / iOS
 ## 断网恢复边界的后续代码修正
 
 原生请求若已收到 HTTP 响应头、读取 JSON 内容时才触发 12 秒超时，先前会把中断当成解析错误，因而不会展示本机已准备练习的离线恢复入口。当前源码把**本请求自己的超时中断**归类为网络不可用，同时保留真正的无效 JSON 为错误；两种情况的针对性测试、移动端类型检查与 iOS/Android Hermes 导出通过。这是代码和运行包导出证据，尚未替代模拟器上断网、强退、重开及补传的交互验收。
+
+## 最新提交的重新构建与跨模拟器首启
+
+2026-10-02，再从提交 `b4f3972` 的完整源码建立不含家庭数据的隔离快照；[源码清单](../../../dist/mobile-native/v0.46/ios-current-qa/source-snapshot.json) SHA-256 为 `9f70ece964f3f71cc6af18584656db582eb908a3d2846e27b18b9269a861040a`。128 个源码文件另存为[独立归档](../../../dist/mobile-native/v0.46/ios-current-qa/source.tgz)，SHA-256 为 `56f8ff52bc75c05b2482fcf322b2b6a8c734acd3aecd5471d8d8d6fce40ca4a6`，逐文件复核通过。重新预生成 iOS 工程、安装 95 个 Pod 并完成 arm64/x86_64 Release 编译。本机模拟器签名包保存在[本地测试 App](../../../dist/mobile-native/v0.46/ios-current-qa/FocusIslandDev.app)，版本 `0.2.8`、构建号 `9`；Hermes 包 SHA-256 为 `07cbd23ae971608eb2fce2264a907d6554052622c06ff138abda28fa53c1872b`。`codesign --verify --deep --strict` 通过。这不是商店包。
+
+- 全新 iPhone 17 Pro / iOS 26.5 原先没有本 App；安装并启动到[正常家长登录页](ios-current-clean-pro-v0.46.png)，没有安全存储警告。设备产生 4096 字节的 SQLCipher 数据库，前 16 字节为 `da 81 ad bb 09 e5 57 27 c8 06 cd 9a 53 22 1b 71`，不是明文 SQLite 标识。此证据覆盖该设备首装与加密文件初查，不覆盖正式签名或练习交互。
+- 曾走通虚构练习、已删除虚构家庭的 iPhone 17 安装同版本本机签名更新包后，仍显示正常家长登录页。没有重新走完整练习，也不能以首屏推断旧 Keychain 项和离线日志迁移都已验证。
+- 曾安装诊断包的 iPhone 17e 在更新后显示[安全存储不可读的保护页](ios-current-keychain-17e-v0.46.png)，已有数据库文件保留。模拟器 `securityd` 明确报告 `NSOSStatusErrorDomain -34018`：应用缺少 `application-identifier` 与 `keychain-access-groups` entitlement。无签名编译产物、手动补本机 ad-hoc 签名、Xcode 默认 `Sign to Run Locally` 都没有使这台设备恢复；后者的签名 entitlement 字典仍为空。同一构建在另外两台设备能到登录页，不能据此把 iPhone 17e 的失败当作业务代码或密钥损坏，也不能忽略这个环境差异。
+
+本机模拟器构建的 Keychain entitlement 未兑现为可检查的最终签名，是发行门槛。需要使用正式开发/分发签名与配置文件，在独立设备上核验实际 entitlement、SecureStore 写入及重启读回、旧包覆盖安装、断网强退重开与补传；目前桌面操作接口仍报告 Mac 已锁定，无法完成本批界面交互。任何安装测试均未清除 iPhone 17e 的加密文件或录入真实家庭资料。
