@@ -13,34 +13,49 @@ import type { OfflineCapsule, OfflineSaved } from '../../../packages/session-run
 import { hashObject } from '../../../packages/content/index.ts';
 import { nativeVerifier } from '../../../packages/content/native-verifier.ts';
 import { UNSYNCED_RETENTION_MS, UNSYNCED_WARNING_MS, retentionClock } from '../../../packages/session-runtime/journal-retention.ts';
+import { nativeDatabaseDirectoryUri } from '../../../packages/session-runtime/native-database-path.ts';
 
 let pending: Promise<SQLite.SQLiteDatabase> | undefined;
 const operations = new SerialQueue();
 const withDatabase = <T>(fn: (db: SQLite.SQLiteDatabase) => Promise<T>) => operations.run(async () => fn(await open()));
 async function open() {
   return pending ??= (async () => {
-    const options = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
-    let key = await SecureStore.getItemAsync('focus.local.journal-key.v1', options);
-    if (!key) {
-      if (SQLite.defaultDatabaseDirectory && new File(SQLite.defaultDatabaseDirectory, 'focus-family.db').exists) throw new Error('Journal key is unavailable; existing data was preserved');
-      key = [...await getRandomBytesAsync(32)].map(v => v.toString(16).padStart(2, '0')).join('');
-      await SecureStore.setItemAsync('focus.local.journal-key.v1', key, options);
-    }
-    if (!/^[a-f0-9]{64}$/.test(key)) throw new Error('Invalid journal key');
-    const db = await SQLite.openDatabaseAsync('focus-family.db');
+    let stage = 'read-key';
     try {
-      await db.execAsync(`PRAGMA key = "x'${key}'";`);
-      const cipher = await db.getFirstAsync<{ cipher_version: string }>('PRAGMA cipher_version');
-      if (!cipher?.cipher_version) throw new Error('An encrypted native development build is required');
-      await db.execAsync('PRAGMA journal_mode=WAL; PRAGMA secure_delete=ON;' + JOURNAL_SCHEMA + OFFLINE_SCHEMA);
-      const columns=await db.getAllAsync<{name:string}>('PRAGMA table_info(journal)');
-      if(!columns.some(column=>column.name==='created_at_ms'))await db.withTransactionAsync(async()=>{
-        await db.execAsync('ALTER TABLE journal ADD COLUMN created_at_ms INTEGER');
-        // Old records have no original creation time. Begin their window at upgrade.
-        await db.runAsync('UPDATE journal SET created_at_ms=? WHERE created_at_ms IS NULL',Date.now());
-      });
-      return db;
-    } catch (e) { await db.closeAsync(); throw e; }
+      const options = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
+      let key = await SecureStore.getItemAsync('focus.local.journal-key.v1', options);
+      if (!key) {
+        stage = 'check-existing-file';
+        if (new File(nativeDatabaseDirectoryUri(SQLite.defaultDatabaseDirectory), 'focus-family.db').exists) throw new Error('Journal key is unavailable; existing data was preserved');
+        stage = 'write-key';
+        key = [...await getRandomBytesAsync(32)].map(v => v.toString(16).padStart(2, '0')).join('');
+        await SecureStore.setItemAsync('focus.local.journal-key.v1', key, options);
+      }
+      if (!/^[a-f0-9]{64}$/.test(key)) throw new Error('Invalid journal key');
+      stage = 'open-database';
+      const db = await SQLite.openDatabaseAsync('focus-family.db');
+      try {
+        stage = 'set-cipher-key';
+        await db.execAsync(`PRAGMA key = "x'${key}'";`);
+        stage = 'check-cipher';
+        const cipher = await db.getFirstAsync<{ cipher_version: string }>('PRAGMA cipher_version');
+        if (!cipher?.cipher_version) throw new Error('An encrypted native development build is required');
+        stage = 'create-schema';
+        await db.execAsync('PRAGMA journal_mode=WAL; PRAGMA secure_delete=ON;' + JOURNAL_SCHEMA + OFFLINE_SCHEMA);
+        stage = 'migrate-journal';
+        const columns=await db.getAllAsync<{name:string}>('PRAGMA table_info(journal)');
+        if(!columns.some(column=>column.name==='created_at_ms'))await db.withTransactionAsync(async()=>{
+          await db.execAsync('ALTER TABLE journal ADD COLUMN created_at_ms INTEGER');
+          // Old records have no original creation time. Begin their window at upgrade.
+          await db.runAsync('UPDATE journal SET created_at_ms=? WHERE created_at_ms IS NULL',Date.now());
+        });
+        return db;
+      } catch (e) { await db.closeAsync(); throw e; }
+    } catch (error) {
+      // Stage and type are diagnostic only; never log the key, SQL or family data.
+      console.error('NATIVE_JOURNAL_OPEN_FAILED', stage, error instanceof Error ? error.name : 'UnknownError');
+      throw error;
+    }
   })().catch(e => { pending = undefined; throw e; });
 }
 async function pruneExpiredJournals() {
