@@ -28,7 +28,7 @@ export default function RecordHistory({child,locale,owner,revision,onExport,onOb
   </nav>; }
   if(state.needsParent)return <p role="status">{t('请重新验证家长身份后查看记录。','Verify your parent identity again to view records.')}</p>;
   return <>
-    <div className="history-intro"><p className="subtle">{copy.explanation}</p><button className="quiet" disabled={state.busy} onClick={()=>{pendingFocus.current='sessions';void client.current?.refresh();}}>{copy.refresh}</button></div>
+    <div className="history-intro"><p className="subtle">{copy.explanation}</p>{owner&&<p className="subtle">{t('导出包含家庭服务记录，并会尝试附上此浏览器仍保留的恢复日志；其他设备的日志不在其中。','The export includes server records and attempts to add recovery logs still held in this browser. Logs on other devices are not included.')}</p>}<button className="quiet" disabled={state.busy} onClick={()=>{pendingFocus.current='sessions';void client.current?.refresh();}}>{copy.refresh}</button></div>
     {state.error&&!state.target&&<p className="notice error" role="alert">{copy.error(state.error)}</p>}
     {state.busy&&!state.target&&report&&<p role="status">{copy.loading}</p>}
         <WeeklyReview key={child.id} childId={child.id} locale={locale} revision={report?.observationCount ?? 0} onRequireParent={onRequireParent} />

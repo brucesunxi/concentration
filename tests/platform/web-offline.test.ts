@@ -44,8 +44,27 @@ test('v1 IndexedDB migration preserves unsynchronized events and only a checked 
   const factory=new IDBFactory();
   await new Promise<void>((resolve,reject)=>{const r=factory.open('focus-family-journal',1);r.onupgradeneeded=()=>r.result.createObjectStore('sessions',{keyPath:'id'}).put({id:capsule.session.id,childId:capsule.session.child_id,events});r.onerror=()=>reject(r.error);r.onsuccess=()=>{r.result.close();resolve();};});
   const store=new WebJournal(factory);assert.deepEqual(await store.read(capsule.session.id,capsule.session.child_id,capsule.familyId),events);assert.equal(await store.resume(),null);
+  assert.equal((await store.exportChild(capsule.familyId,capsule.session.child_id))[0].integrity,'legacy-unverified');
   await assert.rejects(store.write(capsule.session.id,randomUUID(),capsule.familyId,events,0),/LOCAL_OWNER_MISMATCH/);
   await store.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,0,checkpoint);await store.prepare(capsule,0,checkpoint,events);assert.ok(await store.resume());
+});
+
+test('browser export includes only the authenticated child’s retained journals and refuses changed bytes',async()=>{
+  const {factory,store,generation}=await prepared();
+  const another={familyId:randomUUID(),childId:randomUUID(),sessionId:randomUUID()};
+  await store.write(another.sessionId,another.childId,another.familyId,events,generation);
+  await store.close(capsule.session.id);
+  const saved=await store.exportChild(capsule.familyId,capsule.session.child_id);
+  assert.equal(saved.length,1);
+  assert.equal(saved[0].sessionId,capsule.session.id);
+  assert.equal(saved[0].integrity,'verified');
+  assert.deepEqual(saved[0].events,events);
+  assert.deepEqual(await store.exportChild(capsule.familyId,another.childId),[]);
+  assert.deepEqual(await store.exportChild(another.familyId,capsule.session.child_id),[]);
+  const db=await new Promise<IDBDatabase>((resolve,reject)=>{const request=factory.open('focus-family-journal',3);request.onerror=()=>reject(request.error);request.onsuccess=()=>resolve(request.result);});
+  await new Promise<void>((resolve,reject)=>{const tx=db.transaction('sessions','readwrite');const get=tx.objectStore('sessions').get(capsule.session.id);get.onsuccess=()=>tx.objectStore('sessions').put({...get.result,hash:'0'.repeat(64)});tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);});
+  db.close();
+  await assert.rejects(store.exportChild(capsule.familyId,capsule.session.child_id),/LOCAL_EXPORT_INTEGRITY_FAILURE/);
 });
 
 test('v2 journal upgrade preserves the identity generation and starts a conservative retention window for old rows',async()=>{

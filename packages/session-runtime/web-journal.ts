@@ -115,6 +115,26 @@ export class WebJournal {
       done(journal?.events??[]);
     },fail));
   }
+  /** A parent may attach this browser's retained events to an authenticated profile export. */
+  async exportChild(familyId:string,childId:string) {
+    await this.prune();
+    const rows=await this.transaction<Journal[]>(['sessions'],'readonly',(tx,done,fail)=>{
+      const matched:Journal[]=[];
+      const cursor=tx.objectStore('sessions').openCursor();
+      cursor.onerror=()=>fail(cursor.error);
+      cursor.onsuccess=()=>{const row=cursor.result;if(!row){done(matched);return;}const journal=row.value as Journal;
+        if(journal.childId===childId&&(!journal.familyId||journal.familyId===familyId))matched.push(journal);
+        row.continue();};
+    });
+    const records=[];
+    for(const row of rows.sort((a,b)=>a.id.localeCompare(b.id))){
+      if(!Array.isArray(row.events)||!Number.isFinite(row.createdAt))throw new Error('LOCAL_EXPORT_UNREADABLE');
+      const sha256=await hashObject(row.events);
+      if(row.hash&&row.hash!==sha256)throw new Error('LOCAL_EXPORT_INTEGRITY_FAILURE');
+      records.push({sessionId:row.id,createdAt:new Date(row.createdAt).toISOString(),events:row.events,sha256,integrity:row.hash?'verified':'legacy-unverified'});
+    }
+    return records;
+  }
   async write(id:string,childId:string,familyId:string,events:EngineEvent[],generation:number,checkpoint?:ClockCheckpoint) {
     const effectiveNow=await this.prune();
     events=structuredClone(events);
