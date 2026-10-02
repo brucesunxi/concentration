@@ -71,6 +71,42 @@ test('a pending transition preserves signed uploads, blocks new plans and waits 
   assert.equal((await start(f.parent,f.child.id)).session.plan.ageBand,'9-11');
 });
 
+test('explicit age transition can close only uploads whose signed deadline passed, keeping received events', async () => {
+  const f=await fixture(); const old=await start(f.parent,f.child.id);
+  const original=(await api.authenticate(old.auth.value))!;
+  const trial=old.session.plan.trials[0];
+  await api.append(original,old.session.id,{events:[
+    {id:randomUUID(),seq:1,at:0,type:'present',trialId:trial.id,presentation:{frameDeltaMs:16,assetsReady:true,method:'raf-pair'}},
+    {id:randomUUID(),seq:2,at:1000,type:'interrupt',reason:'pause'},
+  ]});
+  f.parent=await login(f);
+  await api.requestAgeReview(f.parent,f.child.id,{targetAgeBand:'9-11',acknowledged:true},version(1),randomUUID());
+  await assert.rejects(api.applyAgeReview(f.parent,f.child.id,{acknowledged:true,localConfirmation:true,resolveExpiredUploads:true},version(2)),denied('UNFINISHED_SESSIONS'));
+  const grant=old.session.continuation_grant;
+  assert.ok(grant);
+  clock=Date.parse(grant.body.uploadUntil)+1;
+  f.parent=await login(f);
+  const review=await api.ageReviewSpace(f.parent,f.child.id);
+  assert.equal(review.unfinished.length,1);
+  assert.equal(review.unfinished[0].uploadExpired,true);
+  await assert.rejects(api.applyAgeReview(f.parent,f.child.id,{acknowledged:true,localConfirmation:true},version(2)),denied('UNFINISHED_SESSIONS'));
+  const applied=await api.applyAgeReview(f.parent,f.child.id,{acknowledged:true,localConfirmation:true,resolveExpiredUploads:true},version(2));
+  assert.equal(applied.currentAgeBand,'9-11');
+  assert.equal(applied.unfinished.length,0);
+  const saved=(await db.query<{state:string;closed_reason:string;used_ms:number;budget_ms:number;result:unknown;completed_at:string}>(
+    'SELECT state,closed_reason,used_ms,budget_ms,result,completed_at FROM sessions WHERE id=$1',[old.session.id])).rows[0];
+  assert.equal(saved.state,'aborted');
+  assert.equal(saved.closed_reason,'upload_expired');
+  assert.equal(saved.used_ms,saved.budget_ms);
+  assert.equal(saved.result,null);
+  assert.ok(saved.completed_at);
+  assert.equal((await db.query<{n:number}>('SELECT count(*)::int n FROM events WHERE session_id=$1',[old.session.id])).rows[0].n,2);
+  assert.equal((await db.query<{n:number}>("SELECT count(*)::int n FROM sessions WHERE child_id=$1 AND state='completed'",[f.child.id])).rows[0].n,0);
+  const exported=await api.exportChild(f.parent,f.child.id);
+  assert.equal(exported.sessions.find(item=>item.id===old.session.id)?.closed_reason,'upload_expired');
+  assert.equal(exported.events.filter(item=>item.sessionId===old.session.id).length,2);
+});
+
 test('adult transition remains pending until independent identity and rights flow exists',async()=>{
   const f=await fixture();
   const pending=await api.requestAgeReview(f.parent,f.child.id,{targetAgeBand:'18+',acknowledged:true},version(1),randomUUID());

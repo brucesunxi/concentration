@@ -181,14 +181,15 @@ export function service(source: Database, now: () => number = Date.now, content?
   }
   async function ageReviewSpaceTx(tx: Queryable,p: Principal,childId: string) {
     const c=await child(tx,p,childId);
-    const unfinished=(await tx.query<{id:string;state:string;created_at:string;device_id:string;upload_until:string|null}>(
-      `SELECT id,state,created_at,device_id,continuation_grant->'body'->>'uploadUntil' AS upload_until
+    const unfinished=(await tx.query<{id:string;state:string;created_at:string;device_id:string;upload_until:string|null;upload_expired:boolean}>(
+      `SELECT id,state,created_at,device_id,continuation_grant->'body'->>'uploadUntil' AS upload_until,
+         (continuation_grant IS NOT NULL AND (continuation_grant->'body'->>'uploadUntil')::timestamptz<=$2::timestamptz) AS upload_expired
        FROM sessions WHERE child_id=$1 AND (state='active' OR
          (closed_reason='device_handover' AND result IS NULL AND
           (continuation_grant IS NULL OR (continuation_grant->'body'->>'uploadUntil')::timestamptz>$2::timestamptz)))
        ORDER BY created_at,id`,[childId,new Date(now()).toISOString()])).rows;
     return {childId,currentAgeBand:c.age_band,locale:c.locale,...ageReview(c),canEdit:p.member_role==='owner',
-      unfinished:unfinished.map(s=>({id:s.id,state:s.state,createdAt:new Date(s.created_at).toISOString(),deviceId:s.device_id,uploadUntil:s.upload_until}))};
+      unfinished:unfinished.map(s=>({id:s.id,state:s.state,createdAt:new Date(s.created_at).toISOString(),deviceId:s.device_id,uploadUntil:s.upload_until,uploadExpired:s.upload_expired}))};
   }
   const members = familyMembers(db,{now,fail,owner,hashPassword,context,token,releaseScope});
   const operations = {
@@ -235,12 +236,20 @@ export function service(source: Database, now: () => number = Date.now, content?
         if(c.age_review_version!==Number(ifMatch.slice(1,-1))) fail(409,'AGE_REVIEW_VERSION_CONFLICT','档案复核已改变，请重新读取。');
         if(!c.age_transition_target) fail(409,'AGE_TRANSITION_NOT_PENDING','没有待生效的年龄变更。');
         if(c.age_transition_target==='18+') fail(409,'ADULT_RIGHTS_REVIEW_REQUIRED','成年后的资料权利需要单独核验，当前不能自动转换。');
+        const at=new Date(now()).toISOString();
+        if(input.resolveExpiredUploads) {
+          // A parent explicitly accepts that the signed upload window is over.
+          // Keep all received events and the full reserved allowance; never
+          // fabricate a completed result or erase an offline device journal.
+          await tx.query(`UPDATE sessions SET state='aborted',closed_reason='upload_expired',used_ms=budget_ms,completed_at=$2
+            WHERE child_id=$1 AND state='active' AND continuation_grant IS NOT NULL
+              AND (continuation_grant->'body'->>'uploadUntil')::timestamptz<=$2::timestamptz`,[childId,at]);
+        }
         const unfinished=await one<{n:number}>(tx,`SELECT count(*)::int n FROM sessions WHERE child_id=$1 AND
           (state='active' OR (closed_reason='device_handover' AND result IS NULL AND
-          (continuation_grant IS NULL OR (continuation_grant->'body'->>'uploadUntil')::timestamptz>$2::timestamptz)))`,[childId,new Date(now()).toISOString()]);
+          (continuation_grant IS NULL OR (continuation_grant->'body'->>'uploadUntil')::timestamptz>$2::timestamptz)))`,[childId,at]);
         if((unfinished?.n??0)>0) fail(409,'UNFINISHED_SESSIONS','请先结束或处理旧设备上的练习。');
         if(releaseScope.mode==='local-development' && input.localConfirmation!==true) fail(400,'LOCAL_CONFIRMATION_REQUIRED','请确认新年龄档的本地预览范围。');
-        const at=new Date(now()).toISOString();
         await tx.query(`UPDATE children SET age_band=$2,age_review_version=age_review_version+1,age_reviewed_at=$3,
           age_review_due_at=$4,age_transition_target=NULL,age_transition_requested_at=NULL,age_transition_request_key=NULL,
           levels='{"search":1,"stop":1,"memory":1,"sustain":1}'::jsonb,course_units=0,
