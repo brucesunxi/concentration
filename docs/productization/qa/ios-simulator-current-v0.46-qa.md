@@ -42,3 +42,9 @@ Mac 解锁后，用仅供成人验收的虚构家庭和孩子在 iPhone 17 / iOS
 本机模拟器构建的 Keychain entitlement 未兑现为可检查的最终签名，是发行门槛。需要使用正式开发/分发签名与配置文件，在独立设备上核验实际 entitlement、SecureStore 写入及重启读回、旧包覆盖安装、断网强退重开与补传；目前桌面操作接口仍报告 Mac 已锁定，无法完成本批界面交互。任何安装测试均未清除 iPhone 17e 的加密文件或录入真实家庭资料。
 
 后续增加 `npm run mobile:verify:ios-keychain -- --app <候选包路径>` 作为签名预检。本批本机包在该检查中明确失败：`MISSING_SIGNING_TEAM`、`MISSING_APPLICATION_IDENTIFIER`、`MISSING_KEYCHAIN_ACCESS_GROUP`；预检不会把两台模拟器的正常首屏误判为可发行的 Keychain 签名，也不能替代后续运行测试。
+
+## 2026-10-02 开发签名复核
+
+用户解锁后，本机 `simctl` 可列出模拟器；桌面交互接口仍持续返回 Mac 锁定，因而没有把新的模拟器操作记为交互验收。为隔离签名问题，只复制上述构建产物到临时目录进行开发签名试验，没有安装覆盖已有设备或使用真实家庭数据。签名证书在系统中可列出；证书显示名称括号中的编号与实际 `TeamIdentifier` 不相同，应以后者和受信任配置文件为准。给临时包添加应用标识、团队标识与 Keychain 访问组后，`codesign --verify --deep --strict` 仍返回 `CSSMERR_TP_NOT_TRUSTED`，且系统报告该包的 entitlement blob 无效、运行时会忽略。预检正确拒绝此包：`INVALID_CODE_SIGNATURE`、`MISSING_APPLICATION_IDENTIFIER`、`MISSING_KEYCHAIN_ACCESS_GROUP`。这次尝试没有解决发布签名阻断。
+
+验收脚本已改用 `codesign --entitlements - --xml` 读取最终包权限，避免继续使用标记为弃用的 `:-` 参数。原本机包仍明确缺少团队与 Keychain 权限；临时开发签名包仍被拒绝。下一步需在 Xcode 中使用对应团队与有效配置文件完成签名，再运行预检，并在独立设备核验 SecureStore 写入、重启读回和离线练习。仅修正权限文件文本或让证书出现在列表中都不足以放行。

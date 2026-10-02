@@ -65,7 +65,7 @@ const iosFiles = await inventory(ios);
 const executable = join(ios, info.CFBundleExecutable);
 const architectures = run('/usr/bin/lipo', ['-archs', executable]).trim().split(/\s+/);
 assert(architectures.includes('arm64'), 'Missing arm64 simulator executable');
-const entitlementRead = spawnSync('/usr/bin/codesign', ['-d', '--entitlements', ':-', ios], { encoding: 'utf8' });
+const entitlementRead = spawnSync('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', ios], { encoding: 'utf8' });
 const entitlementText = entitlementRead.stdout + entitlementRead.stderr;
 const keychainEntitlementPresent = entitlementRead.status === 0
   && /<key>keychain-access-groups<\/key>/.test(entitlementText)

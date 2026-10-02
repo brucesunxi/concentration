@@ -27,7 +27,7 @@ try {
   const signature = run('/usr/bin/codesign', ['--verify', '--deep', '--strict', app]);
   const details = run('/usr/bin/codesign', ['-dv', '--verbose=2', app]);
   const teamIdentifier = (details.stdout + details.stderr).match(/^TeamIdentifier=(.+)$/m)?.[1] ?? null;
-  const entitlementResult = run('/usr/bin/codesign', ['-d', '--entitlements', ':-', app]);
+  const entitlementResult = run('/usr/bin/codesign', ['-d', '--entitlements', '-', '--xml', app]);
   const xml = entitlementResult.stdout.includes('<plist') ? entitlementResult.stdout : entitlementResult.stderr;
   const entitlements = entitlementResult.status === 0 && xml.includes('<plist') ? plistJson('-', xml) : {};
   const failures = assessIosKeychainSigning({
