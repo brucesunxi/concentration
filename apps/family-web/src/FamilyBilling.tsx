@@ -3,6 +3,7 @@ import { CreditCard } from 'lucide-react';
 import type { FamilyBillingStatus } from '../../../packages/contracts/family-billing.ts';
 import type { Locale } from '../../../packages/task-engine/index.ts';
 import { familyBillingCopy } from '../../../packages/session-runtime/family-billing-copy.ts';
+import { familyBillingRefreshDelay } from '../../../packages/session-runtime/family-billing-refresh.ts';
 import { request, RequestError } from './api.ts';
 import './family-billing.css';
 
@@ -23,7 +24,17 @@ export default function FamilyBilling({ familyId, locale, onSignIn }: { familyId
       if (cause instanceof RequestError && (cause.status === 401 || cause.code === 'PARENT_REQUIRED' || cause.code === 'OWNER_REQUIRED')) signIn.current();
     } finally { if (active.current && version === sequence.current) setBusy(false); }
   }
-  useEffect(() => { active.current = true; void reload(); return () => { active.current = false; sequence.current++; }; }, [familyId]);
+  useEffect(() => {
+    active.current = true; void reload();
+    const visible = () => { if (!document.hidden) void reload(); };
+    document.addEventListener('visibilitychange', visible);
+    return () => { active.current = false; sequence.current++; document.removeEventListener('visibilitychange', visible); };
+  }, [familyId]);
+  useEffect(() => {
+    if (busy) return;
+    const timer = window.setTimeout(() => { if (!document.hidden) void reload(); }, familyBillingRefreshDelay(status));
+    return () => window.clearTimeout(timer);
+  }, [busy, status, familyId]);
   const copy = familyBillingCopy(locale, status ?? undefined);
   return <section className="family-card family-billing" aria-labelledby="family-billing-heading">
     <div className="section-title"><h2 id="family-billing-heading"><CreditCard size={22} />{copy.title}</h2></div>

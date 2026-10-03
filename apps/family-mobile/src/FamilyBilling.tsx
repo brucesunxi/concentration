@@ -3,6 +3,7 @@ import { AppState, Text, View } from 'react-native';
 import type { FamilyBillingStatus } from '../../../packages/contracts/family-billing.ts';
 import type { Locale } from '../../../packages/task-engine/index.ts';
 import { familyBillingCopy } from '../../../packages/session-runtime/family-billing-copy.ts';
+import { familyBillingRefreshDelay } from '../../../packages/session-runtime/family-billing-refresh.ts';
 import { MobileClient, MobileRequestError } from './client';
 import { Button, Notice, Page, s } from './ui';
 
@@ -28,6 +29,11 @@ export function FamilyBilling({ familyId, locale, client, onBack, onLogin }: { f
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void reload(); });
     return () => { active.current = false; sequence.current++; listener.remove(); };
   }, [familyId, client]);
+  useEffect(() => {
+    if (busy) return;
+    const timer = setTimeout(() => { if (AppState.currentState === 'active') void reload(); }, familyBillingRefreshDelay(status));
+    return () => clearTimeout(timer);
+  }, [busy, status, familyId, client]);
   const copy = familyBillingCopy(locale, status ?? undefined);
   return <Page title={copy.title}>
     <View style={s.card}>
