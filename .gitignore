@@ -3,6 +3,13 @@ dist/
 .focus-data/
 .env
 .env.*.local
+.env.*
+!.env.example
+*.p8
+*.p12
+*.jks
+*.keystore
+*.pem
 *.log
 .DS_Store
 coverage/

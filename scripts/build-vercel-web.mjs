@@ -2,9 +2,11 @@ import { build } from 'vite';
 import { spawn } from 'node:child_process';
 import { copyFile, mkdir, readdir, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
+import { auditDirectory, auditTrackedFiles } from '../packages/release-safety/public-secret-scan.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const output = resolve(root, 'dist/web');
+await auditTrackedFiles(root);
 
 async function check(script) {
   await new Promise((done, reject) => {
@@ -30,4 +32,5 @@ await mkdir(mediaDir, { recursive: true });
 for (const name of await readdir(resolve(root, 'src/audio'))) {
   if (name.endsWith('.mp3')) await copyFile(resolve(root, 'src/audio', name), resolve(mediaDir, name));
 }
+await auditDirectory(output);
 console.log(JSON.stringify({ contentAssetsViaApi: true }));
