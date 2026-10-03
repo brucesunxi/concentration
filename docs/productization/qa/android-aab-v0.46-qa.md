@@ -13,3 +13,18 @@
 | 敏感文件名 | 包内文件列表未发现 `.env`、数据库、JWK 或私钥文件名；这项检查不替代完整安全审计 |
 
 **用途：**这是用于确认 Android Bundle 能构建的本地测试产物，不是可提交应用商店的正式包。当前 Release 仍使用调试签名，应用配置仍指向本机测试 API，且 `APP_MODE=production` 会阻止未经审批的正式构建。AAB 也不能像 APK 一样直接安装；现有 [arm64 本地 APK 与模拟器验收](android-emulator-offline-v0.46-qa.md)用于实际设备流程测试。正式上架前应确定发行身份和市场、完成内容及隐私审查、配置线上 API 和受控上传签名，再重新构建与验证。
+
+## 可重复的静态验收
+
+`scripts/verify-android-aab.mjs` 会校验 ZIP 完整性、逐项源码 SHA-256、AAB 内的 protobuf 清单、四种架构、内嵌运行代码、敏感文件名、JAR 签名和证书，并在全部通过后写入独立报告。原临时构建目录已不存在，本次使用构建时的 Git 提交 `ee369f6` 逐文件对照清单中 130 份源码；较新的 `4cd685e` 因共享文案摘要不同被正确拒绝。执行时将 `--java-home` 指向已安装的 JDK：
+
+```sh
+node scripts/verify-android-aab.mjs \
+  --aab dist/mobile-native/v0.46/practice-life-ee369f6/android-bundle/FocusIslandDev-v0.2.8-9-local.aab \
+  --snapshot dist/mobile-native/v0.46/practice-life-ee369f6/android-bundle/source-snapshot.json \
+  --source-ref ee369f6 \
+  --java-home /path/to/jdk/Contents/Home \
+  --output dist/mobile-native/v0.46/practice-life-ee369f6/android-bundle/aab-static-report.json
+```
+
+本机生成的 `dist/mobile-native/v0.46/practice-life-ee369f6/android-bundle/aab-static-report.json` 确认原 SHA-256 不变、清单版本 `0.2.8 (9)`、`allowBackup=false`、未开启 `debuggable`、四种架构和调试签名。报告明确 `storeRelease=false`；静态验收不代替上架证书、正式服务器配置、设备操作、内容审定及市场批准。新构建应使用该批自己的源码快照和独立报告路径，不复用本次通过记录。

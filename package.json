@@ -16,7 +16,7 @@
     "voice:generate:offline": "node scripts/generate-system-voice-assets.mjs",
     "voice:content": "node scripts/generate-content-voice-assets.mjs",
     "voice:audit": "node scripts/audit-content-voice-assets.mjs",
-    "test": "node --test tests/*.test.mjs tests/platform/*.test.ts",
+    "test": "node --test tests/*.test.mjs tests/platform/*.test.mjs tests/platform/*.test.ts",
     "test:http": "node --test --test-concurrency=2 tests/http/*.test.mjs",
     "test:browser": "node scripts/run-browser-qa.mjs",
     "audit:preview": "node scripts/audit-protected-preview.mjs",
