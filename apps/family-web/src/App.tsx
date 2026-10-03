@@ -19,8 +19,8 @@ import { securityCopy } from '../../../packages/session-runtime/account-security
 import { isHostedPreview } from './preview-context.ts';
 import { familyErrorCopy } from './error-copy.ts';
 import { collectionStatusAllowsPractice, collectionStatusCopy } from '../../../packages/contracts/collection-status.ts';
-import { practiceInvitationCopy, practiceInvitationDay } from '../../../packages/contracts/practice-invitation.ts';
-import type { PracticeLimits } from '../../../packages/contracts/practice-limits.ts';
+import { practiceInvitationCopy } from '../../../packages/contracts/practice-invitation.ts';
+import type { PracticeStartReview } from '../../../packages/contracts/index.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
 import { supportedDeviceLocale } from '../../../packages/contracts/device-locale.ts';
 import { serializeChildExport } from '../../../packages/session-runtime/profile-actions.ts';
@@ -38,6 +38,7 @@ const FamilyBilling = lazy(() => import('./FamilyBilling.tsx'));
 const FamilyMembers = lazy(() => import('./FamilyMembers.tsx'));
 const JoinFamily = lazy(() => import('./JoinFamily.tsx'));
 const PracticeLimits = lazy(() => import('./PracticeLimits.tsx'));
+const PracticeInvitation = lazy(() => import('./PracticeInvitation.tsx'));
 const AgeReview = lazy(() => import('./AgeReview.tsx'));
 function preferredLocale():Locale {
   try{const saved=localStorage.getItem('focus-ui-locale');if(saved==='zh-CN'||saved==='en')return saved;}catch{}
@@ -79,7 +80,7 @@ export function App() {
   const [session, setSession] = useState<Session | null>(null), [reportRevision, setReportRevision] = useState(0);
   const [offlineOffer,setOfflineOffer]=useState<NonNullable<Awaited<ReturnType<ReturnType<typeof journal>['resume']>>>|null>(null);
   const [modal, setModal] = useState<'profile' | 'login' | 'observation' | 'privacy' | 'navigation' | 'practice-invitation' | 'child-data-visibility' | null>(null), [authMode, setAuthMode] = useState<'setup' | 'login' | 'join'>('setup');
-  const [practiceInvitation, setPracticeInvitation] = useState<{childId: string; task: TaskId; identity: number; day: ReturnType<typeof practiceInvitationDay>; inputMode: 'standard' | 'assistive' | null} | null>(null);
+  const [practiceInvitation, setPracticeInvitation] = useState<{childId: string; task: TaskId; identity: number} | null>(null);
   const [error, setError] = useState(''), [pending, setPending] = useState(false), [notice, setNotice] = useState('');
   const [accountNotice, setAccountNotice] = useState<'password' | 'signout' | 'uncertain' | 'delete-uncertain' | 'signin' | 'deleted' | 'deleted-local-pending' | null>(null);
   const [unavailable,setUnavailable]=useState(false);
@@ -175,26 +176,20 @@ export function App() {
     });
   }
   function inviteToPractice(task: TaskId) {
+    if (pending) return;
     if (!child) { setModal('profile'); return; }
     if (!collectionStatusAllowsPractice(child.collectionStatus,child.consentActive)) { setError(collectionStatusCopy(child.collectionStatus,locale).detail); return; }
-    const childId=child.id, identity=accessVersion.current, childLocale=child.locale;
-    void safely(async () => {
-      const limits=await request<PracticeLimits>(`/children/${childId}/practice-limits`);
-      if (!mounted.current || identity!==accessVersion.current) return;
-      if (limits.version!=='practice-limits-1' || limits.childId!==childId) throw new Error(t('今天的安排暂时无法确认，请重试。', 'Today’s plan could not be confirmed. Please try again.'));
-      setPracticeInvitation({childId,task,identity,day:practiceInvitationDay(limits,childLocale),inputMode:null});
-      setModal('practice-invitation');
-    });
+    setError(''); setPracticeInvitation({childId:child.id,task,identity:accessVersion.current}); setModal('practice-invitation');
   }
-  async function start(invitation: NonNullable<typeof practiceInvitation>, event: MouseEvent<HTMLButtonElement>) {
+  async function start(invitation: NonNullable<typeof practiceInvitation>, review: PracticeStartReview, inputMode: 'standard' | 'assistive', event: MouseEvent<HTMLButtonElement>) {
     const candidate=me?.children.find(c=>c.id===invitation.childId);
     setModal(null); setPracticeInvitation(null);
     if (!candidate || invitation.identity !== accessVersion.current) { setError(t('家庭状态已更新，请重新选择练习。','Your family space changed. Choose the practice again.')); return; }
-    if (!invitation.day.mayStart || !invitation.inputMode || (invitation.inputMode === 'assistive' && ['stop','sustain'].includes(invitation.task))) return;
+    if (review.availableMs < 5000 || !review.currentMinutes || (inputMode === 'assistive' && ['stop','sustain'].includes(invitation.task))) return;
     if (!collectionStatusAllowsPractice(candidate.collectionStatus,candidate.consentActive)) { setError(collectionStatusCopy(candidate.collectionStatus,locale).detail); return; }
     await safely(async () => {
       const identity=++accessVersion.current;
-      const s = await request<Session>(`/children/${candidate.id}/sessions`, 'POST', { task:invitation.task, deviceId: deviceId(), environment: environmentFor(invitation.inputMode === 'assistive' ? 'assistive' : inputForClick(event)) }, { 'Idempotency-Key': crypto.randomUUID() });
+      const s = await request<Session>(`/children/${candidate.id}/sessions`, 'POST', { task:invitation.task, deviceId: deviceId(), environment: environmentFor(inputMode === 'assistive' ? 'assistive' : inputForClick(event)), practiceReview:review }, { 'Idempotency-Key': crypto.randomUUID() });
       if(identity!==accessVersion.current)return;
       await refresh(false);
       const active = await request<Session | null>('/sessions/active');if(identity===accessVersion.current&&mounted.current)setSession(active ?? s);
@@ -306,25 +301,9 @@ export function App() {
     </nav>
     {modal === 'navigation' && <Dialog locale={locale} navigation title={t('想去哪里？', 'Where next?')} onClose={() => setModal(null)}><nav className="navigation-menu" aria-label={t('全部页面', 'All pages')}>{navigation.map(([id, Icon, label]) => <button key={id} aria-current={page === id ? 'page' : undefined} onClick={() => { setModal(null); navigate(id); }}><Icon size={21} aria-hidden="true" /><span>{label}</span>{['report', 'family', 'guide'].includes(id) && me.role === 'child' ? <span className="navigation-access"><LockKeyhole size={15} aria-hidden="true" />{t('家长', 'Parent')}</span> : page === id ? <Check size={19} aria-hidden="true" /> : <ArrowRight size={18} aria-hidden="true" />}</button>)}</nav></Dialog>}
     {modal === 'practice-invitation' && practiceInvitation && invitedChild && <Dialog locale={invitedChild.locale} title={practiceInvitationCopy(invitedChild.ageBand,invitedChild.locale).title} onClose={() => { setModal(null); setPracticeInvitation(null); }}>
-      <div className="practice-invitation" lang={invitedChild.locale}>
-        <p className="practice-invitation-task">{taskContent(practiceInvitation.task,invitedChild.locale,invitedChild.ageBand).title}</p>
-        <p>{practiceInvitationCopy(invitedChild.ageBand,invitedChild.locale).body}</p>
-        {practiceInvitation.day.message && <p className="notice" role="status">{practiceInvitation.day.message}</p>}
-        {me.role === 'parent' && <p className="subtle">{practiceInvitationCopy(invitedChild.ageBand,invitedChild.locale).parentHint}</p>}
-        <fieldset className="practice-input-choice">
-          <legend>{translate(invitedChild.locale)('这次怎样操作？', 'How will you use this practice?')}</legend>
-          <label><input type="radio" name="practice-input-mode" checked={practiceInvitation.inputMode === 'standard'} onChange={() => setPracticeInvitation(current => current && ({...current,inputMode:'standard'}))} />{translate(invitedChild.locale)('普通触屏、鼠标或键盘', 'Touch, mouse or keyboard')}</label>
-          <label><input type="radio" name="practice-input-mode" checked={practiceInvitation.inputMode === 'assistive'} disabled={['stop','sustain'].includes(practiceInvitation.task)} onChange={() => setPracticeInvitation(current => current && ({...current,inputMode:'assistive'}))} />{translate(invitedChild.locale)('读屏操作（单独记录）', 'Screen reader (recorded separately)')}</label>
-          <p className="subtle">{['stop','sustain'].includes(practiceInvitation.task)
-            ? translate(invitedChild.locale)('这道限时看图任务暂不支持读屏操作。可以改选“找一找”或“记一记”，也可以今天不练。', 'This timed visual task is not available with a screen reader yet. Choose Search or Memory, or stop for today.')
-            : translate(invitedChild.locale)('网页无法自动识别读屏软件。请在开始前选择；读屏记录暂不推进基础课程或自动调难度，也不与普通操作成绩比较。', 'The browser cannot detect a screen reader automatically. Choose before starting. Screen reader records do not advance the foundation course or change difficulty, and are not compared with standard input.')}</p>
-        </fieldset>
-        <div className="practice-invitation-actions">
-          <button type="button" className="primary" disabled={pending || !practiceInvitation.day.mayStart || !practiceInvitation.inputMode} onClick={event => void start(practiceInvitation,event)}>{practiceInvitationCopy(invitedChild.ageBand,invitedChild.locale).begin}</button>
-          <button type="button" className="quiet" disabled={pending} onClick={() => { setModal(null); setPracticeInvitation(null); }}>{practiceInvitationCopy(invitedChild.ageBand,invitedChild.locale).later}</button>
-          {!practiceInvitation.day.mayStart && <button type="button" className="quiet" onClick={() => { setModal(null); setPracticeInvitation(null); navigate('limits'); }}>{invitedChild.locale === 'zh-CN' ? '查看今天的安排' : 'View today’s plan'}</button>}
-        </div>
-      </div>
+      <Suspense fallback={<p role="status">{translate(invitedChild.locale)('正在确认今天的安排…','Checking today’s plan…')}</p>}><PracticeInvitation child={invitedChild} task={practiceInvitation.task} canEdit={!!owner} parentPresent={me.role==='parent'} pending={pending}
+        onBegin={(review,mode,event)=>void start(practiceInvitation,review,mode,event)} onClose={()=>{setModal(null);setPracticeInvitation(null);}}
+        onPlan={()=>{setModal(null);setPracticeInvitation(null);navigate('limits');}} /></Suspense>
     </Dialog>}
     {modal === 'child-data-visibility' && child && me.role === 'child' && <Dialog locale={locale} title={childDataVisibilityCopy(child.ageBand, locale).title} onClose={() => setModal(null)}><div className="child-data-visibility"><p>{childDataVisibilityCopy(child.ageBand, locale).introduction}</p>{(['practice', 'reflection', 'control'] as const).map(section => <section key={section}><h3>{childDataVisibilityCopy(child.ageBand, locale)[`${section}Heading`]}</h3><p>{childDataVisibilityCopy(child.ageBand, locale)[section]}</p></section>)}<p className="notice">{childDataVisibilityCopy(child.ageBand, locale).device}</p><button type="button" className="primary" onClick={() => setModal(null)}>{childDataVisibilityCopy(child.ageBand, locale).close}</button></div></Dialog>}
     {modal === 'profile' && owner && <Dialog locale={locale} title={t('认识一位小探索家', 'Meet an explorer')} onClose={() => setModal(null)}><form className="stack-form" onSubmit={e => void addProfile(e)}><p className="subtle">{t('昵称就够了。每个孩子的练习与记录各自保存。', 'A nickname is enough. Each child gets their own practice and records.')}</p><label>{t('孩子的昵称', 'Child’s nickname')}<input name="alias" autoFocus required maxLength={24} placeholder={t('例如：小树', 'For example: River')} /></label><label>{t('年龄段', 'Age band')}<select name="ageBand" defaultValue="6-8">{['6-8', '9-11', '12-14', '15-17'].map(v => <option key={v} value={v}>{v} {t('岁', 'years')}</option>)}</select></label><label>{t('练习语言', 'Practice language')}<select name="locale" defaultValue={locale}><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>{me.mode === 'local-development' ? <label className="check-label"><input name="confirmation" type="checkbox" required />{hostedPreview ? t('我会只用虚构孩子昵称测试，知道新练习记录保存在云端，并会让参与测试的孩子每次自行选择是否参加。', 'I will use a fictional child nickname, understand that new practice records are stored in the cloud, and let any child taking part in testing choose each time whether to join.') : t('我同意在这台电脑保存本地测试记录，并会让孩子在每次练习前自己选择是否参加。', 'I agree to save local test records on this computer and let my child choose whether to take part before each practice.')}</label> : <p className="notice">{t('建立档案后仍需完成适用的监护核验，才能开始练习。当前版本尚未开放核验入口。', 'This profile will need guardian verification before practice. Verification is not yet available in this version.')}</p>}{error && <p className="notice error" role="alert">{error}</p>}<button className="primary" disabled={pending}>{t('为孩子准备好', 'Prepare their space')}<ArrowRight size={18} /></button></form></Dialog>}

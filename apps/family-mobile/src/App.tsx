@@ -17,6 +17,7 @@ import { ParentGuide } from './ParentGuide';
 import { AccountSecurity } from './AccountSecurity';
 import { FamilyBilling } from './FamilyBilling';
 import { PracticeLimits } from './PracticeLimits';
+import { PracticeInvitation } from './PracticeInvitation';
 import { LifeGoals } from './LifeGoals';
 import { TeenStrategyHistory } from './TeenStrategyHistory';
 import { isNetworkFailure, verifyOfflineSession } from '../../../packages/session-runtime/offline-session.ts';
@@ -26,8 +27,7 @@ import { cleanupExportFiles } from './exports';
 import { LocalJournalWarning } from './LocalJournalWarning';
 import type { Me, Child, Session } from '../../../packages/contracts/models.ts';
 import { collectionStatusAllowsPractice, collectionStatusCopy } from '../../../packages/contracts/collection-status.ts';
-import { practiceInvitationCopy, practiceInvitationDay } from '../../../packages/contracts/practice-invitation.ts';
-import type { PracticeLimits as PracticeLimitsSnapshot } from '../../../packages/contracts/practice-limits.ts';
+import type { PracticeStartReview } from '../../../packages/contracts/index.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
 import { supportedDeviceLocale } from '../../../packages/contracts/device-locale.ts';
 import { connectionErrorCopy, requestErrorCopy } from '../../../packages/contracts/request-error-copy.ts';
@@ -44,7 +44,7 @@ function FamilyApp() {
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'billing' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy'>('home');
   const [lifeSuggestion, setLifeSuggestion] = useState<GoalInput['templateId'] | undefined>();
   const [selected, setSelected] = useState<Child | null>(null), [covered, setCovered] = useState(false);
-  const [practiceInvitation, setPracticeInvitation] = useState<{childId:string;task:TaskId;identity:number;day:ReturnType<typeof practiceInvitationDay>}|null>(null);
+  const [practiceInvitation, setPracticeInvitation] = useState<{childId:string;task:TaskId;identity:number}|null>(null);
   const mounted = useRef(true), identityVersion = useRef(0);
   const owner = me?.role === 'parent' && me.member?.role === 'owner', support = me?.role === 'parent' && me.member?.role === 'support';
   const t = translate(locale);
@@ -126,7 +126,7 @@ function FamilyApp() {
     return()=>{live=false;clearInterval(timer);};
   },[me?.role,me?.member?.id,me?.member?.state]);
   async function action(fn: () => Promise<void>) { setBusy(true); setError(''); try { await fn(); } catch (e) { if (mounted.current) setError(message(e)); } finally { if (mounted.current) setBusy(false); } }
-  async function start(child: Child, task: TaskId) {
+  async function start(child: Child, task: TaskId, review: PracticeStartReview) {
     if (!collectionStatusAllowsPractice(child.collectionStatus,child.consentActive)) { setError(collectionStatusCopy(child.collectionStatus,locale).detail); return; }
     const identity = identityVersion.current;
     const screenReader = await AccessibilityInfo.isScreenReaderEnabled().catch(() => null);
@@ -135,7 +135,7 @@ function FamilyApp() {
     if (screenReader && ['stop', 'sustain'].includes(task)) { setError(timedScreenReaderMessage); return; }
     const version = ++identityVersion.current;
     await action(async () => {
-      const active = await client.start(child.id, task, screenReader ? 'assistive' : 'touch');
+      const active = await client.start(child.id, task, screenReader ? 'assistive' : 'touch', review);
       if (!mounted.current || version !== identityVersion.current) return;
       setSession(active); setSelected(null); setView('home');
       setMe(current => current && ({ ...current, role: 'child', children: [child] }));
@@ -149,10 +149,7 @@ function FamilyApp() {
       if(!mounted.current||identity!==identityVersion.current)return;
       if(screenReader === null){setError(t('暂时无法确认读屏设置，请重新打开后再试。', 'Unable to check the screen reader setting. Reopen the app and try again.'));return;}
       if(screenReader && ['stop', 'sustain'].includes(task)){setError(timedScreenReaderMessage);return;}
-      const limits=await client.request<PracticeLimitsSnapshot>(`/children/${childId}/practice-limits`);
-      if(!mounted.current||identity!==identityVersion.current)return;
-      if(limits.version!=='practice-limits-1'||limits.childId!==childId)throw new Error('PRACTICE_PLAN_MISMATCH');
-      setPracticeInvitation({childId,task,identity,day:practiceInvitationDay(limits,child.locale)});
+      setPracticeInvitation({childId,task,identity});
     });
   }
   if (session && (me || offlineOffer)) return <View style={{ flex: 1 }}><Practice key={session.id} session={session} familyId={me?.family.id ?? offlineOffer!.capsule.familyId} client={client} offline={!!offlineOffer} onExit={() => { setSession(null); void refresh(false); }} onExploreLife={me?.role==='child'&&me.children.some(c=>c.id===session.child_id)?()=>{
@@ -173,21 +170,12 @@ function FamilyApp() {
   if(practiceInvitation){
     const invitedChild=me.children.find(child=>child.id===practiceInvitation.childId);
     if(invitedChild){
-      const invitationCopy=practiceInvitationCopy(invitedChild.ageBand,invitedChild.locale);
-      return <Page title={invitationCopy.title} subtitle={taskContent(practiceInvitation.task,invitedChild.locale,invitedChild.ageBand).title}>
-        <Text style={s.body}>{invitationCopy.body}</Text>
-        {!!practiceInvitation.day.message&&<Notice>{practiceInvitation.day.message}</Notice>}
-        {me.role==='parent'&&<Text style={s.muted}>{invitationCopy.parentHint}</Text>}
-        <Notice>{error}</Notice>
-        <Button title={invitationCopy.begin} disabled={busy||!practiceInvitation.day.mayStart} onPress={()=>{
+      return <PracticeInvitation child={invitedChild} task={practiceInvitation.task} client={client} canEdit={!!owner} parentPresent={me.role==='parent'} pending={busy} error={error} onBegin={review=>{
           const chosen=practiceInvitation;
           setPracticeInvitation(null);
           if(chosen.identity!==identityVersion.current){setError(t('家庭状态已更新，请重新选择练习。','Your family space changed. Choose the practice again.'));return;}
-          void start(invitedChild,chosen.task);
-        }}/>
-        <Button quiet title={invitationCopy.later} disabled={busy} onPress={()=>setPracticeInvitation(null)}/>
-        {!practiceInvitation.day.mayStart&&<Button quiet title={invitedChild.locale==='zh-CN'?'查看今天的安排':'View today’s plan'} onPress={()=>{setPracticeInvitation(null);setSelected(invitedChild);setView('limits');}}/>}
-      </Page>;
+          void start(invitedChild,chosen.task,review);
+        }} onClose={()=>setPracticeInvitation(null)} onPlan={()=>{setPracticeInvitation(null);setSelected(invitedChild);setView('limits');}} />;
     }
   }
   if(me.role==='parent' && me.member?.state==='pending')return <Page title={t('等待家庭创建者确认','Waiting for the family creator')}><Text style={s.heading}>{me.family.name} · {me.member.displayName}</Text><Text style={s.body}>{me.member.loginName}</Text><Text style={s.body}>{t('请与创建者核对登录名。确认之前，这里不会显示孩子资料。','Check your username with the creator. Child records stay hidden until they confirm.')}</Text><Notice>{error}</Notice><Button title={t('重新读取','Reload')} disabled={busy} onPress={()=>void refresh(false)}/><Button quiet title={t('退出登录','Sign out')} onPress={()=>void action(async()=>{await client.logout();setMe(null);})}/></Page>;

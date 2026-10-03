@@ -12,7 +12,8 @@ import type { AgeBand, EngineEvent } from '../../packages/task-engine/index.ts';
 import { nextFamilyDay } from '../../packages/session-runtime/day-boundary.ts';
 import { PracticeLimitClient } from '../../packages/session-runtime/practice-limit-client.ts';
 import type { PracticeLimits } from '../../packages/contracts/practice-limits.ts';
-import { practiceInvitationDay } from '../../packages/contracts/practice-invitation.ts';
+import { practiceInvitationDay, practiceStartReview } from '../../packages/contracts/practice-invitation.ts';
+import { practiceStartReviewSchema } from '../../packages/contracts/index.ts';
 import { practiceLimitFormIdentity, practiceLimitsRefreshDelay } from '../../packages/session-runtime/practice-limit-refresh.ts';
 let db: Database, api: FocusService, catalogue: Awaited<ReturnType<typeof createLocalContent>>, authority: Awaited<ReturnType<typeof createSessionAuthority>>;
 const base = Date.parse('2026-10-01T08:00:00Z'); let clock = base;
@@ -201,4 +202,57 @@ test('budget-only refresh preserves a form acknowledgement; calendar, scope or s
     { next: { minutes: 2, day: snapshot.nextDay } }, { collectionActive: false }, { childId: 'another-child' }, { timezone: 'Asia/Shanghai' },
   ]) assert.notEqual(practiceLimitFormIdentity({ ...snapshot, ...change }), original);
   assert.equal(practiceLimitFormIdentity(null), null);
+});
+
+test('reviewed Web and native starts reject changed plans atomically before creating records or rotating credentials', async () => {
+  for (const transport of ['web', 'native'] as const) {
+    const f = await fixture();
+    const p = (await api.authenticate((await api.login(f.credentials, transport)).value, transport))!;
+    const review = practiceStartReview(await api.practiceLimits(p, f.c.id), 'en');
+    const input = { task: 'search', deviceId: randomUUID(), environment: transport === 'web' ? TEST_ENVIRONMENT : { ...TEST_ENVIRONMENT, platform: 'ios', deviceClass: 'phone', input: 'touch' } };
+    for (const change of [
+      { day: '2026-10-02' }, { settingsVersion: review.settingsVersion + 1 }, { ageBand: '9-11' }, { locale: 'zh-CN' },
+      { currentMinutes: 4 }, { confirmedMs: 1 }, { reservedMs: 1 }, { availableMs: review.availableMs - 1 },
+    ]) await assert.rejects(api.start(p, f.c.id, { ...input, practiceReview: { ...review, ...change } }, randomUUID()), denied('PRACTICE_PLAN_CHANGED'));
+    assert.equal((await db.query('SELECT id FROM sessions WHERE child_id=$1', [f.c.id])).rows.length, 0);
+    assert.equal((await api.authenticate((await api.login(f.credentials, transport)).value, transport))!.child_id, null);
+    assert.equal((await api.me(p)).role, 'parent', 'Rejected review keeps the requesting parent credential');
+    const started = await api.start(p, f.c.id, { ...input, practiceReview: review }, randomUUID());
+    const stored = await db.query<{ daily_limit_snapshot: { settingsVersion: number } }>('SELECT daily_limit_snapshot FROM sessions WHERE id=$1', [started.session.id]);
+    assert.equal(stored.rows[0].daily_limit_snapshot.settingsVersion, review.settingsVersion);
+    assert.equal(started.session.budget_ms, review.availableMs);
+  }
+});
+
+test('an actual settings or usage change requires a new review, and exact retries preserve the original grant across family days', async () => {
+  const f = await fixture();
+  const input = { task: 'search', deviceId: randomUUID(), environment: TEST_ENVIRONMENT };
+  const first = practiceStartReview(await api.practiceLimits(f.p, f.c.id), 'en');
+  await set(f, 4);
+  await assert.rejects(api.start(f.p, f.c.id, { ...input, practiceReview: first }, randomUUID()), denied('PRACTICE_PLAN_CHANGED'));
+  const reviewed = practiceStartReview(await api.practiceLimits(f.p, f.c.id), 'en'), key = randomUUID();
+  const accepted = await api.start(f.p, f.c.id, { ...input, practiceReview: reviewed }, key);
+  const cp = (await api.authenticate(accepted.auth.value))!;
+  await api.append(cp, accepted.session.id, { events: [{ id: randomUUID(), seq: 1, at: 0, type: 'end', reason: 'child_stopped' }] });
+  await api.finalize(cp, accepted.session.id, { lastSeq: 1 });
+  clock = Date.parse('2026-10-02T08:00:00Z');
+  const p = await login(f), retry = await api.start(p, f.c.id, { ...input, practiceReview: reviewed }, key);
+  assert.equal(retry.session.id, accepted.session.id); assert.deepEqual(retry.session.continuation_grant, accepted.session.continuation_grant);
+  const parentAgain = await login(f);
+  await assert.rejects(api.start(parentAgain, f.c.id, { ...input, practiceReview: reviewed }, randomUUID()), denied('PRACTICE_PLAN_CHANGED'));
+  const today = practiceStartReview(await api.practiceLimits(parentAgain, f.c.id), 'en');
+  await assert.rejects(api.start(parentAgain, f.c.id, { ...input, practiceReview: today }, key), denied('IDEMPOTENCY_CONFLICT'));
+  assert.equal((await db.query('SELECT id FROM sessions WHERE child_id=$1', [f.c.id])).rows.length, 1);
+
+  const other = await fixture(), beforeUsage = practiceStartReview(await api.practiceLimits(other.p, other.c.id), 'en');
+  await stop(other, 1000);
+  await assert.rejects(api.start(await login(other), other.c.id, { ...input, practiceReview: beforeUsage }, randomUUID()), denied('PRACTICE_PLAN_CHANGED'));
+});
+
+test('start review accepts only its known bounded fields and cannot carry unknown consent or time assertions', () => {
+  const review = practiceStartReview(snapshot, 'en');
+  assert.deepEqual(practiceStartReviewSchema.parse(review), review);
+  for (const change of [{ version: 'unknown' }, { settingsVersion: 0 }, { confirmedMs: -1 }, { availableMs: 720001 }, { childAssentVerified: true }]) {
+    assert.equal(practiceStartReviewSchema.safeParse({ ...review, ...change }).success, false);
+  }
 });

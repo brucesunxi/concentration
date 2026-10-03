@@ -1,5 +1,6 @@
 import type { AgeBand, Locale } from '../task-engine/index.ts';
 import type { PracticeLimits } from './practice-limits.ts';
+import type { PracticeStartReview } from './index.ts';
 
 type Invitation = { title: string; body: string; begin: string; later: string; parentHint: string };
 
@@ -24,6 +25,22 @@ const copy: Record<AgeBand, Record<Locale, Invitation>> = {
 
 export function practiceInvitationCopy(ageBand: AgeBand, locale: Locale): Invitation {
   return copy[ageBand][locale];
+}
+
+export function practiceStartReview(limits: PracticeLimits, locale: Locale): PracticeStartReview {
+  return { version: 'practice-start-review-1', day: limits.day, settingsVersion: limits.settingsVersion,
+    ageBand: limits.ageBand, locale, currentMinutes: limits.currentMinutes, confirmedMs: limits.confirmedMs,
+    reservedMs: limits.reservedMs, availableMs: limits.availableMs };
+}
+
+export function practiceInvitationRefreshCopy(locale: Locale) {
+  return locale === 'en' ? {
+    loading: 'Checking today’s plan…', failed: 'Today’s plan could not be confirmed. Check your connection and try again; you can also choose not to start.',
+    refresh: 'Check today’s plan again', changed: 'Your family’s plan has updated. Have another look; you still decide whether to begin.',
+  } : {
+    loading: '正在确认今天的安排…', failed: '暂时无法确认今天的安排。可以联网后再试，也可以现在不开始。',
+    refresh: '再确认今天的安排', changed: '家里的安排已更新。再看一看，是否开始仍由你决定。',
+  };
 }
 
 export function practiceInvitationDay(limits: PracticeLimits, locale: Locale) {

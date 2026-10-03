@@ -533,8 +533,7 @@ export function service(source: Database, now: () => number = Date.now, content?
           result = active;
         }
         if (!result) {
-          const f = await one<Family>(tx, 'SELECT timezone FROM families WHERE id=$1', [p.family_id]);
-          const issued = now(), budgetDay = day(f!.timezone, issued);
+          const issued = now(), budgetDay = day(family.timezone, issued);
           if (releaseScope.requiresEntitlement(family.residence_country, c.age_band, c.locale, input.environment.platform)) {
             if (!entitlementReader) fail(503, 'ENTITLEMENT_UNAVAILABLE', '家庭权益暂时无法确认，请稍后重试。');
             let entitlement;
@@ -545,6 +544,12 @@ export function service(source: Database, now: () => number = Date.now, content?
           }
           const spent = await usageTotals(tx, childId, budgetDay), minutes = effectiveMinutes(c, budgetDay);
           const available = Math.max(0, minutes * 60000 - spent.confirmed - spent.reserved);
+          const review = input.practiceReview;
+          if (!review && releaseScope.mode === 'approved') fail(428, 'PRACTICE_REVIEW_REQUIRED', '请更新应用，并在查看今天的安排后自行选择是否开始。');
+          if (review && (review.day !== budgetDay || review.settingsVersion !== c.daily_limit_version || review.ageBand !== c.age_band || review.locale !== c.locale
+            || review.currentMinutes !== minutes || review.confirmedMs !== spent.confirmed || review.reservedMs !== spent.reserved || review.availableMs !== available)) {
+            fail(409, 'PRACTICE_PLAN_CHANGED', '今天的安排已更新，请重新选择练习、查看说明后再决定是否开始。');
+          }
           if (minutes === 0) fail(409, 'PRACTICE_PAUSED', '家庭已暂停新练习，可以先休息或尝试生活中的小策略。');
           if (available < 5000) fail(409, 'DAILY_LIMIT', '今天的练习已足够，可以把策略带到生活里。');
           const reference = await (await contentReady()).pick(input.task, c.age_band, c.locale, tx);
@@ -552,7 +557,7 @@ export function service(source: Database, now: () => number = Date.now, content?
           const level = previousCondition?.level ?? 1;
           const id = randomUUID(), plan = createPlan({ id, task: input.task, ageBand: c.age_band, locale: c.locale, seed: randomBytes(16).toString('hex'), level, environment: input.environment, content: reference });
           const release = await (await contentReady()).release(reference, tx, true);
-          const grant = await (await authorityReady()).issue({ id, childId, deviceId: input.deviceId, plan, budgetMs: available, transport: p.transport, now: issued, contentExpiry: Date.parse(release.body.expiresAt), dayEnd: nextFamilyDay(issued, f!.timezone) });
+          const grant = await (await authorityReady()).issue({ id, childId, deviceId: input.deviceId, plan, budgetMs: available, transport: p.transport, now: issued, contentExpiry: Date.parse(release.body.expiresAt), dayEnd: nextFamilyDay(issued, family.timezone) });
           result = (await one<Session>(tx, 'INSERT INTO sessions(id,child_id,request_key,request_hash,device_id,plan,budget_day,budget_ms,created_at,continuation_grant,daily_limit_snapshot,release_scope_identity) VALUES($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12) RETURNING *', [id, childId, key, requestHash, input.deviceId, plan, budgetDay, available, new Date(issued).toISOString(), grant, { version: 'practice-limits-1', settingsVersion: c.daily_limit_version, day: budgetDay, minutes }, releaseScope.identity]))!;
         }
         if (result.plan.content) await (await contentReady()).release(result.plan.content, tx, true);

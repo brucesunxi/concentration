@@ -9,6 +9,7 @@ import type { GuardianVerification } from '../../apps/api/guardian-consent.ts';
 import { collectionStatusAllowsPractice, collectionStatusCopy } from '../../packages/contracts/collection-status.ts';
 import { TEST_ENVIRONMENT } from '../../packages/task-engine/index.ts';
 import type { Entitlement } from '../../packages/billing/index.ts';
+import { practiceStartReview } from '../../packages/contracts/practice-invitation.ts';
 
 const approvals = { product: 'product/ticket-1234', legal: 'legal/ticket-1234', security: 'security/ticket-1234' };
 const consentNotice = { version: 'family-practice-1', sha256: 'a'.repeat(64) };
@@ -83,7 +84,12 @@ test('registration, child creation and new practice enforce the same server matr
     assert.equal((await open.me(parent)).children[0].collectionStatus,'guardian-verified');
     const closed = service(db, Date.now, undefined, undefined, createReleaseScope({ version: '2026-10-01.closed', rules: [] }));
     await assert.rejects(closed.start(parent, child.id, { task: 'search', deviceId: randomUUID(), environment: TEST_ENVIRONMENT }, randomUUID()), denied);
-    const started = await open.start(parent, child.id, { task: 'search', deviceId: randomUUID(), environment: TEST_ENVIRONMENT }, randomUUID());
+    await assert.rejects(open.start(parent, child.id, { task: 'search', deviceId: randomUUID(), environment: TEST_ENVIRONMENT }, randomUUID()),
+      (error: unknown) => error instanceof ApiError && error.status === 428 && error.code === 'PRACTICE_REVIEW_REQUIRED');
+    assert.equal((await db.query('SELECT id FROM sessions WHERE child_id=$1', [child.id])).rows.length, 0);
+    assert.equal((await open.me(parent)).role, 'parent');
+    const review = practiceStartReview(await open.practiceLimits(parent, child.id), 'en');
+    const started = await open.start(parent, child.id, { task: 'search', deviceId: randomUUID(), environment: TEST_ENVIRONMENT, practiceReview: review }, randomUUID());
     assert.equal(started.session.plan.ageBand, '9-11');
     const childPrincipal = (await open.authenticate(started.auth.value))!;
     const sameMarketDifferentApproval = service(db, Date.now, undefined, undefined, createReleaseScope({ ...approved, rules: [{ ...approved.rules[0], approvals: { ...approvals, legal: 'legal/ticket-5678' } }] }));
@@ -139,7 +145,8 @@ test('a paid release requires a verified family entitlement only when issuing a 
     };
     const child = await makeChild('Synthetic paid release');
     const second = await makeChild('Synthetic grace release');
-    const input = { task: 'search' as const, deviceId: randomUUID(), environment: TEST_ENVIRONMENT };
+    const input = { task: 'search' as const, deviceId: randomUUID(), environment: TEST_ENVIRONMENT,
+      practiceReview: practiceStartReview(await api.practiceLimits(owner, child.id), 'en') };
     const key = randomUUID();
     const code = (name: string) => (error: unknown) => error instanceof ApiError && error.code === name;
     await assert.rejects(noReader.start(owner, child.id, input, key), code('ENTITLEMENT_UNAVAILABLE'));
@@ -161,7 +168,7 @@ test('a paid release requires a verified family entitlement only when issuing a 
     assert.equal(reads, readsAtIssue);
     state = 'grace';
     const fresh = (await api.authenticate((await api.login({ name: credentials.name, password: credentials.password })).value))!;
-    const grace = await api.start(fresh, second.id, { ...input, deviceId: randomUUID() }, randomUUID());
+    const grace = await api.start(fresh, second.id, { ...input, deviceId: randomUUID(), practiceReview: practiceStartReview(await api.practiceLimits(fresh, second.id), 'en') }, randomUUID());
     assert.equal(grace.session.state, 'active');
   } finally { await db.close(); }
 });

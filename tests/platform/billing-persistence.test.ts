@@ -9,6 +9,7 @@ import { grantRuntimeRoles, verifyRuntimeRole } from '../../apps/api/family-isol
 import { CONTEXT_SQL } from '../../apps/api/database-context.ts';
 import type { GuardianVerification } from '../../apps/api/guardian-consent.ts';
 import { TEST_ENVIRONMENT } from '../../packages/task-engine/index.ts';
+import { practiceStartReview } from '../../packages/contracts/practice-invitation.ts';
 
 const start = '2026-10-01T00:00:00.000Z', end = '2026-11-01T00:00:00.000Z';
 const source = { provider: 'app-store' as const, originalTransactionId: 'synthetic-purchase-1' };
@@ -65,7 +66,8 @@ test('a paid release starts from persisted entitlement and a refund blocks only 
     proof = { ...proof, reference: randomUUID(), childId: second.id };
     await api.grantGuardianConsent(parent, second.id, randomUUID());
     assert.equal((await api.billingStatus(parent)).state, 'free');
-    const input = { task: 'search' as const, deviceId: randomUUID(), environment: TEST_ENVIRONMENT }, key = randomUUID();
+    const input = { task: 'search' as const, deviceId: randomUUID(), environment: TEST_ENVIRONMENT,
+      practiceReview: practiceStartReview(await api.practiceLimits(parent, child.id), 'en') }, key = randomUUID();
     await assert.rejects(api.start(parent, child.id, input, key), (error: unknown) => error instanceof ApiError && error.code === 'ENTITLEMENT_REQUIRED');
     await recordVerifiedBillingFact(db, parent.family_id, period('paid-event'));
     const paidStatus = await api.billingStatus(parent);

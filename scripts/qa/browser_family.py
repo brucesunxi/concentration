@@ -53,6 +53,7 @@ def verify_candidate_is_served(base):
 def play_one_formal_step(page):
     page.get_by_role("button", name="Start today’s practice").click()
     invitation = page.get_by_role("dialog")
+    invitation.get_by_text("Please hand the screen to your child", exact=False).wait_for()
     assert "Please hand the screen to your child" in invitation.inner_text()
     invitation.get_by_label("Touch, mouse or keyboard").check()
     page.get_by_role("button", name="I want to start").click()
@@ -194,6 +195,74 @@ def verify_practice_limit_refresh(page):
         page.get_by_role("button", name="Today", exact=True).first.click()
 
 
+def verify_invitation_refresh_and_race(page):
+    snapshot = page.evaluate("""async () => {
+      const me = await (await fetch('/api/me')).json();
+      return (await (await fetch(`/api/children/${me.children[0].id}/practice-limits`)).json());
+    }""")
+    reads = 0
+    starts = []
+
+    def observe(request):
+        if request.method == "POST" and re.search(r"/api/children/[^/]+/sessions$", request.url):
+            starts.append(request.post_data_json)
+
+    def response(route):
+        nonlocal reads
+        reads += 1
+        value = dict(snapshot, timezone="UTC", day="2026-10-01", nextDay="2026-10-02", generatedAt="2026-10-01T23:59:58Z")
+        if reads >= 2:
+            value.update(day="2026-10-02", nextDay="2026-10-03", generatedAt="2026-10-02T00:00:01Z", currentMinutes=0, availableMs=0, status="paused")
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(value))
+
+    pattern = "**/api/children/*/practice-limits"
+    page.on("request", observe)
+    page.route(pattern, response)
+    try:
+        page.get_by_role("button", name="Start today’s practice").click()
+        dialog = page.get_by_role("dialog")
+        dialog.get_by_label("Touch, mouse or keyboard").check()
+        begin = dialog.get_by_role("button", name="I want to start")
+        expect(begin).to_be_enabled()
+        dialog.get_by_text("Your family has planned a rest day", exact=False).wait_for(timeout=10000)
+        expect(begin).to_be_disabled()
+        dialog.get_by_text("Your family’s plan has updated", exact=False).wait_for()
+        assert starts == [], "A day refresh must not decide to start for the child"
+        dialog.get_by_role("button", name="Not now", exact=True).click()
+    finally:
+        page.unroute(pattern, response)
+
+    try:
+        page.get_by_role("button", name="Start today’s practice").click()
+        dialog = page.get_by_role("dialog")
+        dialog.get_by_label("Touch, mouse or keyboard").check()
+        expect(dialog.get_by_role("button", name="I want to start")).to_be_enabled()
+        changed = page.evaluate("""async () => {
+          const me = await (await fetch('/api/me')).json();
+          const id = me.children[0].id;
+          const plan = await (await fetch(`/api/children/${id}/practice-limits`)).json();
+          const result = await fetch(`/api/children/${id}/practice-limits`, {method:'PATCH',
+            headers:{'Content-Type':'application/json','X-CSRF-Token':me.csrf,'If-Match':`"${plan.settingsVersion}"`},
+            body:JSON.stringify({minutes:3,effectiveDay:plan.nextDay,acknowledged:true})});
+          return result.status;
+        }""")
+        assert changed == 200
+        with page.expect_response(lambda item: re.search(r"/children/[^/]+/sessions$", item.url)) as rejected:
+            dialog.get_by_role("button", name="I want to start").click()
+        assert rejected.value.status == 409
+        page.get_by_text("Today’s plan has updated.", exact=False).wait_for()
+        assert len(starts) == 1 and starts[0]["practiceReview"]["version"] == "practice-start-review-1"
+        state = page.evaluate("""async () => {
+          const me = await (await fetch('/api/me')).json();
+          const report = await (await fetch(`/api/children/${me.children[0].id}/report`)).json();
+          return {role:me.role, records:report.sessions.length};
+        }""")
+        assert state == {"role": "parent", "records": 0}, "Rejected review must not create a practice or replace parent access"
+        print("PASS practice invitation: midnight rest blocks start; changed plan rejects the submitted old review without records or credential rotation")
+    finally:
+        page.remove_listener("request", observe)
+
+
 def verify_family_flow(browser, base):
     page = browser.new_page(viewport={"width": 1440, "height": 900}, locale="en-US", timezone_id="America/New_York")
     errors = []
@@ -220,6 +289,7 @@ def verify_family_flow(browser, base):
         page.set_viewport_size({"width": 1440, "height": 900})
 
         verify_practice_limit_refresh(page)
+        verify_invitation_refresh_and_race(page)
 
         page.locator(".task-card").nth(1).click()
         timed_invitation = page.get_by_role("dialog")
@@ -228,6 +298,7 @@ def verify_family_flow(browser, base):
         timed_invitation.get_by_role("button", name="Close").click()
         play_one_formal_step(page)
         page.get_by_role("button", name="Start today’s practice").click()
+        page.get_by_role("dialog").get_by_text("You have already practised today", exact=False).wait_for()
         invitation = page.get_by_role("dialog").inner_text()
         assert "You have already practised today" in invitation
         assert "there is no need to use the remaining time" in invitation

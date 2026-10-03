@@ -54,7 +54,7 @@
 | `GET /children/:id/life-goals` | 当前档案作用域 | 分龄模板、最多 20 个目标（含当前目标）、总数、采集状态、sharingPolicy；新增 contentPolicy、content、releases |
 | `POST /children/:id/life-goals` | intent、templateId、support、contentHash；Idempotency-Key | goal、replayed；家长 suggest / 孩子 choose |
 | `PATCH /children/:id/life-goals/:goalId` | action、对应字段；Idempotency-Key 和 If-Match | 当前 goal、replayed；冲突不覆盖 |
-| `POST /children/:id/sessions` | task、deviceId、environment；另带 Idempotency-Key | 准入复核后返回冻结计划、剩余任务预算、continuation_grant、绑定设备的儿童 Cookie/csrf 或原生 accessToken |
+| `POST /children/:id/sessions` | task、deviceId、environment、practiceReview；另带 Idempotency-Key | 准入和安排快照复核后返回冻结计划、剩余任务预算、continuation_grant、绑定设备的儿童 Cookie/csrf 或原生 accessToken |
 | `POST /children/:id/recovery` | 家长作用域，deviceId | 当前练习快照、最近 20 份独立历史、marketOpen、逐会话 mayResume 和未分配额度 |
 | `POST /children/:id/recovery/:sessionId/handover` | 最近家长验证、deviceId、acknowledged=true；If-Match 和 Idempotency-Key | 结束旧课程资格，保存交接来源；回执丢失可重试 |
 | `POST /children/:id/recovery/:sessionId/resume` | 最近家长验证，原 deviceId | 原安装/传输恢复，原子切换为孩子凭据，不延长授权 |
@@ -73,6 +73,8 @@
 | `DELETE /children/:id` | 最近家长验证 | 删除档案及关联数据库记录 |
 
 `task`：search / stop / memory / sustain；`ageBand`：6-8 / 9-11 / 12-14 / 15-17；`locale`：zh-CN / en。设备标识为随机 UUID，不是硬件指纹。观察 context 为 packing / tidying / reading / project，提醒次数为 0–20。
+
+`practiceReview` 版本为 `practice-start-review-1`，包含 `day`、`settingsVersion`、`ageBand`、`locale`、`currentMinutes`、`confirmedMs`、`reservedMs`、`availableMs`。两端从最新安排响应生成，语言取已选孩子的练习语言。在批准矩阵模式的新会话中必需，缺失返回 `428 PRACTICE_REVIEW_REQUIRED`；仅开发预览兼容缺失字段的旧客户端。创建时任一字段与服务端当前状态不符，返回 `409 PRACTICE_PLAN_CHANGED`，不新建会话或旋转凭据。同一幂等键需保留完整原请求；改变快照重用旧键返回 `IDEMPOTENCY_CONFLICT`。已准备会话的原样重试或匹配活动会话恢复不使用新快照改写原授权。这不是监护或孩子身份凭证。
 
 `residenceCountry` 是两位大写国家代码；缺省兼容旧本地客户端并记为虚构 `ZZ`。正式市场清单绝不批准 `ZZ`。原生注册在批准矩阵模式必须提供 `registrationPlatform=ios/android`；Web 注册只能提供 `web`。当前本地服务仅使用开发适配器，详见 [准入契约](RELEASE-SCOPE.md)。
 

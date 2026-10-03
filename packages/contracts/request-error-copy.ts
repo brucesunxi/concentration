@@ -20,6 +20,8 @@ const byCode: Record<string, readonly [string, string]> = {
   AGE_REVIEW_REQUIRED: ['请先由家长确认适合的年龄档。', 'A parent needs to review this child’s age band before new practice.'],
   CONSENT_REVOKED: ['这份档案已停止采集。', 'Data collection has stopped for this profile.'],
   PRACTICE_PAUSED: ['家庭已暂停新练习，可以休息或在生活中试试小策略。', 'Your family has paused new practice. You can rest or try a strategy away from the screen.'],
+  PRACTICE_PLAN_CHANGED: ['今天的安排已更新，请重新选择练习、查看说明后再决定是否开始。', 'Today’s plan has updated. Choose the practice again, review the instructions, then decide whether to begin.'],
+  PRACTICE_REVIEW_REQUIRED: ['请更新应用，并在查看今天的安排后自行选择是否开始。', 'Update the app, review today’s plan, then decide whether to begin.'],
   DAILY_LIMIT: ['今天的练习安排已足够，可以先休息。', 'Today’s practice allowance is complete. Take a break.'],
   SESSION_CONFLICT: ['这份档案在另一台设备有未结束的练习，请家长查看。', 'Another device has an unfinished practice. Ask a parent to review it.'],
   INPUT_CONDITION_CHANGED: ['这台设备有另一种操作方式的未结束练习，请先完成或处理原练习。', 'This device has unfinished practice in another input mode. Finish or review that practice first.'],
