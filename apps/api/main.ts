@@ -1,7 +1,7 @@
 import http from 'node:http';
 import { readFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
-import { randomUUID, timingSafeEqual } from 'node:crypto';
+import { timingSafeEqual } from 'node:crypto';
 import { ZodError } from 'zod';
 import { openDatabase, migrate } from './database.ts';
 import { service, ApiError } from './service.ts';
@@ -18,6 +18,7 @@ import { localReleaseScope } from './release-scope.ts';
 import { authClientFingerprint, authClientIp, authRateKind, takeAuthSlot } from './auth-rate-limit.ts';
 import { databaseEntitlementReader } from './billing-access.ts';
 import { requestQuery } from './request-query.ts';
+import { observeFamilyRequest, familyRequestLoggingEnabled } from './request-observation.ts';
 
 export async function createFamilyServer(options: { serverless?: boolean } = {}) {
 if (process.env.APP_MODE === 'production') throw new Error('Production release remains gated: verified guardian consent, OIDC, regional review, and operational validation are not yet complete.');
@@ -47,12 +48,14 @@ async function body(req: http.IncomingMessage) {
 function cookie(value: string, child = false) { return `focus_session=${value}; HttpOnly; SameSite=Strict; Path=/; Max-Age=${child ? 86400 : 28800}${options.serverless ? '; Secure' : ''}`; }
 const equal = (a: string, b: string) => { const aa = Buffer.from(a), bb = Buffer.from(b); return aa.length === bb.length && timingSafeEqual(aa, bb); };
 const server = http.createServer(async (req, res) => {
-  const requestId = randomUUID();
+  const observation = observeFamilyRequest(req, res, { enabled: familyRequestLoggingEnabled(!!options.serverless), errorsOnly: !options.serverless && process.env.FOCUS_HTTP_LOGS !== '0', source: options.serverless ? 'vercel' : 'standalone' });
+  observation.setVersion(sourceVersion);
+  const requestId = observation.requestId;
   res.setHeader('X-Request-ID', requestId); res.setHeader('X-Content-Type-Options', 'nosniff');
   res.setHeader('Referrer-Policy', 'same-origin'); res.setHeader('Cache-Control', 'no-store');
   res.setHeader('Permissions-Policy', 'camera=(), microphone=(), geolocation=()');
   res.setHeader('X-Frame-Options', 'DENY');
-  const json = (data: unknown, status = 200) => { res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
+  const json = (data: unknown, status = 200) => { if (status >= 400) observation.setFailure((data as { code?: unknown })?.code); res.writeHead(status, { 'Content-Type': 'application/json; charset=utf-8' }); res.end(JSON.stringify(data)); };
   try {
     const url = new URL(req.url || '/', `http://127.0.0.1:${port}`), method = req.method || 'GET';
     const hostname = (req.headers.host || '').split(':')[0];
@@ -190,7 +193,7 @@ const server = http.createServer(async (req, res) => {
     else if (error instanceof ProtocolError) json({ code: error.code, message: error.message, requestId }, 422);
     else if (error instanceof ContentError) json({ code: error.code, message: '这份练习内容暂时不可用，已停止继续使用。请回到家庭空间。', requestId }, 409);
     else if ((error as { code?: string }).code === 'ENOENT') json({ code: 'NOT_BUILT', message: '请先构建应用，或使用本地开发地址。', requestId }, 404);
-    else { console.error(JSON.stringify({ requestId, error: error instanceof Error ? error.name : 'UnknownError' })); json({ code: 'INTERNAL_ERROR', message: '暂时无法完成，请重试。', requestId }, 500); }
+    else json({ code: 'INTERNAL_ERROR', message: '暂时无法完成，请重试。', requestId }, 500);
   }
 });
 server.requestTimeout = 15000; server.headersTimeout = 10000;
