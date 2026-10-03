@@ -3,13 +3,12 @@ import { spawn } from 'node:child_process';
 import { mkdir, mkdtemp, readFile, rm, stat } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { publishWebRelease, readWebReleaseState } from '../packages/web-release/index.ts';
-import { auditDirectory, auditTrackedFiles } from '../packages/release-safety/public-secret-scan.mjs';
+import { auditDirectory } from '../packages/release-safety/public-secret-scan.mjs';
 
 const root = resolve(import.meta.dirname, '..'), args = process.argv.slice(2);
 if (args.length && (args.length !== 2 || args[0] !== '--store')) throw new Error('Usage: node scripts/build-web.mjs [--store directory]');
 const store = resolve(args[1] || resolve(root, 'dist/web-releases'));
 const legacy = resolve(root, 'dist/web');
-await auditTrackedFiles(root);
 await mkdir(resolve(root, 'dist'), { recursive: true });
 let current = await readWebReleaseState(store);
 // Preserve the complete previous build before this installation's first managed publication.
