@@ -1,7 +1,7 @@
 import type { FamilyBillingStatus } from '../contracts/family-billing.ts';
 import type { Locale } from '../task-engine/index.ts';
 
-export function familyBillingCopy(locale: Locale, status?: FamilyBillingStatus) {
+export function familyBillingCopy(locale: Locale, status?: FamilyBillingStatus, timeZone?: string) {
   const en = locale === 'en';
   const title = en ? 'Family access' : '家庭使用状态';
   const rights = en ? 'Your saved records, export, and deletion remain available regardless of purchase status.' : '无论购买状态如何，已有记录、导出和删除入口都会保留。';
@@ -16,7 +16,10 @@ export function familyBillingCopy(locale: Locale, status?: FamilyBillingStatus) 
     refunded: [en ? 'Purchase was refunded' : '购买已退款', en ? 'The verified purchase no longer grants new paid access. Check the purchase channel for refund details.' : '已核验的购买不再提供新的付费使用权限；退款详情请查看购买渠道。'],
   } as const;
   const [heading, detail] = messages[status.state];
-  const until = status.validUntil ? `${en ? 'Current access through' : '当前使用期至'} ${new Date(status.validUntil).toLocaleDateString(locale)}.` : null;
+  // Entitlements end at this exact instant; a date alone can imply an extra day.
+  const until = status.validUntil ? `${en ? 'Access expires at' : '使用权限将于'} ${new Intl.DateTimeFormat(locale, {
+    year: 'numeric', month: 'short', day: 'numeric', hour: 'numeric', minute: '2-digit', timeZoneName: 'short', timeZone,
+  }).format(new Date(status.validUntil))}${en ? '.' : ' 到期。'}` : null;
   const renewal = status.autoRenew === null ? null : status.autoRenew
     ? en ? 'The channel currently reports automatic renewal as on. Confirm the terms in your purchase account.' : '渠道当前记录为自动续费开启；具体条款请在购买账号中确认。'
     : en ? 'The channel currently reports automatic renewal as off. Your current period remains available until its end.' : '渠道当前记录为自动续费关闭；当前使用期仍可持续至到期。';
