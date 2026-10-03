@@ -1,4 +1,4 @@
-import { cp, mkdir, mkdtemp, access, readFile, readdir, lstat, writeFile } from 'node:fs/promises';
+import { cp, mkdir, mkdtemp, access, readFile, readdir, lstat, statfs, writeFile } from 'node:fs/promises';
 import { createHash } from 'node:crypto';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
@@ -8,6 +8,22 @@ import { tmpdir } from 'node:os';
 // An ASCII path avoids legacy Ruby tool failures with the source directory's
 // invisible character. Only this allowlist is copied: no .env or family data.
 const root = fileURLToPath(new URL('../', import.meta.url));
+const checkSpaceOnly = process.argv.length === 3 && process.argv[2] === '--check-space';
+if (process.argv.length > 2 && !checkSpaceOnly) {
+  throw new Error('Usage: npm run mobile:prepare-build [-- --check-space]');
+}
+const minimumFreeGiB = 10;
+const freeSpace = await statfs(tmpdir(), { bigint: true });
+const availableBytes = freeSpace.bavail * freeSpace.bsize;
+const minimumBytes = BigInt(minimumFreeGiB) * 1024n ** 3n;
+const availableGiB = Number((availableBytes * 100n) / (1024n ** 3n)) / 100;
+if (checkSpaceOnly) {
+  console.log(JSON.stringify({ temporaryDirectory: tmpdir(), availableGiB, minimumFreeGiB, ready: availableBytes >= minimumBytes }, null, 2));
+  process.exit(0);
+}
+if (availableBytes < minimumBytes) {
+  throw new Error(`Native build preparation needs at least ${minimumFreeGiB} GiB free in ${tmpdir()} (${availableGiB} GiB available). Review old build directories before retrying; this command will not remove them.`);
+}
 await access(join(root, 'node_modules'));
 const target = await mkdtemp(join(tmpdir(), 'focus-native-build-'));
 await mkdir(join(target, 'apps/family-mobile'), { recursive: true });

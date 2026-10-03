@@ -118,6 +118,8 @@ npm run mobile:bundle
 npm run mobile:prepare-build
 ```
 
+先用 `npm run mobile:prepare-build -- --check-space` 可只读查看临时盘可用空间，不创建构建目录。准备命令要求临时盘至少剩余 10 GiB；不足时会在创建目录前停止，且不会自动删除已有目录。这个下限只用于避免在空间明显不足时开工，并不保证完整的 iOS/Android 构建一定有足够空间。构建完成后，确认产物和源码归档已另行保存，再人工检查并清理不再使用的临时目录。
+
 命令返回临时目录及 `.focus-native-source.json` 源码快照，只复制明确列出的源码、锁文件和已安装依赖，不复制 `.env`、家庭数据库、签名私钥、缓存或已生成 iOS/Android 工程。快照记录产品版本、原生壳版本及每份源码的字节数和 SHA-256。进入返回的目录后执行：
 
 ```sh
