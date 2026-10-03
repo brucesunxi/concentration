@@ -1,5 +1,6 @@
 """Isolated browser acceptance for a real family flow, using fictional data only."""
 
+import json
 import os
 import re
 import shutil
@@ -11,7 +12,7 @@ import urllib.error
 import urllib.request
 from pathlib import Path
 
-from playwright.sync_api import sync_playwright
+from playwright.sync_api import expect, sync_playwright
 
 
 ROOT = Path(__file__).resolve().parents[2]
@@ -39,6 +40,14 @@ def wait_for_server(server, base):
         except (urllib.error.URLError, TimeoutError):
             time.sleep(0.2)
     raise TimeoutError("Local family service did not become ready")
+
+
+def verify_candidate_is_served(base):
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+    with opener.open(base + "/index.html", timeout=10) as response:
+        received = response.read()
+    expected = (ROOT / "dist/web/index.html").read_bytes()
+    assert received == expected, "Browser acceptance must serve the newly built candidate rather than a retained release"
 
 
 def play_one_formal_step(page):
@@ -120,6 +129,71 @@ def check_assistive_memory_focus(page):
     page.get_by_role("button", name="Done, time for a break").click()
 
 
+def verify_practice_limit_refresh(page):
+    snapshot = page.evaluate("""async () => {
+      const me = await (await fetch('/api/me')).json();
+      return (await (await fetch(`/api/children/${me.children[0].id}/practice-limits`)).json());
+    }""")
+    reads = 0
+    writes = 0
+
+    def response(route):
+        nonlocal reads, writes
+        if route.request.method != "GET":
+            writes += 1
+            route.continue_()
+            return
+        reads += 1
+        if reads == 3:
+            route.abort()
+            return
+        value = dict(snapshot, timezone="UTC", day="2026-10-01", nextDay="2026-10-02", generatedAt="2026-10-01T12:00:00Z")
+        if reads >= 2:
+            value.update(confirmedMs=60000, availableMs=420000)
+        if reads == 5:
+            value["generatedAt"] = "2026-10-01T23:59:58Z"
+        if reads >= 6:
+            value.update(day="2026-10-02", nextDay="2026-10-03", generatedAt="2026-10-02T00:00:01Z", confirmedMs=0, availableMs=480000)
+        route.fulfill(status=200, content_type="application/json", body=json.dumps(value))
+
+    pattern = "**/api/children/*/practice-limits"
+    page.route(pattern, response)
+    try:
+        page.get_by_role("button", name="Practice & rest", exact=True).first.click()
+        maximum = page.get_by_label("New daily maximum")
+        confirmation = page.get_by_label("I understand the effective date and will discuss the plan with my child.")
+        save = page.get_by_role("button", name="Save future plan")
+        maximum.select_option("2")
+        confirmation.check()
+        expect(save).to_be_enabled()
+        with page.expect_response(lambda item: "/practice-limits" in item.url):
+            page.evaluate("window.dispatchEvent(new Event('focus'))")
+        expect(save).to_be_enabled()
+        expect(maximum).to_have_value("2")
+        expect(confirmation).to_be_checked()
+        page.evaluate("window.dispatchEvent(new Event('focus'))")
+        page.get_by_text("The latest plan could not be confirmed.", exact=False).wait_for()
+        expect(maximum).to_have_value("2")
+        expect(confirmation).to_be_checked()
+        expect(save).to_be_disabled()
+        page.get_by_role("button", name="Refresh today’s status").click()
+        expect(save).to_be_enabled()
+        expect(maximum).to_have_value("2")
+        with page.expect_response(lambda item: "/practice-limits" in item.url):
+            page.evaluate("window.dispatchEvent(new Event('focus'))")
+        expect(save).to_be_enabled()
+        page.get_by_text("Family date 2026-10-02 · UTC", exact=True).wait_for(timeout=10000)
+        expect(confirmation).not_to_be_checked()
+        expect(maximum).to_have_value("8")
+        expect(save).to_be_disabled()
+        assert reads >= 6, "The family midnight did not trigger a new read"
+        assert writes == 0, "Refreshing must never submit an unsaved family arrangement"
+        print("PASS practice plan refresh: foreground and transient failure keep unsaved choice; stale data blocks saving; server family midnight clears old acknowledgement; no automatic write")
+    finally:
+        page.unroute(pattern, response)
+        page.get_by_role("button", name="Today", exact=True).first.click()
+
+
 def verify_family_flow(browser, base):
     page = browser.new_page(viewport={"width": 1440, "height": 900}, locale="en-US", timezone_id="America/New_York")
     errors = []
@@ -144,6 +218,8 @@ def verify_family_flow(browser, base):
         page.get_by_role("button", name="Start today’s practice").wait_for(timeout=10000)
         assert page.evaluate("document.body.scrollWidth <= innerWidth"), "Practice selection overflows a 320px viewport"
         page.set_viewport_size({"width": 1440, "height": 900})
+
+        verify_practice_limit_refresh(page)
 
         page.locator(".task-card").nth(1).click()
         timed_invitation = page.get_by_role("dialog")
@@ -232,10 +308,12 @@ def main():
         for name in list(env):
             if name.startswith(("FOCUS_", "VERCEL")) or name.startswith("DATABASE_"):
                 env.pop(name)
-        env.update({"APP_MODE": "local", "DATABASE_URL": "", "API_PORT": str(port), "STUDIO_PORT": "0", "FOCUS_DATA_DIR": data_dir})
+        env.update({"APP_MODE": "local", "DATABASE_URL": "", "API_PORT": str(port), "STUDIO_PORT": "0", "FOCUS_DATA_DIR": data_dir,
+                    "FOCUS_WEB_RELEASE_DIR": str(Path(data_dir) / "unused-web-releases")})
         server = subprocess.Popen([shutil.which("node") or "node", "apps/api/main.ts"], cwd=ROOT, env=env, stdout=subprocess.DEVNULL, stderr=subprocess.PIPE, text=True)
         try:
             wait_for_server(server, base)
+            verify_candidate_is_served(base)
             with sync_playwright() as playwright:
                 launch = {"headless": True, "args": ["--no-sandbox"]}
                 if os.environ.get("FOCUS_BROWSER_PATH"):

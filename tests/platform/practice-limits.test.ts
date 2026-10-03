@@ -13,6 +13,7 @@ import { nextFamilyDay } from '../../packages/session-runtime/day-boundary.ts';
 import { PracticeLimitClient } from '../../packages/session-runtime/practice-limit-client.ts';
 import type { PracticeLimits } from '../../packages/contracts/practice-limits.ts';
 import { practiceInvitationDay } from '../../packages/contracts/practice-invitation.ts';
+import { practiceLimitFormIdentity, practiceLimitsRefreshDelay } from '../../packages/session-runtime/practice-limit-refresh.ts';
 let db: Database, api: FocusService, catalogue: Awaited<ReturnType<typeof createLocalContent>>, authority: Awaited<ReturnType<typeof createSessionAuthority>>;
 const base = Date.parse('2026-10-01T08:00:00Z'); let clock = base;
 const denied = (code: string) => (error: unknown) => error instanceof ApiError && error.code === code;
@@ -152,4 +153,52 @@ test('client protects pending writes, clears stale conflict and unknown results,
   assert.deepEqual(input, { minutes: 2, acknowledged: true, effectiveDay: '2026-10-02' }); assert.deepEqual(headers, { 'If-Match': '"1"' });
   reject(new Error('lost response')); await pending; assert.equal(c.state.data, null); assert.equal(c.state.saved, false); assert.equal(c.state.error, 'RESULT_UNCONFIRMED');
   await c.load(); const conflict = c.save(3); reject({ code: 'LIMIT_VERSION_CONFLICT' }); await conflict; assert.equal(c.state.data, null); assert.equal(c.state.error, 'LIMIT_VERSION_CONFLICT');
+});
+
+test('automatic reads preserve drafts through a transient failure, block unconfirmed writes, and clear revoked or mismatched snapshots', async () => {
+  let reply!: (value: PracticeLimits) => void, fail!: (error: unknown) => void, waiting = false, writes = 0;
+  const c = new PracticeLimitClient(snapshot.childId, true, async <T>(_path: string, method?: string) => {
+    if (method) { writes++; return snapshot as T; }
+    if (!waiting) return snapshot as T;
+    return new Promise<T>((resolve, reject) => { reply = value => resolve(value as T); fail = reject; });
+  }, () => {});
+  await c.load(); waiting = true;
+  const refreshing = c.refresh();
+  assert.equal(c.state.data, snapshot); assert.equal(c.state.refreshing, true); assert.equal(c.state.busy, true);
+  await c.save(2); await c.refresh(); assert.equal(writes, 0);
+  reply({ ...snapshot, confirmedMs: 60000, availableMs: 420000 }); await refreshing;
+  assert.equal(c.state.refreshing, false); assert.equal(c.state.busy, false); assert.equal(c.state.data?.confirmedMs, 60000);
+  const rejected = c.refresh(); fail({ code: 'UNAUTHENTICATED' }); await rejected;
+  assert.equal(c.state.data, null); assert.equal(c.state.needsParent, true);
+  waiting = false; await c.load(); waiting = true;
+  const lost = c.refresh(); fail(new Error('network unavailable')); await lost;
+  assert.equal(c.state.data, snapshot); assert.equal(c.state.stale, true); assert.equal(c.state.needsParent, false); assert.equal(c.state.error, 'LOAD_FAILED');
+  await c.save(2); assert.equal(writes, 0, 'A retained snapshot cannot authorize a write');
+  const recovered = c.refresh(); reply(snapshot); await recovered; assert.equal(c.state.stale, false);
+  const mismatch = c.refresh(); reply({ ...snapshot, childId: 'wrong' }); await mismatch; assert.equal(c.state.data, null); assert.equal(c.state.stale, false);
+  const leaving = c.refresh(); c.dispose(); const before = c.state; reply(snapshot); await leaving;
+  assert.equal(c.state, before, 'A response after leaving cannot restore the profile');
+});
+
+test('automatic reads use the server family midnight across DST and non-hour offsets, with bounded retries', () => {
+  for (const [timezone, generatedAt, expected] of [
+    ['America/New_York', '2026-03-09T03:59:50Z', 10250], // 23-hour day
+    ['America/New_York', '2026-11-02T04:59:50Z', 10250], // 25-hour day
+    ['Asia/Kathmandu', '2026-10-01T18:14:59Z', 1250],
+    ['Asia/Shanghai', '2026-10-01T15:59:59.999Z', 1000],
+  ] as const) assert.equal(practiceLimitsRefreshDelay({ ...snapshot, timezone, generatedAt }), expected);
+  assert.equal(practiceLimitsRefreshDelay(snapshot), 300000);
+  assert.equal(practiceLimitsRefreshDelay(null), 60000);
+  assert.equal(practiceLimitsRefreshDelay({ ...snapshot, generatedAt: 'invalid' }), 60000);
+  assert.equal(practiceLimitsRefreshDelay({ ...snapshot, timezone: 'invalid' }), 60000);
+});
+
+test('budget-only refresh preserves a form acknowledgement; calendar, scope or settings changes invalidate it', () => {
+  const original = practiceLimitFormIdentity(snapshot);
+  assert.equal(practiceLimitFormIdentity({ ...snapshot, generatedAt: '2026-10-01T09:00:00Z', confirmedMs: 10000, reservedMs: 10000, availableMs: 460000, status: 'reserved' }), original);
+  for (const change of [
+    { day: '2026-10-02', nextDay: '2026-10-03' }, { settingsVersion: 2 }, { currentMinutes: 4 },
+    { next: { minutes: 2, day: snapshot.nextDay } }, { collectionActive: false }, { childId: 'another-child' }, { timezone: 'Asia/Shanghai' },
+  ]) assert.notEqual(practiceLimitFormIdentity({ ...snapshot, ...change }), original);
+  assert.equal(practiceLimitFormIdentity(null), null);
 });
