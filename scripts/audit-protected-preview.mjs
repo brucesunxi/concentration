@@ -195,11 +195,20 @@ try {
       const rows = Array.isArray(report.value?.sessions) ? report.value.sessions : [];
       throw new Error(`SYNTHETIC_REPORT_MISSING_${report.status}_${report.value?.code ?? 'NO_CODE'}_ROWS_${rows.length}_MATCH_${rows.some(item => item.id === started.value.id)}_COMPLETE_${rows.some(item => item.result?.completed === true)}`);
     }
+    const exported = await call(`/children/${child.value.id}/export`, 'GET', undefined, webAuth(parentAgain));
+    if (exported.status !== 200 || exported.value?.schemaVersion !== 2 || exported.value?.child?.id !== child.value.id ||
+        !exported.value?.sessions?.some(item => item.id === started.value.id) ||
+        !exported.value?.events?.some(item => item.sessionId === started.value.id) ||
+        !/^cache-control:\s*no-store\s*$/im.test(exported.headers) ||
+        !/^content-disposition:\s*attachment; filename="focus-family-records.json"\s*$/im.test(exported.headers) ||
+        /"(?:password_hash|token_hash|accessToken|csrf|request_key|request_hash|device_id)"\s*:/.test(JSON.stringify(exported.value))) {
+      throw new Error('SYNTHETIC_CHILD_EXPORT_FAILED');
+    }
     if (await removeSyntheticFamily()) await unlink(pending);
     const revoked = await call('/me', 'GET', undefined, original);
     if (revoked.status !== 401 || revoked.value?.code !== 'UNAUTHENTICATED') throw new Error('SYNTHETIC_SESSION_STILL_ACTIVE');
     verifyAliasUnchanged(await deploymentInfo(), deployed.deploymentId);
-    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', deploymentId: deployed.deploymentId, commit: deployed.commit, databaseReady: true, webShellVerified: true, webShellBytes, familyCreated: true, childRead: true, billingPreviewRead: true, signedMediaVerified: true, recalledMediaRejected: true, practiceFinalized: true, parentReportRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
+    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', deploymentId: deployed.deploymentId, commit: deployed.commit, databaseReady: true, webShellVerified: true, webShellBytes, familyCreated: true, childRead: true, billingPreviewRead: true, signedMediaVerified: true, recalledMediaRejected: true, practiceFinalized: true, parentReportRead: true, childExportRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
   }
 } catch (error) {
   if (credentials && !cleanupOnly) {

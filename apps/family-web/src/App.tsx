@@ -264,7 +264,7 @@ export function App() {
     if (!child || !me) return;
     const childId=child.id,familyId=me.family.id,identity=accessVersion.current;
     await safely(async () => {
-      const data = await request<{child:{id:string}}>(`/children/${childId}/export`);
+      const data = await request<{child:{id:string}}>(`/children/${childId}/export`, 'GET', undefined, {}, { timeoutMs: 120000 });
       if(data.child.id!==childId || identity!==accessVersion.current)throw new Error(t('家庭状态已改变，请重新打开档案后导出。','The family space changed. Reopen this profile before exporting.'));
       let records:Awaited<ReturnType<ReturnType<typeof journal>['exportChild']>>|null=null;
       try{records=await journal().exportChild(familyId,childId);}
@@ -272,7 +272,7 @@ export function App() {
       if(identity!==accessVersion.current)throw new Error(t('家庭状态已改变，请重新打开档案后导出。','The family space changed. Reopen this profile before exporting.'));
       const combined={...data,localRecovery:{scope:'this-browser-only',capturedAt:new Date().toISOString(),status:records===null?'unavailable':records.length?'included':'none',records:records??[]}};
       let serialized:string;
-      try{serialized=serializeChildExport(combined,childId);}
+      try{serialized=serializeChildExport(combined,childId,50_000_000);}
       catch(error){throw new Error(error instanceof Error&&error.message==='EXPORT_TOO_LARGE'
         ?t('记录超过单次导出大小限制，文件尚未生成。请保留原设备资料，待支持分批导出后再试。','The records exceed the single-export size limit. No file was created. Keep the original device data until split exports are available.')
         :t('档案导出未通过完整性或隐私检查，文件尚未生成。请稍后再试。','The export failed its format or privacy check. No file was created. Please retry later.'));}

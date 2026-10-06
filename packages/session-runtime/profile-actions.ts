@@ -1,4 +1,5 @@
 import { isNetworkFailure } from './offline-session.ts';
+import { forbiddenExportFields } from './export-safety.ts';
 
 export type ProfileAction = 'export' | 'withdraw' | 'delete';
 export type ExportDelivery = 'saved' | 'share-sheet-closed' | 'cancelled';
@@ -51,13 +52,12 @@ export async function performProfileAction(action: ProfileAction, familyId: stri
   return { action, serverConfirmed: true, localCleared, delivery: undefined };
 }
 
-export function serializeChildExport(data: unknown, childId: string) {
+export function serializeChildExport(data: unknown, childId: string, maxCharacters = 10_000_000) {
   const value = data as { schemaVersion?: number; child?: { id?: string }; sessions?: unknown; events?: unknown; observations?: unknown; confirmations?: unknown; verifiedConsents?: unknown } | null;
   if (!value || ![1,2].includes(value.schemaVersion ?? 0) || value.child?.id !== childId ||
     ![value.sessions,value.events,value.observations,value.confirmations].every(Array.isArray) ||
     (value.schemaVersion === 2 && !Array.isArray(value.verifiedConsents))) throw new Error('EXPORT_FORMAT_INVALID');
-  const forbidden = new Set(['password_hash','token_hash','accessToken','csrf','request_key','request_hash','device_id']);
-  const text = JSON.stringify(value, (key, entry) => { if (forbidden.has(key)) throw new Error('EXPORT_CONTAINS_PRIVATE_CREDENTIALS'); return entry; }, 2);
-  if (text.length > 10_000_000) throw new Error('EXPORT_TOO_LARGE');
+  const text = JSON.stringify(value, (key, entry) => { if (forbiddenExportFields.has(key)) throw new Error('EXPORT_CONTAINS_PRIVATE_CREDENTIALS'); return entry; }, 2);
+  if (text.length > maxCharacters) throw new Error('EXPORT_TOO_LARGE');
   return text;
 }

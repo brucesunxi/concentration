@@ -78,4 +78,6 @@ test('the export serializer rejects other children and nested credential fields'
   const localRecovery = { scope: 'this-browser-only', status: 'included', records: [{ sessionId: 'session-a', events: [{ id: 'event-a', seq: 1, at: 1 }] }] };
   assert.deepEqual(JSON.parse(serializeChildExport({ ...exported, localRecovery }, 'child-a')).localRecovery, localRecovery);
   assert.throws(() => serializeChildExport({ ...exported, localRecovery: { records: [{ events: [{ device_id: 'secret' }] }] } }, 'child-a'), /EXPORT_CONTAINS_PRIVATE_CREDENTIALS/);
+  assert.throws(() => serializeChildExport({ ...exported, observations: [{ note: 'long' }] }, 'child-a', 100), /EXPORT_TOO_LARGE/);
+  assert.doesNotThrow(() => serializeChildExport({ ...exported, observations: [{ note: 'long' }] }, 'child-a', 1000));
 });

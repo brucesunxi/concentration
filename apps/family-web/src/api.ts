@@ -17,7 +17,7 @@ function accountAccessEnded(outcome: AccountAccessOutcome, deletingFamily?: Dele
   }
 }
 export class RequestError extends Error { code: string; status: number; requestId: string | null; constructor(message: string, code: string, status: number, requestId: string | null = null) { super(message); this.code = code; this.status = status; this.requestId = requestId; } }
-export async function request<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}, options?: { deletingFamily?: DeletedFamily }): Promise<T> {
+export async function request<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}, options?: { deletingFamily?: DeletedFamily; timeoutMs?: number }): Promise<T> {
   const accountChange=(method==='POST' && /^\/auth\/(change-password|logout-all)$/.test(path)) || (method==='DELETE' && path==='/family');
   const deletingFamily=method==='DELETE'&&path==='/family'?options?.deletingFamily:undefined;
   if(method==='DELETE'&&path==='/family'&&!deletingFamily)throw new Error('LOCAL_DELETION_CONTEXT_REQUIRED');
@@ -31,7 +31,7 @@ export async function request<T>(path: string, method = 'GET', data?: unknown, h
     else await journal().invalidate();
   }
   if(method!=='GET'&&!csrf&&!/^\/auth\/(login|setup|join)$/.test(path))await request('/me');
-  const signal = AbortSignal.timeout(12000);
+  const signal = AbortSignal.timeout(options?.timeoutMs ?? 12000);
   const res = await fetch('/api' + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal }).catch(()=>{if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily);throw new NetworkUnavailable();});
   const requestId = validRequestReference(res.headers.get('X-Request-ID'));
   const unreadable = () => { if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily); return new RequestError('The service reply could not be confirmed.', 'RESPONSE_UNREADABLE', res.status, requestId); };

@@ -98,6 +98,9 @@ test('family life goals survive restart and enforce choice, version, transport, 
     assert.equal((await call(`/children/${child.id}/withdraw`, { ...unlocked, method: 'POST', data: {} })).response.status, 200);
     assert.equal((await call(path, nativeChild)).response.status, 401); assert.equal((await call(path, scope)).response.status, 401);
     const exported = await call(`/children/${child.id}/export`, unlocked);
+    assert.match(exported.response.headers.get('transfer-encoding') ?? '', /chunked/);
+    assert.equal(exported.response.headers.get('content-length'), null);
+    assert.equal(exported.response.headers.get('cache-control'), 'no-store');
     assert.equal(exported.body.life.goals.length, 2); assert.equal(exported.body.life.actions.length, 6);
     assert.equal(exported.body.life.goals.find(g => g.id === next.body.goal.id).closedReason, 'withdrawn');
     for (const field of ['request_key', 'request_hash', 'accessToken', 'csrf']) assert.equal(JSON.stringify(exported.body).includes(field), false);

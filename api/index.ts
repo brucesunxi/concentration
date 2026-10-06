@@ -13,7 +13,12 @@ export default async function handler(request: http.IncomingMessage, response: h
     });
     const runtime = await ready;
     observation.runtimeReady();
-    runtime.emit('request', request, response);
+    await new Promise<void>(resolve => {
+      if (response.writableFinished || response.destroyed) { resolve(); return; }
+      response.once('finish', resolve);
+      response.once('close', resolve);
+      runtime.emit('request', request, response);
+    });
   } catch {
     observation.setFailure('SERVICE_UNAVAILABLE');
     if (!response.headersSent) {
