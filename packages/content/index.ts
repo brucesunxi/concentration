@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import {assessNarration} from './narration-readiness.ts';
 
 export const canonical = (value: unknown): string => JSON.stringify(value, (_, v) => v && typeof v === 'object' && !Array.isArray(v) ? Object.fromEntries(Object.keys(v).sort().map(k => [k, v[k]])) : v);
 const utf8 = (value: unknown) => new TextEncoder().encode(canonical(value));
@@ -81,9 +82,9 @@ export async function verifyRelease(raw: unknown, trusted: TrustedKey[], options
     else check(!body.markets.includes('LOCAL'),'REVIEW_INCOMPLETE');
     check(body.pack.review === 'approved' && body.pack.assets.every(a => a.review === 'approved'), 'REVIEW_INCOMPLETE');
     if (body.channel === 'published') {
-      const narration = body.pack.assets.find(a => a.id === body.pack.audio?.assetId);
-      check(body.pack.audio && narration?.mime === 'audio/mpeg' && narration.voice, 'AUDIO_COVERAGE_REQUIRED');
-      check(body.pack.audio?.copyKey === 'rule', 'RULE_NARRATION_REQUIRED');
+      const narration=assessNarration(body.pack);
+      check(narration.attached&&narration.voiceIdentified, 'AUDIO_COVERAGE_REQUIRED');
+      check(narration.ruleAttached, 'RULE_NARRATION_REQUIRED');
     }
     const identities = new Set<string>(), roles = new Set<string>();
     for (const approval of body.approvals) {

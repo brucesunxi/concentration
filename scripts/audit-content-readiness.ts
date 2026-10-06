@@ -2,6 +2,7 @@ import { writeFile } from 'node:fs/promises';
 import { openDatabase, migrate } from '../apps/api/database.ts';
 import { createLocalContent } from '../apps/api/content.ts';
 import { verifyRelease, verifyAsset } from '../packages/content/index.ts';
+import {assessNarration} from '../packages/content/narration-readiness.ts';
 import type { ContentPack, Release } from '../packages/content/index.ts';
 import { TASKS } from '../packages/task-engine/index.ts';
 import type { AgeBand, Locale } from '../packages/task-engine/index.ts';
@@ -38,9 +39,10 @@ try {
   for (const ageBand of ages) for (const locale of languages) for (const task of TASKS) {
     const slot = `${task}:${ageBand}:${locale}`, row = bySlot.get(slot);
     const pack: ContentPack | undefined = row?.envelope.body.pack;
-    const narrationAsset = pack?.assets.find(a => a.id === pack.audio?.assetId);
-    const audioAttached = !!(pack?.audio && narrationAsset?.mime === 'audio/mpeg' && narrationAsset.transcript === pack.copy[pack.audio.copyKey]);
-    const ruleNarrationAttached = audioAttached && pack?.audio?.copyKey === 'rule';
+    const narration=pack?assessNarration(pack):null;
+    const narrationAsset=narration?.asset;
+    const audioAttached=narration?.attached??false;
+    const ruleNarrationAttached=narration?.ruleAttached??false;
     const issues = [
       ...(!row ? ['CONTENT_MISSING'] : []),
       ...(row && (row.state !== 'active' || row.envelope.body.channel !== 'published') ? ['NOT_PUBLISHED'] : []),
@@ -48,13 +50,13 @@ try {
       ...(pack?.assets.some(a => a.review !== 'approved') ? ['MEDIA_REVIEW_PENDING'] : []),
       ...(!audioAttached ? ['FIXED_AUDIO_MISSING'] : []),
       ...(audioAttached && !ruleNarrationAttached ? ['RULE_NARRATION_MISSING'] : []),
-      ...(audioAttached && !narrationAsset?.voice ? ['VOICE_ID_MISSING'] : []),
+      ...(audioAttached && !narration?.voiceIdentified ? ['VOICE_ID_MISSING'] : []),
       ...(row?.envelope.body.markets.includes('LOCAL') ? ['LOCAL_MARKET_ONLY'] : []),
     ];
     rows.push({ slot, ageBand, locale, task, contentId:pack?.id ?? null, contentVersion:pack?.version ?? null,
       contentHash:row?.envelope.body.packHash ?? null, channel:row?.envelope.body.channel ?? null,
       requiredNarrationKind:'rule', requiredNarrationText:pack?.copy.rule ?? null,
-      attachedCopyKey:pack?.audio?.copyKey ?? null,
+      attachedCopyKey:narration?.copyKey ?? null,
       audioAttached, ruleNarrationAttached, audioSha256:audioAttached ? narrationAsset?.sha256 ?? null : null,
       voice:audioAttached ? narrationAsset?.voice ?? null : null, issues });
   }

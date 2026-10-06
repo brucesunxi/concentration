@@ -12,6 +12,7 @@ import type { Release, TrustedKey } from '../../packages/content/index.ts';
 import { service } from '../../apps/api/service.ts';
 import { TASKS, TEST_ENVIRONMENT } from '../../packages/task-engine/index.ts';
 import { contentNarration } from '../../packages/content/voice-catalogue.ts';
+import {assessNarration} from '../../packages/content/narration-readiness.ts';
 import { completeEvents } from './fixtures.ts';
 import { reconcile } from '../../apps/family-web/src/journal.ts';
 import { nativeVerifier } from '../../packages/content/native-verifier.ts';
@@ -92,6 +93,23 @@ test('every age, task and language has an exact fixed narration without changing
         if (narration.existing) old++; else added++;
       }
   assert.deepEqual({ old, added }, { old: 6, added: 26 });
+});
+test('one narration assessment drives the source inventory, studio warning and publication requirement',async()=>{
+  const counts={rule:0,strategy:0};
+  for(const age of ['6-8','9-11','12-14','15-17'] as const)
+    for(const locale of ['zh-CN','en'] as const)
+      for(const task of TASKS){
+        const pack=(await content.get((await content.pick(task,age,locale)).sha256)).body.pack;
+        const status=assessNarration(pack);
+        assert.equal(status.attached,true);
+        assert.equal(status.voiceIdentified,true);
+        if(status.ruleAttached)counts.rule++;else {counts.strategy++;assert.equal(task,'stop');assert.equal(status.copyKey,'strategy');}
+      }
+  assert.deepEqual(counts,{rule:24,strategy:8});
+  const missing=structuredClone(preview.body.pack);delete missing.audio;
+  assert.equal(assessNarration(missing).attached,false);
+  const unattributed=structuredClone(preview.body.pack);delete unattributed.assets.find(a=>a.id===unattributed.audio?.assetId)!.voice;
+  assert.equal(assessNarration(unattributed).voiceIdentified,false);
 });
 test('tampered payloads and unknown signing keys fail verification', async () => {
   const altered = structuredClone(preview); altered.body.pack.copy.title = 'Altered title';
