@@ -12,7 +12,7 @@ export async function processMedia(kind:MediaMetadata['kind'],input:Buffer):Prom
     const child=spawn(process.execPath,[fileURLToPath(new URL('./media-worker.ts',import.meta.url)),kind],{stdio:['pipe','pipe','pipe']});
     let size=0,done=false;const chunks:Buffer[]=[];
     const fail=(code:string,status=422)=>{if(done)return;done=true;clearTimeout(timer);child.kill('SIGKILL');try{studioFail(status,code,mediaError(code));}catch(e){reject(e);}};
-    const timer=setTimeout(()=>fail('MEDIA_PROCESSOR_TIMEOUT',503),25000);
+    const timer=setTimeout(()=>fail('MEDIA_PROCESSOR_TIMEOUT',503),45000);
     child.stdout.on('data',(b:Buffer)=>{size+=b.length;if(size>8*1024*1024)fail('MEDIA_OUTPUT_TOO_LARGE');else chunks.push(b);});
     child.stderr.resume();child.stdin.on('error',()=>{});
     child.once('error',()=>fail('MEDIA_PROCESSOR_UNAVAILABLE',503));
@@ -27,6 +27,6 @@ export async function processMedia(kind:MediaMetadata['kind'],input:Buffer):Prom
   });}finally{active--;}
 }
 export function mediaError(code:string){
-  const messages:Record<string,string>={MEDIA_PROCESSOR_UNAVAILABLE:'本机媒体检查工具不可用，请配置 FFmpeg 后重试。',MEDIA_PROCESSOR_TIMEOUT:'媒体检查超时，请保留文件稍后重试。',MEDIA_ATLAS_DIMENSIONS:'图片须为 256–2048 像素的正方形静态 PNG，边长为偶数，四格各占一半。',MEDIA_INVALID_IMAGE:'图片无法完整解码，请重新导出静态 PNG。',MEDIA_INVALID_AUDIO:'声音无法完整解码，请重新导出有效 MP3。',MEDIA_AUDIO_DURATION:'规则声音须为 0.2–120 秒。',MEDIA_AUDIO_SILENT:'声音接近全静音，请检查原始录音。',MEDIA_OUTPUT_TOO_LARGE:'处理后的文件超过 5 MB，请减小素材后重新导入。'};
+  const messages:Record<string,string>={MEDIA_PROCESSOR_UNAVAILABLE:'本机媒体检查工具不可用，请配置 FFmpeg 后重试。',MEDIA_PROCESSOR_TIMEOUT:'媒体检查超时，请保留文件稍后重试。',MEDIA_ATLAS_DIMENSIONS:'图片须为 256–2048 像素的正方形静态 PNG，边长为偶数，四格各占一半。',MEDIA_INVALID_IMAGE:'图片无法完整解码，请重新导出静态 PNG。',MEDIA_INVALID_AUDIO:'声音无法完整解码，请重新导出有效 MP3。',MEDIA_AUDIO_DURATION:'规则声音须为 0.2–120 秒。',MEDIA_AUDIO_SILENT:'声音接近全静音，请检查原始录音。',MEDIA_AUDIO_ENGINEERING:'声音响度、峰值或首尾静音未达到工程要求，请调整后重新导入。',MEDIA_OUTPUT_TOO_LARGE:'处理后的文件超过 5 MB，请减小素材后重新导入。'};
   return messages[code]??'素材检查未通过，请检查文件格式后重新导入。';
 }

@@ -41,11 +41,17 @@ test('image import decodes bounded PNG, strips metadata and rejects false type, 
 });
 test('audio import decodes actual samples, retains playable MP3 frames and rejects invalid data or unavailable tooling',async()=>{
   const bytes=await readFile('src/audio/search-rule.mp3'),result=await processMedia('guide',bytes);
-  assert.equal(result.inspection.mime,'audio/mpeg');assert.ok(result.inspection.durationMs!>200);assert.ok(result.inspection.durationMs!<120000);assert.ok(Number.isFinite(result.inspection.rmsDbfs));assert.notEqual(result.body.subarray(0,3).toString(),'ID3');
+  assert.equal(result.inspection.mime,'audio/mpeg');assert.ok(result.inspection.durationMs!>200);assert.ok(result.inspection.durationMs!<120000);assert.ok(Number.isFinite(result.inspection.rmsDbfs));assert.ok(Number.isFinite(result.inspection.narrationQuality?.integratedLufs));assert.ok(Number.isFinite(result.inspection.narrationQuality?.truePeakDbtp));assert.notEqual(result.body.subarray(0,3).toString(),'ID3');
   const again=await processMedia('guide',result.body);assert.ok(Math.abs(again.inspection.durationMs!-result.inspection.durationMs!)<100);
   await assert.rejects(processMedia('guide',Buffer.from('not an audio file at all')),rejected('MEDIA_INVALID_AUDIO'));
   const old=process.env.FOCUS_FFMPEG_PATH;process.env.FOCUS_FFMPEG_PATH='/nonexistent/focus-test-ffmpeg';
   try{await assert.rejects(processMedia('guide',bytes),rejected('MEDIA_PROCESSOR_UNAVAILABLE'));}finally{if(old===undefined)delete process.env.FOCUS_FFMPEG_PATH;else process.env.FOCUS_FFMPEG_PATH=old;}
+});
+test('audio import rejects a quiet or late-starting recording before it enters the review library',async()=>{
+  const {stdout:quiet}=await promisify(execFile)(process.env.FOCUS_FFMPEG_PATH||'ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=440:sample_rate=24000','-t','2','-af','volume=-35dB','-c:a','libmp3lame','-b:a','64k','-f','mp3','pipe:1'],{encoding:'buffer',maxBuffer:1024*1024,timeout:10000});
+  await assert.rejects(processMedia('guide',quiet),rejected('MEDIA_AUDIO_ENGINEERING'));
+  const {stdout:late}=await promisify(execFile)(process.env.FOCUS_FFMPEG_PATH||'ffmpeg',['-hide_banner','-loglevel','error','-i','src/audio/search-rule.mp3','-af','adelay=1500','-c:a','libmp3lame','-b:a','64k','-f','mp3','pipe:1'],{encoding:'buffer',maxBuffer:1024*1024,timeout:10000});
+  await assert.rejects(processMedia('guide',late),rejected('MEDIA_AUDIO_ENGINEERING'));
 });
 test('library keeps import intent and original private, deduplicates immutable objects and refuses changed retries or wrong roles',async()=>{
   const f=await fixture();try{

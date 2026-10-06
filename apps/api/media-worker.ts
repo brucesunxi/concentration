@@ -4,6 +4,7 @@ import {promisify} from 'node:util';
 import sharp from 'sharp';
 import {MEDIA_UPLOAD_LIMIT} from '../../packages/content/media-library.ts';
 import type {MediaInspection} from '../../packages/content/media-library.ts';
+import {measureNarrationQuality} from '../../packages/audio/engineering-quality.ts';
 const kind=process.argv[2];
 async function ffmpeg(input:Buffer,args:string[],maxBytes:number):Promise<Buffer>{
   return new Promise((resolve,reject)=>{
@@ -57,9 +58,17 @@ async function inspect(input:Buffer){
   // Retain compressed audio frames, strip tags/cover art. No generative model or lossy re-encoding.
   const body=await ffmpeg(input,['-map_metadata','-1','-c:a','copy','-id3v2_version','0','-write_id3v1','0','-write_xing','0','-f','mp3'],MEDIA_UPLOAD_LIMIT);
   if(body.length<20)throw new Error('MEDIA_INVALID_AUDIO');
+  let narrationQuality;
+  try{narrationQuality=await measureNarrationQuality(body,durationMs);}
+  catch(error){
+    const message=error instanceof Error?error.message:'';
+    if(message.includes('timed out'))throw new Error('MEDIA_PROCESSOR_TIMEOUT');
+    if(message.includes('unavailable'))throw new Error('MEDIA_PROCESSOR_UNAVAILABLE');
+    throw new Error('MEDIA_AUDIO_ENGINEERING');
+  }
   const tool=await promisify(execFile)(process.env.FOCUS_FFMPEG_PATH||'ffmpeg',['-version'],{timeout:3000,maxBuffer:16384,killSignal:'SIGKILL'}).catch(()=>{throw new Error('MEDIA_PROCESSOR_UNAVAILABLE');});
   const processor=tool.stdout.split('\n')[0].slice(0,180)+'; metadata-free stream copy profile 1';
-  const inspection:MediaInspection={version:'media-check-1',processor,mime:'audio/mpeg',durationMs:Math.round(durationMs),analysisSampleRate:24000,analysisChannels:1,peakDbfs:Number((20*Math.log10(peak)).toFixed(2)),rmsDbfs:Number((20*Math.log10(rms)).toFixed(2)),clippedFraction:clipped/samples,metadataRemoved:true};
+  const inspection:MediaInspection={version:'media-check-1',processor,mime:'audio/mpeg',durationMs:Math.round(durationMs),analysisSampleRate:24000,analysisChannels:1,peakDbfs:Number((20*Math.log10(peak)).toFixed(2)),rmsDbfs:Number((20*Math.log10(rms)).toFixed(2)),clippedFraction:clipped/samples,narrationQuality,metadataRemoved:true};
   return {body:body.toString('base64'),inspection};
 }
 try{
