@@ -17,6 +17,17 @@ const directRoutes = new Set([
   '/api/family/members', '/api/family/invitations', '/api/session-authorities', '/api/content/trust', '/api/children', '/api/sessions/active',
 ]);
 const childOperations = new Set(['enter', 'sessions', 'report', 'strategy-history', 'weekly', 'observations', 'withdraw', 'export', 'parent-guide', 'practice-limits', 'age-review', 'recovery', 'life-goals']);
+const safeCategories = new Set([
+  ...directRoutes, ...[...childOperations].map(operation => '/api/children/:childId/' + operation),
+  '/api/children/:childId', '/api/children/:childId/age-review/apply', '/api/children/:childId/life-goals/history',
+  '/api/children/:childId/life-goals/:goalId', '/api/children/:childId/recovery/:sessionId/handover',
+  '/api/children/:childId/recovery/:sessionId/resume', '/api/family/members/:id', '/api/family/invitations/:id',
+  '/api/sessions/:sessionId/status', '/api/sessions/:sessionId/events', '/api/sessions/:sessionId/finalize',
+  '/api/content/releases/:sha256', 'unknown-api', 'content-asset', 'media', 'web', 'malformed',
+]);
+export function isFamilyRouteCategory(value: unknown): value is string {
+  return typeof value === 'string' && safeCategories.has(value);
+}
 
 /** Only fixed route categories can reach a log, including unknown or malformed URLs. */
 export function familyRouteCategory(rawUrl: string | undefined): string {

@@ -36,7 +36,8 @@
     "studio:build": "tsc --noEmit && vite build --config vite.studio.config.ts",
     "db:prepare": "node scripts/prepare-postgres.ts",
     "db:audit:billing": "node scripts/audit-billing-neon.ts",
-    "db:audit:runtime": "node scripts/audit-neon-runtime-readonly.ts"
+    "db:audit:runtime": "node scripts/audit-neon-runtime-readonly.ts",
+    "ops:summary": "node scripts/summarize-request-observations.mjs"
   },
   "engines": {
     "node": ">=24.14.0"

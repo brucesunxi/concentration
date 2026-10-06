@@ -2,7 +2,7 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { EventEmitter } from 'node:events';
 import type { IncomingMessage, ServerResponse } from 'node:http';
-import { familyRouteCategory, observeFamilyRequest, familyRequestLoggingEnabled } from '../../apps/api/request-observation.ts';
+import { familyRouteCategory, isFamilyRouteCategory, observeFamilyRequest, familyRequestLoggingEnabled } from '../../apps/api/request-observation.ts';
 
 const id = '9cd90b81-e945-4809-87ce-8b5966c6a39b', privateValue = 'synthetic-private-child-name-and-secret';
 class Response extends EventEmitter {
@@ -32,7 +32,11 @@ test('route categories remove every object identifier, query and unknown path ra
     [`/api/children/${id}/${privateValue}`, 'unknown-api'], [`/api/${privateValue}`, 'unknown-api'],
     [`/content-assets/${privateValue}`, 'content-asset'], [`/media/${privateValue}.mp3`, 'media'],
     [`/${privateValue}`, 'web'], ['http://[invalid', 'malformed'],
-  ]) assert.equal(familyRouteCategory(url), category);
+  ]) {
+    assert.equal(familyRouteCategory(url), category);
+    assert.equal(isFamilyRouteCategory(category), true);
+  }
+  assert.equal(isFamilyRouteCategory(`/api/children/${id}?secret=${privateValue}`), false);
 });
 
 test('a Vercel request and its reused family handler produce one correlated, bounded event without private inputs', () => {
