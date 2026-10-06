@@ -57,6 +57,12 @@ def play_one_formal_step(page):
     assert "Please hand the screen to your child" in invitation.inner_text()
     invitation.get_by_label("Touch, mouse or keyboard").check()
     page.get_by_role("button", name="I want to start").click()
+    examples = page.get_by_role("group", name="Examples for this rule")
+    expect(examples).to_be_visible()
+    assert examples.get_by_role("img", name="Rabbit").count() == 1
+    for label in ("Fox", "Bear", "Cat"):
+        assert examples.get_by_role("img", name=label).count() == 1
+    expect(examples.get_by_text("Find all of these")).to_be_visible()
     page.get_by_role("button", name="I want to try").click()
 
     for step in range(3):

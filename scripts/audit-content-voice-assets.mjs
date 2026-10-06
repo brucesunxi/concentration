@@ -37,14 +37,23 @@ for (const ageBand of ['6-8','9-11','12-14','15-17'])
   for (const locale of ['zh-CN','en'])
     for (const task of TASKS) {
       const item = contentNarration(task,ageBand,locale);
-      slots.push({ ageBand, locale, task, file:item.relativePath });
+      slots.push({ ageBand, locale, task, copyKey:item.copyKey, file:item.relativePath });
     }
 if (rows.length !== 16 || slots.length !== 32 || new Set(rows.map(row => row.file)).size !== 16) throw new Error('Narration catalogue coverage is incomplete');
 const report = {
   schemaVersion:1, generatedAt:new Date().toISOString(),
   scope:'Local source audio inspection only. Does not certify speech quality, native-language review, child understanding or market publication.',
   qualityBounds:narrationQualityBounds,
-  summary:{ sourceFiles:rows.length, generatedCandidates:rows.filter(row => row.source === 'azure-speech-candidate').length, coveredContentSlots:slots.length, engineeringQualityChecked:rows.length, humanApproved:0 },
+  summary:{
+    sourceFiles:rows.length,
+    generatedCandidates:rows.filter(row => row.source === 'azure-speech-candidate').length,
+    coveredContentSlots:slots.length,
+    narratedRuleSlots:slots.filter(slot => slot.copyKey === 'rule').length,
+    narratedStrategySlots:slots.filter(slot => slot.copyKey === 'strategy').length,
+    ruleNarrationGaps:slots.filter(slot => slot.copyKey !== 'rule').length,
+    engineeringQualityChecked:rows.length,
+    humanApproved:0,
+  },
   rows, slots,
 };
 if (args.length) await writeFile(resolve(root,args[1]), JSON.stringify(report,null,2)+'\n');
