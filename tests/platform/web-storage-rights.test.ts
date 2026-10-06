@@ -2,7 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { IDBFactory, IDBObjectStore } from 'fake-indexeddb';
 
-test('a failed browser journal cannot block parent sign-in or child data rights, but blocks new practice', async () => {
+test('a failed browser journal cannot block parent sign-in, sign-out or child data rights, but blocks new practice', async () => {
   const previousIndexedDB = globalThis.indexedDB;
   const previousFetch = globalThis.fetch;
   const originalPut = IDBObjectStore.prototype.put;
@@ -24,9 +24,10 @@ test('a failed browser journal cannot block parent sign-in or child data rights,
     await api.request('/auth/login', 'POST', { name: 'Synthetic family', password: 'synthetic-password' });
     await api.request('/children/synthetic-child/withdraw', 'POST', {});
     await api.request('/children/synthetic-child', 'DELETE');
-    assert.deepEqual(paths, ['/api/auth/login', '/api/children/synthetic-child/withdraw', '/api/children/synthetic-child']);
+    await api.request('/auth/logout', 'POST', {});
+    assert.deepEqual(paths, ['/api/auth/login', '/api/children/synthetic-child/withdraw', '/api/children/synthetic-child', '/api/auth/logout']);
     await assert.rejects(api.request('/children/synthetic-child/sessions', 'POST', {}), /Synthetic browser storage failure/);
-    assert.equal(paths.length, 3);
+    assert.equal(paths.length, 4);
   } finally {
     IDBObjectStore.prototype.put = originalPut;
     globalThis.indexedDB = previousIndexedDB;

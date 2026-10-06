@@ -391,7 +391,24 @@ def verify_family_flow(browser, base):
         page.get_by_text("The profile, linked records and cached records in this browser have been deleted.").wait_for(timeout=10000)
         assert page.evaluate("async () => (await (await fetch('/api/me')).json()).children.length") == 0
         page.unroute(deletion_url, lose_deletion_receipt)
-        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, separate keyboard-operated screen reader condition, server confirmation, same-day rest cue")
+        page.evaluate("""() => {
+          const original = IDBObjectStore.prototype.put;
+          IDBObjectStore.prototype.put = function (...args) {
+            if (this.name === 'meta') throw new DOMException('Synthetic browser storage failure', 'QuotaExceededError');
+            return original.apply(this, args);
+          };
+        }""")
+        with page.expect_response(lambda item: item.url.endswith('/api/auth/logout')) as signed_out:
+            page.get_by_role("button", name="Sign out and clear cached records").click()
+        assert signed_out.value.status == 200, "Broken browser storage must not block server sign-out"
+        page.get_by_text("This browser cannot safely read or clear local records", exact=False).wait_for()
+        page.get_by_role("button", name="Open family space").wait_for()
+        page.get_by_label("Family name").fill(FAMILY)
+        page.get_by_label("Parent password").fill(PASSWORD)
+        page.get_by_role("button", name="Open family space").click()
+        page.get_by_role("heading", name="A small discovery today").wait_for(timeout=10000)
+        page.get_by_text("This browser cannot safely read or clear local records", exact=False).wait_for()
+        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, separate screen reader condition, server confirmation, storage-failure sign-out and parent sign-in")
     except Exception:
         artifact = ROOT / "dist/browser-qa/failure.png"
         artifact.parent.mkdir(parents=True, exist_ok=True)
