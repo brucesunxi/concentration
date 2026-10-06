@@ -759,17 +759,18 @@ export function service(source: Database, now: () => number = Date.now, content?
           await write(json);
         };
         const pageSize = 200;
-        const writeRows = async (key: string, read: (limit: number, offset: number) => Promise<unknown[]>) => {
-          await write(`,"${key}":[`);
-          let offset = 0, first = true;
+        type ExportCursor = { at: string; id: string; n?: number };
+        const writeRows = async (key: string, read: (limit: number, after: ExportCursor | null) => Promise<{ value: unknown; cursor: ExportCursor }[]>, firstField = false) => {
+          await write(`${firstField ? '' : ','}"${key}":[`);
+          let after: ExportCursor | null = null, first = true;
           while (true) {
-            const rows = await read(pageSize, offset);
+            const rows = await read(pageSize, after);
             for (const row of rows) {
               if (!first) await write(',');
               first = false;
-              await writeValue(row);
+              await writeValue(row.value);
             }
-            offset += rows.length;
+            if (rows.length) after = rows[rows.length - 1].cursor;
             if (rows.length < pageSize) break;
           }
           await write(']');
@@ -778,34 +779,64 @@ export function service(source: Database, now: () => number = Date.now, content?
         await writeValue(new Date(now()).toISOString());
         await write(',"child":'); await writeValue(publicChild(c));
         await write(',"practiceLimits":'); await writeValue(practiceLimits);
-        await writeRows('sessions', async (limit, offset) => (await tx.query(`SELECT id,plan,state,result,created_at,completed_at,closed_reason,daily_limit_snapshot,release_scope_identity,
+        await writeRows('sessions', async (limit, after) => {
+          const params = after ? [childId, after.at, after.id, limit] : [childId, limit];
+          const rows = await tx.query<{ id: string; cursor_at: string } & Record<string, unknown>>(`SELECT id,plan,state,result,created_at,completed_at,closed_reason,daily_limit_snapshot,release_scope_identity,
           (SELECT jsonb_build_object('reason','device_handover','actorScope','parent','closedAt',h.created_at) FROM session_handovers h WHERE h.session_id=sessions.id) AS handover,
           CASE WHEN continuation_grant IS NULL THEN NULL ELSE jsonb_build_object(
             'version',continuation_grant->'body'->'version','windowPolicy',continuation_grant->'body'->'windowPolicy',
             'issuedAt',continuation_grant->'body'->'issuedAt','recordUntil',continuation_grant->'body'->'recordUntil',
             'uploadUntil',continuation_grant->'body'->'uploadUntil','maxActiveMs',continuation_grant->'body'->'maxActiveMs',
-            'maxEvents',continuation_grant->'body'->'maxEvents','planHash',continuation_grant->'body'->'planHash') END AS authorization
-          FROM sessions WHERE child_id=$1 ORDER BY created_at,id LIMIT $2 OFFSET $3`, [childId, limit, offset])).rows);
-        await writeRows('events', async (limit, offset) => (await tx.query('SELECT e.session_id AS "sessionId",e.body AS event FROM events e JOIN sessions s ON s.id=e.session_id WHERE s.child_id=$1 ORDER BY s.created_at,s.id,e.seq LIMIT $2 OFFSET $3', [childId, limit, offset])).rows);
-        await writeRows('observations', async (limit, offset) => (await tx.query('SELECT id,task,context,prompts,child_choice,created_at FROM observations WHERE child_id=$1 ORDER BY created_at,id LIMIT $2 OFFSET $3', [childId, limit, offset])).rows);
-        await writeRows('confirmations', async (limit, offset) => (await tx.query('SELECT purpose,version,acknowledged_at,withdrawn_at FROM local_confirmations WHERE child_id=$1 ORDER BY acknowledged_at,id LIMIT $2 OFFSET $3', [childId, limit, offset])).rows);
-        await writeRows('verifiedConsents', async (limit, offset) => (await tx.query('SELECT provider,country,age_band,locale,purpose,notice_version,notice_sha256,release_scope_identity,verified_at,granted_at,expires_at,withdrawn_at FROM guardian_consents WHERE child_id=$1 ORDER BY granted_at,id LIMIT $2 OFFSET $3', [childId, limit, offset])).rows);
+            'maxEvents',continuation_grant->'body'->'maxEvents','planHash',continuation_grant->'body'->'planHash') END AS authorization,
+          to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
+          FROM sessions WHERE child_id=$1 ${after ? 'AND (created_at,id)>($2::timestamptz,$3::uuid)' : ''}
+          ORDER BY created_at,id LIMIT $${params.length}`, params);
+          return rows.rows.map(({ cursor_at, ...value }) => ({ value, cursor: { at: cursor_at, id: value.id } }));
+        });
+        await writeRows('events', async (limit, after) => {
+          const params = after ? [childId, after.at, after.id, after.n, limit] : [childId, limit];
+          const rows = await tx.query<{ sessionId: string; event: unknown; cursor_at: string; cursor_seq: number }>(
+            `SELECT e.session_id AS "sessionId",e.body AS event,
+              to_char(s.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at,e.seq AS cursor_seq
+              FROM events e JOIN sessions s ON s.id=e.session_id WHERE s.child_id=$1
+              ${after ? 'AND (s.created_at,s.id,e.seq)>($2::timestamptz,$3::uuid,$4::int)' : ''}
+              ORDER BY s.created_at,s.id,e.seq LIMIT $${params.length}`, params);
+          return rows.rows.map(row => ({ value: { sessionId: row.sessionId, event: row.event }, cursor: { at: row.cursor_at, id: row.sessionId, n: row.cursor_seq } }));
+        });
+        await writeRows('observations', async (limit, after) => {
+          const params = after ? [childId, after.at, after.id, limit] : [childId, limit];
+          const rows = await tx.query<{ id: string; cursor_at: string } & Record<string, unknown>>(
+            `SELECT id,task,context,prompts,child_choice,created_at,
+              to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
+              FROM observations WHERE child_id=$1 ${after ? 'AND (created_at,id)>($2::timestamptz,$3::uuid)' : ''}
+              ORDER BY created_at,id LIMIT $${params.length}`, params);
+          return rows.rows.map(({ cursor_at, ...value }) => ({ value, cursor: { at: cursor_at, id: value.id } }));
+        });
+        await writeRows('confirmations', async (limit, after) => {
+          const params = after ? [childId, after.at, after.id, limit] : [childId, limit];
+          const rows = await tx.query<{ cursor_id: string; cursor_at: string } & Record<string, unknown>>(
+            `SELECT purpose,version,acknowledged_at,withdrawn_at,id AS cursor_id,
+              to_char(acknowledged_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
+              FROM local_confirmations WHERE child_id=$1 ${after ? 'AND (acknowledged_at,id)>($2::timestamptz,$3::uuid)' : ''}
+              ORDER BY acknowledged_at,id LIMIT $${params.length}`, params);
+          return rows.rows.map(({ cursor_at, cursor_id, ...value }) => ({ value, cursor: { at: cursor_at, id: cursor_id } }));
+        });
+        await writeRows('verifiedConsents', async (limit, after) => {
+          const params = after ? [childId, after.at, after.id, limit] : [childId, limit];
+          const rows = await tx.query<{ cursor_id: string; cursor_at: string } & Record<string, unknown>>(
+            `SELECT provider,country,age_band,locale,purpose,notice_version,notice_sha256,release_scope_identity,verified_at,granted_at,expires_at,withdrawn_at,id AS cursor_id,
+              to_char(granted_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
+              FROM guardian_consents WHERE child_id=$1 ${after ? 'AND (granted_at,id)>($2::timestamptz,$3::uuid)' : ''}
+              ORDER BY granted_at,id LIMIT $${params.length}`, params);
+          return rows.rows.map(({ cursor_at, cursor_id, ...value }) => ({ value, cursor: { at: cursor_at, id: cursor_id } }));
+        });
         await write(',"life":{');
-        await write('"goals":[');
-        let first = true;
-        for (let offset = 0; ; offset += pageSize) {
-          const rows = await life.exportPage(tx, childId, 'goals', pageSize, offset);
-          for (const row of rows) { if (!first) await write(','); first = false; await writeValue(row); }
-          if (rows.length < pageSize) break;
-        }
-        await write('],"actions":[');
-        first = true;
-        for (let offset = 0; ; offset += pageSize) {
-          const rows = await life.exportPage(tx, childId, 'actions', pageSize, offset);
-          for (const row of rows) { if (!first) await write(','); first = false; await writeValue(row); }
-          if (rows.length < pageSize) break;
-        }
-        await write(']}}');
+        await writeRows('goals', (limit, after) => life.exportGoalsPage(tx, childId, limit, after), true);
+        await writeRows('actions', async (limit, after) => {
+          const rows = await life.exportActionsPage(tx, childId, limit, after ? { at: after.at, goalId: after.id, version: after.n! } : null);
+          return rows.map(row => ({ value: row.value, cursor: { at: row.cursor.at, id: row.cursor.goalId, n: row.cursor.version } }));
+        });
+        await write('}}');
       });
     },
   };

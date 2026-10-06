@@ -135,13 +135,22 @@ export function lifeGoals(db: Database, dependencies: {
       const actions = await tx.query('SELECT a.id,a.goal_id,a.version,a.actor_scope,a.payload,a.answers_removed,a.created_at FROM life_goal_actions a JOIN life_goals g ON g.id=a.goal_id WHERE g.child_id=$1 ORDER BY g.created_at,g.id,a.version', [childId]);
       return { goals: rows.rows.map(publicGoal), actions: actions.rows };
     },
-    async exportPage(tx: Queryable, childId: string, kind: 'goals' | 'actions', limit: number, offset: number) {
-      if (kind === 'goals') {
-        const rows = await tx.query<Row>('SELECT * FROM life_goals WHERE child_id=$1 ORDER BY created_at,id LIMIT $2 OFFSET $3', [childId, limit, offset]);
-        return rows.rows.map(publicGoal);
-      }
-      const rows = await tx.query('SELECT a.id,a.goal_id,a.version,a.actor_scope,a.payload,a.answers_removed,a.created_at FROM life_goal_actions a JOIN life_goals g ON g.id=a.goal_id WHERE g.child_id=$1 ORDER BY g.created_at,g.id,a.version LIMIT $2 OFFSET $3', [childId, limit, offset]);
-      return rows.rows;
+    async exportGoalsPage(tx: Queryable, childId: string, limit: number, after: { at: string; id: string } | null) {
+      const boundary = after ? 'AND (created_at,id)>($2::timestamptz,$3::uuid)' : '';
+      const params = after ? [childId, after.at, after.id, limit] : [childId, limit];
+      const rows = await tx.query<Row & { cursor_at: string }>(`SELECT *,to_char(created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
+        FROM life_goals WHERE child_id=$1 ${boundary} ORDER BY created_at,id LIMIT $${params.length}`, params);
+      return rows.rows.map(row => ({ value: publicGoal(row), cursor: { at: row.cursor_at, id: row.id } }));
+    },
+    async exportActionsPage(tx: Queryable, childId: string, limit: number, after: { at: string; goalId: string; version: number } | null) {
+      const boundary = after ? 'AND (g.created_at,g.id,a.version)>($2::timestamptz,$3::uuid,$4::int)' : '';
+      const params = after ? [childId, after.at, after.goalId, after.version, limit] : [childId, limit];
+      const rows = await tx.query<{ cursor_at: string; id: string; goal_id: string; version: number; actor_scope: string; payload: unknown; answers_removed: boolean; created_at: string }>(
+        `SELECT a.id,a.goal_id,a.version,a.actor_scope,a.payload,a.answers_removed,a.created_at,
+          to_char(g.created_at AT TIME ZONE 'UTC','YYYY-MM-DD"T"HH24:MI:SS.US"Z"') AS cursor_at
+          FROM life_goal_actions a JOIN life_goals g ON g.id=a.goal_id WHERE g.child_id=$1 ${boundary}
+          ORDER BY g.created_at,g.id,a.version LIMIT $${params.length}`, params);
+      return rows.rows.map(({ cursor_at, ...value }) => ({ value, cursor: { at: cursor_at, goalId: value.goal_id, version: value.version } }));
     },
   };
 }

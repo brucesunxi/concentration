@@ -248,7 +248,11 @@ test('verified consent is bound to guardian, child, notice, release scope and ex
     assert.equal((await api.me(parent)).children[0].collectionStatus,'collection-withdrawn');
     assert.equal((await db.query<{ withdrawn_at:string|null }>('SELECT withdrawn_at FROM guardian_consents WHERE child_id=$1',[c.id])).rows.every(row=>row.withdrawn_at!==null),true);
     await assert.rejects(api.grantGuardianConsent(parent,c.id,randomUUID()),code('CONSENT_REVOKED'));
-    assert.equal((await api.exportChild(parent,c.id)).verifiedConsents.length,2);
+    const exported = await api.exportChild(parent,c.id);
+    assert.equal(exported.verifiedConsents.length,2);
+    const chunks:string[]=[];
+    await api.exportChildToSink(parent,c.id,async chunk=>{chunks.push(chunk);});
+    assert.deepEqual(JSON.parse(chunks.join('')).verifiedConsents,JSON.parse(JSON.stringify(exported.verifiedConsents)));
   } finally { await db.close(); }
 });
 
