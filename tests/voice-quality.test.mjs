@@ -1,10 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { execFileSync } from 'node:child_process';
-import { mkdtempSync, rmSync } from 'node:fs';
+import { existsSync, mkdtempSync, readFileSync, rmSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join, resolve } from 'node:path';
 import { measureNarrationQuality } from '../scripts/voice-engineering-quality.mjs';
+import { saveVoiceCandidate } from '../scripts/voice-candidate-writer.mjs';
 import { taskContent } from '../packages/content/copy.ts';
 
 function durationMs(path) {
@@ -37,4 +38,22 @@ test('rule candidate plan uses all four complete stop instructions without touch
       assert.ok(line.endsWith(` | ${taskContent('stop',locale,age).rule}`));
     }
   assert.equal(lines[4],'4 recordings planned; no network request made.');
+});
+
+test('candidate writing rejects bad engineering audio and never replaces an existing recording',async()=>{
+  const folder=mkdtempSync(join(tmpdir(),'focus-voice-candidate-'));
+  try{
+    const source=resolve(import.meta.dirname,'../src/audio/search-rule.mp3');
+    const bytes=readFileSync(source),destination=join(folder,'candidate.mp3');
+    const quality=await saveVoiceCandidate(destination,bytes,durationMs(source));
+    assert.ok(quality.integratedLufs>-24&&quality.integratedLufs<-16);
+    assert.deepEqual(readFileSync(destination),bytes);
+    await assert.rejects(saveVoiceCandidate(destination,bytes,durationMs(source)),/already exists/);
+    assert.deepEqual(readFileSync(destination),bytes);
+    const quiet=join(folder,'quiet.mp3');
+    execFileSync('ffmpeg',['-hide_banner','-loglevel','error','-f','lavfi','-i','sine=frequency=700:duration=1','-af','volume=-30dB','-ac','1','-ar','24000','-codec:a','libmp3lame','-y',quiet]);
+    const rejected=join(folder,'rejected.mp3');
+    await assert.rejects(saveVoiceCandidate(rejected,readFileSync(quiet),durationMs(quiet)),/Audio engineering quality check failed/);
+    assert.equal(existsSync(rejected),false);
+  }finally{rmSync(folder,{recursive:true,force:true});}
 });

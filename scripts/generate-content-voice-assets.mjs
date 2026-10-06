@@ -1,8 +1,9 @@
-import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
-import { createHash, randomUUID } from 'node:crypto';
-import { resolve, dirname } from 'node:path';
+import { readFile } from 'node:fs/promises';
+import { createHash } from 'node:crypto';
+import { resolve } from 'node:path';
 import { CONTENT_NARRATIONS, narrationText } from '../packages/content/voice-catalogue.ts';
 import { processMedia } from '../apps/api/media-processor.ts';
+import { saveVoiceCandidate } from './voice-candidate-writer.mjs';
 
 const root = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
@@ -77,18 +78,8 @@ for (const item of entries) {
   if (!response.ok) throw new Error(`Azure Speech failed for ${item.relativePath}: HTTP ${response.status}`);
   const source = Buffer.from(await response.arrayBuffer());
   const processed = await processMedia('guide', source);
-  await mkdir(dirname(path), { recursive:true });
-  const temporary = `${path}.${randomUUID()}.tmp`;
-  await writeFile(temporary, processed.body, { flag:'wx' });
-  try {
-    await link(temporary, path);
-  } catch (error) {
-    if (error.code === 'EEXIST') throw new Error(`Recording already exists; inspect it before retrying: ${item.relativePath}`);
-    throw error;
-  } finally {
-    await rm(temporary,{force:true});
-  }
+  const quality = await saveVoiceCandidate(path, processed.body, processed.inspection.durationMs);
   const sha256 = createHash('sha256').update(processed.body).digest('hex');
-  console.log(`Generated ${item.relativePath} | ${processed.body.length} bytes | ${processed.inspection.durationMs} ms | sha256 ${sha256}`);
+  console.log(`Generated ${item.relativePath} | ${processed.body.length} bytes | ${processed.inspection.durationMs} ms | ${quality.integratedLufs} LUFS | ${quality.truePeakDbtp} dBTP | sha256 ${sha256}`);
 }
 console.log(`Complete: ${entries.length} requested candidate recordings. Human listening and content review are still required.`);
