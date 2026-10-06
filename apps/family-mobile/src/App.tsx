@@ -34,6 +34,7 @@ import { connectionErrorCopy, requestErrorCopy } from '../../../packages/contrac
 import type { AgeBand, Locale, TaskId } from '../../../packages/task-engine/index.ts';
 import { TASKS } from '../../../packages/task-engine/index.ts';
 import { taskContent, translate, isTeen } from '../../../packages/content/copy.ts';
+import { familyHelpCopy } from '../../../packages/family-support/family-help.ts';
 
 const client = new MobileClient();
 function FamilyApp() {
@@ -41,7 +42,7 @@ function FamilyApp() {
   const [offlineOffer,setOfflineOffer]=useState<NonNullable<Awaited<ReturnType<typeof readOfflineSession>>>|null>(null);
   const [locale, setLocale] = useState<Locale>(() => supportedDeviceLocale(getLocales().map(item => item.languageTag))), [familyName, setFamilyName] = useState('');
   const localeRef = useRef(locale); localeRef.current = locale;
-  const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'billing' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy'>('home');
+  const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'billing' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy' | 'help'>('home');
   const [lifeSuggestion, setLifeSuggestion] = useState<GoalInput['templateId'] | undefined>();
   const [selected, setSelected] = useState<Child | null>(null), [covered, setCovered] = useState(false);
   const [practiceInvitation, setPracticeInvitation] = useState<{childId:string;task:TaskId;identity:number}|null>(null);
@@ -204,6 +205,15 @@ function FamilyApp() {
     const copy = childDataVisibilityCopy(me.children[0].ageBand, me.children[0].locale);
     return <Page title={copy.title}><Text style={s.body}>{copy.introduction}</Text>{(['practice', 'reflection', 'control'] as const).map(section => <View key={section} style={s.card}><Text accessibilityRole="header" style={s.heading}>{copy[`${section}Heading`]}</Text><Text style={s.body}>{copy[section]}</Text></View>)}<Notice>{copy.device}</Notice><Button title={copy.close} onPress={() => setView('home')} /></Page>;
   }
+  if (view === 'help') {
+    const copy = familyHelpCopy(locale, me.role);
+    return <Page title={copy.title} subtitle={copy.introduction}>
+      {me.role === 'parent' && me.children.length > 1 && <View style={s.card}><Text style={s.label}>{t('选择要查看的孩子', 'Choose a child')}</Text><View style={s.row}>{me.children.map(child => <Choice key={child.id} label={child.alias} selected={selected?.id === child.id} onPress={() => setSelected(child)} />)}</View></View>}
+      {copy.cards.map(card => <View key={card.title} style={s.card}><Text accessibilityRole="header" style={s.heading}>{card.title}</Text><Text style={s.body}>{card.body}</Text>{card.action && selected && <Button quiet title={card.actionLabel} onPress={() => setView(card.action)} />}</View>)}
+      <Text style={s.muted}>{copy.closing}</Text>
+      <Button quiet title={t('返回首页', 'Back to home')} onPress={() => { setSelected(null); setView('home'); }} />
+    </Page>;
+  }
   return <Page title={me.role === 'parent' ? t('一起，慢慢来。', 'One small step, together.') : t('今天想练习什么？', 'What would you like to practice?')} subtitle={me.role === 'parent' ? t('选择一位家庭成员，开始一段短练习。', 'Choose a family member for a short practice.') : t('你可以求助，也可以随时停下来。', 'You can ask for help and stop at any time.')}>
     <Notice>{error}</Notice>
     {me.role === 'parent' ? <FamilyArtwork kind="bridge" /> : me.children[0] && !isTeen(me.children[0].ageBand) && <FamilyArtwork kind="island" />}
@@ -224,6 +234,7 @@ function FamilyApp() {
     {me.role === 'parent' && <Button quiet title={t('家长协作','Parents together')} disabled={busy} onPress={()=>setView('members')}/>}
     {me.role === 'parent' && <Button quiet title={t('账号与登录', 'Account & sign-ins')} disabled={busy} onPress={() => setView('security')} />}
     {owner && <Button quiet title={t('家庭使用状态', 'Family access')} disabled={busy} onPress={() => setView('billing')} />}
+    <Button quiet title={t('需要帮助', 'Need help')} onPress={() => { setSelected(me.children[0] ?? null); setView('help'); }} />
     {me.role === 'child' && <Button quiet title={t('进入家长空间', 'Open parent space')} onPress={() => { setMe(null); setSession(null); }} />}
     <Button quiet title={t('退出家庭空间', 'Sign out')} disabled={busy} onPress={() => void action(async () => { const version = ++identityVersion.current; try { await client.logout(); } finally { if (mounted.current && version === identityVersion.current) { setMe(null); setSession(null); } } })} />
     {busy && <ActivityIndicator color={colors.accent} />}

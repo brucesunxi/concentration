@@ -1,0 +1,9 @@
+.family-help { display: grid; gap: 24px; }
+.family-help > .lead { max-width: 65ch; }
+.family-help-grid { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 18px; }
+.family-help-card { display: grid; align-content: start; justify-items: start; gap: 14px; padding: 26px; border: 1px solid var(--line); border-radius: 20px; background: var(--paper); }
+.family-help-card h2 { font-size: 22px; line-height: 1.35; }
+.family-help-card p { color: var(--muted); line-height: 1.7; }
+.family-help-card .quiet { margin-top: 4px; }
+.family-help-closing { padding: 18px 22px; border-radius: 16px; background: var(--sage); line-height: 1.6; }
+@media (max-width: 720px) { .family-help-grid { grid-template-columns: 1fr; } .family-help-card { padding: 20px; } }
