@@ -1,7 +1,8 @@
 import {spawn} from 'node:child_process';
+import {narrationQualityBounds} from './narration-quality.ts';
+import type {NarrationQuality} from './narration-quality.ts';
 
-export const narrationQualityBounds=Object.freeze({minLufs:-24,maxLufs:-16,maxTruePeakDbtp:-1,maxLeadMs:500,maxTailMs:1200});
-export interface NarrationQuality {integratedLufs:number;truePeakDbtp:number;leadingSilenceMs:number;trailingSilenceMs:number}
+export {narrationQualityBounds} from './narration-quality.ts';
 
 /** Technical checks only; hearing, wording and age suitability need human review. */
 export async function measureNarrationQuality(source:string|Buffer,durationMs:number,ffmpeg=process.env.FOCUS_FFMPEG_PATH||'ffmpeg'):Promise<NarrationQuality>{

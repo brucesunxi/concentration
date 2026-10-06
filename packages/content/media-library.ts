@@ -1,5 +1,5 @@
 import {z} from 'zod';
-import type {NarrationQuality} from '../audio/engineering-quality.ts';
+import type {NarrationQuality} from '../audio/narration-quality.ts';
 export const MEDIA_UPLOAD_LIMIT=5*1024*1024;
 export const MEDIA_STORAGE_LIMIT=256*1024*1024;
 export const MEDIA_IMPORT_TTL_MS=24*60*60*1000;
