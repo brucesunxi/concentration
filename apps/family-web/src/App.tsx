@@ -176,7 +176,7 @@ export function App() {
     setPending(true);
     try {
       await prepareBrowserIdentity();deviceReady.current=true;
-      await journal().invalidate();
+      await journal().generation();
       setStorageProblem(false);
       await refresh(false);
     } catch { setStorageProblem(true); }
