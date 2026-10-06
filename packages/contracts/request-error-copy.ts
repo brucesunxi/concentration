@@ -2,6 +2,7 @@ import type { Locale } from '../task-engine/index.ts';
 
 const byCode: Record<string, readonly [string, string]> = {
   RESPONSE_UNREADABLE: ['家庭服务的回复暂时无法确认。请先刷新查看最新状态，再决定是否重试。', 'The family service reply could not be confirmed. Refresh to check the latest state before trying again.'],
+  EXPORT_SERVER_LIMIT: ['记录超过当前单次导出上限，文件尚未生成。请保留原设备资料，待支持分批导出。', 'The records exceed the current server export limit. No file was created. Keep the original device data until split exports are available.'],
   LOGIN_FAILED: ['家庭名称或密码不正确，或暂时无法登录。', 'The family name or password is incorrect, or sign-in is temporarily unavailable.'],
   NAME_TAKEN: ['家庭名称已存在，请登录或换一个名称。', 'That family name is already in use. Sign in or choose another name.'],
   RATE_LIMITED: ['尝试过于频繁，请稍后再试。', 'Too many attempts. Please wait before trying again.'],

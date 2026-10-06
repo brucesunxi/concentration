@@ -34,7 +34,8 @@ export class MobileClient {
     this.token = saved && /^[a-f0-9]{64}$/.test(saved) ? saved : null; this.role = this.token ? 'child' : null;
   }
   async request<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}): Promise<T> {
-    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 12000);
+    const timeoutMs = method === 'GET' && /^\/children\/[a-f0-9-]{36}\/export$/.test(path) ? 180000 : 12000;
+    const controller = new AbortController(), timer = setTimeout(() => controller.abort(), timeoutMs);
     try {
       const response = await fetch(API_ORIGIN + '/api' + path, { method, credentials: 'omit', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'X-Focus-Client': 'native-local-v1', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) }).catch(() => { throw new NetworkUnavailable(); });
       const requestId = validRequestReference(response.headers.get('X-Request-ID'));

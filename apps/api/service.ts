@@ -37,6 +37,7 @@ import { checkedGuardianVerification } from './guardian-consent.ts';
 import type { GuardianVerifier } from './guardian-consent.ts';
 import type { FamilyEntitlementReader } from './billing-access.ts';
 import type { FamilyBillingStatus } from '../../packages/contracts/family-billing.ts';
+import { assertExportSafe } from '../../packages/session-runtime/export-safety.ts';
 
 const scrypt = promisify(scryptCallback);
 const digest = (value: string) => createHash('sha256').update(value).digest('hex');
@@ -746,11 +747,72 @@ export function service(source: Database, now: () => number = Date.now, content?
         return { schemaVersion: 2, exportedAt: new Date(now()).toISOString(), child: publicChild(c), practiceLimits, sessions: sessions.rows, events: events.rows, observations: observations.rows, confirmations: confirmations.rows, verifiedConsents: verifiedConsents.rows, life: await life.export(tx, childId) };
       });
     },
+    async exportChildToSink(p: Principal, childId: string, write: (chunk: string) => Promise<void>) {
+      recentParent(p, now());
+      await db.transaction(async tx => {
+        const c = await child(tx, p, childId, true);
+        const { generatedAt: _generatedAt, ...practiceLimits } = await operations.practiceLimits(p, childId);
+        const writeValue = async (value: unknown) => {
+          assertExportSafe(value);
+          const json = JSON.stringify(value);
+          if (json === undefined) throw new Error('EXPORT_FORMAT_INVALID');
+          await write(json);
+        };
+        const pageSize = 200;
+        const writeRows = async (key: string, read: (limit: number, offset: number) => Promise<unknown[]>) => {
+          await write(`,"${key}":[`);
+          let offset = 0, first = true;
+          while (true) {
+            const rows = await read(pageSize, offset);
+            for (const row of rows) {
+              if (!first) await write(',');
+              first = false;
+              await writeValue(row);
+            }
+            offset += rows.length;
+            if (rows.length < pageSize) break;
+          }
+          await write(']');
+        };
+        await write('{"schemaVersion":2,"exportedAt":');
+        await writeValue(new Date(now()).toISOString());
+        await write(',"child":'); await writeValue(publicChild(c));
+        await write(',"practiceLimits":'); await writeValue(practiceLimits);
+        await writeRows('sessions', async (limit, offset) => (await tx.query(`SELECT id,plan,state,result,created_at,completed_at,closed_reason,daily_limit_snapshot,release_scope_identity,
+          (SELECT jsonb_build_object('reason','device_handover','actorScope','parent','closedAt',h.created_at) FROM session_handovers h WHERE h.session_id=sessions.id) AS handover,
+          CASE WHEN continuation_grant IS NULL THEN NULL ELSE jsonb_build_object(
+            'version',continuation_grant->'body'->'version','windowPolicy',continuation_grant->'body'->'windowPolicy',
+            'issuedAt',continuation_grant->'body'->'issuedAt','recordUntil',continuation_grant->'body'->'recordUntil',
+            'uploadUntil',continuation_grant->'body'->'uploadUntil','maxActiveMs',continuation_grant->'body'->'maxActiveMs',
+            'maxEvents',continuation_grant->'body'->'maxEvents','planHash',continuation_grant->'body'->'planHash') END AS authorization
+          FROM sessions WHERE child_id=$1 ORDER BY created_at,id LIMIT $2 OFFSET $3`, [childId, limit, offset])).rows);
+        await writeRows('events', async (limit, offset) => (await tx.query('SELECT e.session_id AS "sessionId",e.body AS event FROM events e JOIN sessions s ON s.id=e.session_id WHERE s.child_id=$1 ORDER BY s.created_at,s.id,e.seq LIMIT $2 OFFSET $3', [childId, limit, offset])).rows);
+        await writeRows('observations', async (limit, offset) => (await tx.query('SELECT id,task,context,prompts,child_choice,created_at FROM observations WHERE child_id=$1 ORDER BY created_at,id LIMIT $2 OFFSET $3', [childId, limit, offset])).rows);
+        await writeRows('confirmations', async (limit, offset) => (await tx.query('SELECT purpose,version,acknowledged_at,withdrawn_at FROM local_confirmations WHERE child_id=$1 ORDER BY acknowledged_at,id LIMIT $2 OFFSET $3', [childId, limit, offset])).rows);
+        await writeRows('verifiedConsents', async (limit, offset) => (await tx.query('SELECT provider,country,age_band,locale,purpose,notice_version,notice_sha256,release_scope_identity,verified_at,granted_at,expires_at,withdrawn_at FROM guardian_consents WHERE child_id=$1 ORDER BY granted_at,id LIMIT $2 OFFSET $3', [childId, limit, offset])).rows);
+        await write(',"life":{');
+        await write('"goals":[');
+        let first = true;
+        for (let offset = 0; ; offset += pageSize) {
+          const rows = await life.exportPage(tx, childId, 'goals', pageSize, offset);
+          for (const row of rows) { if (!first) await write(','); first = false; await writeValue(row); }
+          if (rows.length < pageSize) break;
+        }
+        await write('],"actions":[');
+        first = true;
+        for (let offset = 0; ; offset += pageSize) {
+          const rows = await life.exportPage(tx, childId, 'actions', pageSize, offset);
+          for (const row of rows) { if (!first) await write(','); first = false; await writeValue(row); }
+          if (rows.length < pageSize) break;
+        }
+        await write(']}}');
+      });
+    },
   };
   // Public authentication methods establish their narrower context above. Every
   // other operation receives a server-authenticated Principal, never body fields.
   const selfScopedMethods = new Set(['setup', 'login', 'join', 'authenticate', 'sessionAuthorities', 'changePassword', 'logoutAll', 'deleteFamily', 'grantGuardianConsent']);
-  const ownerMethods = new Set(['billingStatus','addChild','withdraw','deleteChild','exportChild','setPracticeLimit','pausePracticeToday','handover','lifeSpace','lifeHistory','createLifeGoal','actLifeGoal','inviteMember','cancelInvitation','actMember','requestAgeReview','applyAgeReview']);
+  const ownerMethods = new Set(['billingStatus','addChild','withdraw','deleteChild','exportChild','exportChildToSink','setPracticeLimit','pausePracticeToday','handover','lifeSpace','lifeHistory','createLifeGoal','actLifeGoal','inviteMember','cancelInvitation','actMember','requestAgeReview','applyAgeReview']);
   const pendingMethods = new Set(['me','logout','accountSecurity','familyMembers']);
   return Object.fromEntries(Object.entries(operations).map(([name, action]) => [name,
     selfScopedMethods.has(name) ? action : (p: Principal, ...args: unknown[]) => authenticated(p, current => {

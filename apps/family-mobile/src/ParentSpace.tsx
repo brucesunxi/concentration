@@ -47,6 +47,7 @@ export function ParentSpace({ child, family, mode, locale, client, onBack, onCha
       EXPORT_PARTIAL_FILE: t('保存未完成，选定位置可能留有不完整文件，请检查。', 'Saving failed. Check the selected folder for an incomplete file.'),
       SHARING_UNAVAILABLE: t('此设备暂时无法打开系统分享，请稍后重试。', 'System sharing is unavailable. Please retry later.'),
       EXPORT_TOO_LARGE: t('记录超过本机导出大小限制，请使用网页端导出。', 'These records exceed the mobile export limit. Use the web app to export them.'),
+      EXPORT_SERVER_LIMIT: t('记录超过当前单次导出上限，文件尚未生成。请保留原设备资料，待支持分批导出。', 'The records exceed the current server export limit. No file was created. Keep the original device data until split exports are available.'),
       PROFILE_UNAVAILABLE: t('档案已不可用，请返回家庭空间。', 'This profile is unavailable. Return to your family space.'),
       PARENT_SCOPE_INCOMPLETE: t('只有家庭创建者的完整档案列表才能确认删除结果。请用创建者账号重试。', 'Only the family creator’s complete profile list can confirm a deletion. Sign in as the creator and retry.'),
     };

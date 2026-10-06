@@ -135,5 +135,13 @@ export function lifeGoals(db: Database, dependencies: {
       const actions = await tx.query('SELECT a.id,a.goal_id,a.version,a.actor_scope,a.payload,a.answers_removed,a.created_at FROM life_goal_actions a JOIN life_goals g ON g.id=a.goal_id WHERE g.child_id=$1 ORDER BY g.created_at,g.id,a.version', [childId]);
       return { goals: rows.rows.map(publicGoal), actions: actions.rows };
     },
+    async exportPage(tx: Queryable, childId: string, kind: 'goals' | 'actions', limit: number, offset: number) {
+      if (kind === 'goals') {
+        const rows = await tx.query<Row>('SELECT * FROM life_goals WHERE child_id=$1 ORDER BY created_at,id LIMIT $2 OFFSET $3', [childId, limit, offset]);
+        return rows.rows.map(publicGoal);
+      }
+      const rows = await tx.query('SELECT a.id,a.goal_id,a.version,a.actor_scope,a.payload,a.answers_removed,a.created_at FROM life_goal_actions a JOIN life_goals g ON g.id=a.goal_id WHERE g.child_id=$1 ORDER BY g.created_at,g.id,a.version LIMIT $2 OFFSET $3', [childId, limit, offset]);
+      return rows.rows;
+    },
   };
 }

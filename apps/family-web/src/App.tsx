@@ -264,7 +264,7 @@ export function App() {
     if (!child || !me) return;
     const childId=child.id,familyId=me.family.id,identity=accessVersion.current;
     await safely(async () => {
-      const data = await request<{child:{id:string}}>(`/children/${childId}/export`, 'GET', undefined, {}, { timeoutMs: 120000 });
+      const data = await request<{child:{id:string}}>(`/children/${childId}/export`, 'GET', undefined, {}, { timeoutMs: 180000 });
       if(data.child.id!==childId || identity!==accessVersion.current)throw new Error(t('家庭状态已改变，请重新打开档案后导出。','The family space changed. Reopen this profile before exporting.'));
       let records:Awaited<ReturnType<ReturnType<typeof journal>['exportChild']>>|null=null;
       try{records=await journal().exportChild(familyId,childId);}

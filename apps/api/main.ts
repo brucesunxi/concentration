@@ -19,7 +19,7 @@ import { authClientFingerprint, authClientIp, authRateKind, takeAuthSlot } from 
 import { databaseEntitlementReader } from './billing-access.ts';
 import { requestQuery } from './request-query.ts';
 import { observeFamilyRequest, familyRequestLoggingEnabled } from './request-observation.ts';
-import { streamChildExport } from './export-stream.ts';
+import { deliverChildExportFile } from './export-file.ts';
 
 export async function createFamilyServer(options: { serverless?: boolean } = {}) {
 if (process.env.APP_MODE === 'production') throw new Error('Production release remains gated: verified guardian consent, OIDC, regional review, and operational validation are not yet complete.');
@@ -184,7 +184,7 @@ const server = http.createServer(async (req, res) => {
       }
       if (operation === 'observations' && method === 'POST') { json(await api.observe(principal, id, await body(req), String(req.headers['idempotency-key'] ?? '')), 201); return; }
       if (operation === 'withdraw' && method === 'POST') { json(await api.withdraw(principal, id)); return; }
-      if (operation === 'export' && method === 'GET') { await streamChildExport(res, await api.exportChild(principal, id)); return; }
+      if (operation === 'export' && method === 'GET') { await deliverChildExportFile(res, write => api.exportChildToSink(principal, id, write)); return; }
       if (!operation && method === 'DELETE') { json(await api.deleteChild(principal, id)); return; }
     }
     const eventRoute = url.pathname.match(/^\/api\/sessions\/([a-f0-9-]{36})\/(events|finalize)$/);
