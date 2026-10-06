@@ -2,6 +2,7 @@ import { test } from 'node:test';
 import assert from 'node:assert/strict';
 import { randomUUID } from 'node:crypto';
 import { openDatabase, migrate } from '../../apps/api/database.ts';
+import type { Queryable } from '../../apps/api/database.ts';
 import { databaseEntitlementReader, recordVerifiedBillingFact } from '../../apps/api/billing-access.ts';
 import { service, ApiError } from '../../apps/api/service.ts';
 import { createReleaseScope } from '../../apps/api/release-scope.ts';
@@ -110,6 +111,39 @@ test('the family runtime role can read only its own entitlement and cannot issue
       })).state, 'free');
       await assert.rejects(db.query("UPDATE public.billing_ledgers SET body='{}'::jsonb"), /permission denied/);
       await assert.rejects(db.query('SELECT * FROM public.billing_events'), /permission denied/);
+    } finally { await db.query('RESET ROLE'); }
+  } finally { await db.close(); }
+});
+
+test('runtime verification shares one transaction and still rejects a missing billing grant', async () => {
+  const db = await openDatabase('memory://');
+  try {
+    await migrate(db);
+    await db.query('CREATE ROLE focus_verification_test');
+    await grantRuntimeRoles(db, 'focus_verification_test');
+    await db.query('SET ROLE focus_verification_test');
+    let transactions = 0, checks = 0;
+    const scoped = {
+      query: async () => { throw new Error('CHECK_ESCAPED_TRANSACTION'); },
+      transaction: <T>(fn: (tx: Queryable) => Promise<T>) => {
+        transactions++;
+        return db.transaction(tx => fn({ query: <R>(sql: string, params?: unknown[]) => {
+          checks++;
+          return tx.query<R>(sql, params);
+        } }));
+      },
+    };
+    try {
+      await verifyRuntimeRole(scoped, 'family');
+      assert.equal(transactions, 1);
+      assert.ok(checks >= 15);
+      await db.transaction(tx => verifyRuntimeRole(tx, 'family'));
+    } finally { await db.query('RESET ROLE'); }
+    await db.query('REVOKE SELECT ON public.billing_ledgers FROM focus_verification_test');
+    await db.query('SET ROLE focus_verification_test');
+    try {
+      await assert.rejects(verifyRuntimeRole(scoped, 'family'), /DATABASE_BILLING_READ_REQUIRED/);
+      assert.equal(transactions, 2);
     } finally { await db.query('RESET ROLE'); }
   } finally { await db.close(); }
 });

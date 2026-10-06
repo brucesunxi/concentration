@@ -91,7 +91,16 @@ export async function grantRuntimeRoles(db: Database, familyRole: string, studio
   });
 }
 
-export async function verifyRuntimeRole(db: Database, kind: 'family' | 'studio') {
+export async function verifyRuntimeRole(db: Queryable & { transaction?: Database['transaction'] }, kind: 'family' | 'studio') {
+  // The PostgreSQL adapter wraps each standalone query in a scoped transaction.
+  // Keep startup checks on one connection instead of repeating that setup for
+  // every catalogue query. A caller already in a read-only transaction supplies
+  // only query, so its existing transaction remains the boundary.
+  if (db.transaction) return db.transaction(tx => verifyRuntimeRoleChecks(tx, kind));
+  return verifyRuntimeRoleChecks(db, kind);
+}
+
+async function verifyRuntimeRoleChecks(db: Queryable, kind: 'family' | 'studio') {
   const role = (await db.query<{ unsafe: boolean }>(`SELECT EXISTS(SELECT 1 FROM pg_roles WHERE
     (rolsuper OR rolbypassrls OR rolcreaterole OR rolcreatedb) AND pg_has_role(current_user,oid,'MEMBER')) AS unsafe`)).rows[0];
   if (!role || role.unsafe) throw new Error('DATABASE_RUNTIME_ROLE_UNSAFE');
