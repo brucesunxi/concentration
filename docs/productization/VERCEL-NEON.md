@@ -28,7 +28,7 @@
 
 ## 受保护预览的合成家庭验收
 
-已登录 Vercel CLI 且项目保持 Authentication 保护时，执行 `npm run audit:preview`。脚本只连接固定的 `concentration-two.vercel.app`，使用随机虚构家庭与孩子，依次检查数据库就绪、Web 注册与 Cookie、建档、有效签名图片和固定语音的字节摘要、已召回图片的 404、完整合成练习、家长报告，以及创建者注销及旧会话失效。成功后删除测试家庭，不输出密码、Cookie、CSRF 或连接串。临时请求文件使用本机受限权限并在退出时移除。
+已登录 Vercel CLI 且项目保持 Authentication 保护时，执行 `npm run audit:preview`。脚本只连接固定的 `concentration-two.vercel.app`，先核对线上离线清单与预算，并逐项下载首屏静态文件，比对实际字节数和 SHA-256、首页入口及两张无损 WebP 预览；随后使用随机虚构家庭与孩子，检查数据库就绪、Web 注册与 Cookie、建档、有效签名图片和固定语音的字节摘要、已召回图片的 404、完整合成练习、家长报告，以及创建者注销及旧会话失效。成功后删除测试家庭，不输出密码、Cookie、CSRF 或连接串。临时请求文件使用本机受限权限并在退出时移除。
 
 如果网络在创建与注销之间中断，脚本会尝试自动清理；无法确认时，将仅供恢复使用的随机测试凭据保存在被忽略的 `.focus-data/neon/protected-preview-audit-pending.json`。恢复连接后执行 `npm run audit:preview -- --cleanup`，确认清理完成再重新验收。合成事件由程序生成，不等于孩子实际完成练习；此项也不能代替独立 Neon 测试分支的权限并发、备份恢复或真机检查。
 

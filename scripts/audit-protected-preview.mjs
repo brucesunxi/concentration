@@ -55,8 +55,10 @@ async function call(path, method = 'GET', body, auth, options = {}) {
   return { status, value, headers };
 }
 
-async function contentAsset(path) {
-  if (!/^\/content-assets\/[a-f0-9]{64}\.(png|mp3)$/.test(path)) throw new Error('SYNTHETIC_ASSET_PATH_INVALID');
+async function publicBytes(path) {
+  if (!/^\/content-assets\/[a-f0-9]{64}\.(png|mp3)$/.test(path) &&
+      !/^\/assets\/[A-Za-z0-9_.-]+\.(js|css|webp)$/.test(path) &&
+      !['/', '/index.html', '/offline-shell.json', '/budget.json'].includes(path)) throw new Error('SYNTHETIC_ASSET_PATH_INVALID');
   const requestId = randomUUID(), headerFile = join(temporary, requestId + '.headers'), bodyFile = join(temporary, requestId + '.body');
   const output = await runCurl(['curl', path, '--deployment', origin, '--', '--silent', '--show-error', '--dump-header', headerFile,
     '--output', bodyFile, '--write-out', '__FOCUS_HTTP_STATUS__%{http_code}']);
@@ -64,6 +66,47 @@ async function contentAsset(path) {
   const headers = await readFile(headerFile, 'utf8'), bytes = await readFile(bodyFile);
   await Promise.all([unlink(headerFile), unlink(bodyFile)]);
   return { status, headers, bytes };
+}
+
+async function checkWebShell() {
+  const shellResponse = await publicBytes('/offline-shell.json');
+  const budgetResponse = await publicBytes('/budget.json');
+  if (shellResponse.status !== 200 || budgetResponse.status !== 200) throw new Error('SYNTHETIC_WEB_SHELL_MANIFEST_MISSING');
+  let shell, budget;
+  try {
+    shell = JSON.parse(shellResponse.bytes.toString('utf8'));
+    budget = JSON.parse(budgetResponse.bytes.toString('utf8'));
+  } catch { throw new Error('SYNTHETIC_WEB_SHELL_MANIFEST_INVALID'); }
+  if (shell.schemaVersion !== 1 || !Array.isArray(shell.assets) || !Array.isArray(budget.assets) ||
+      budget.passed !== true || !Number.isSafeInteger(budget.limitBytes) || !Number.isSafeInteger(budget.totalBytes) ||
+      budget.totalBytes > budget.limitBytes || shell.totalBytes !== budget.totalBytes) throw new Error('SYNTHETIC_WEB_SHELL_BUDGET_INVALID');
+  const files = shell.assets.filter(asset => asset.url !== '/');
+  const budgetFiles = new Map(budget.assets.map(asset => [asset.path, asset]));
+  if (files.length !== budget.assets.length || budgetFiles.size !== files.length ||
+      shell.assets.filter(asset => asset.url === '/').length !== 1) throw new Error('SYNTHETIC_WEB_SHELL_FILES_INVALID');
+  for (const name of ['characters', 'objects']) {
+    if (!files.some(asset => new RegExp(`^/assets/${name}-sheet-[A-Za-z0-9_-]+\\.webp$`).test(asset.url)) ||
+        files.some(asset => new RegExp(`^/assets/${name}-sheet-.*\\.png$`).test(asset.url))) throw new Error(`SYNTHETIC_WEB_${name.toUpperCase()}_PREVIEW_INVALID`);
+  }
+  let totalBytes = 0;
+  for (const asset of files) {
+    if (!asset || typeof asset.url !== 'string' || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 ||
+        !/^[a-f0-9]{64}$/.test(asset.sha256)) throw new Error('SYNTHETIC_WEB_SHELL_ENTRY_INVALID');
+    const reported = budgetFiles.get(asset.url.slice(1));
+    if (!reported || reported.bytes !== asset.bytes || reported.sha256 !== asset.sha256) throw new Error('SYNTHETIC_WEB_SHELL_REPORT_MISMATCH');
+    const delivered = await publicBytes(asset.url);
+    if (delivered.status !== 200 || delivered.bytes.length !== asset.bytes ||
+        createHash('sha256').update(delivered.bytes).digest('hex') !== asset.sha256) throw new Error('SYNTHETIC_WEB_SHELL_DELIVERY_MISMATCH');
+    totalBytes += delivered.bytes.length;
+  }
+  const rootAsset = shell.assets.find(asset => asset.url === '/');
+  const htmlAsset = files.find(asset => asset.url === '/index.html');
+  if (!rootAsset || !htmlAsset || rootAsset.bytes !== htmlAsset.bytes || rootAsset.sha256 !== htmlAsset.sha256 ||
+      totalBytes !== shell.totalBytes) throw new Error('SYNTHETIC_WEB_SHELL_TOTAL_MISMATCH');
+  const rootPage = await publicBytes('/');
+  if (rootPage.status !== 200 || rootPage.bytes.length !== rootAsset.bytes ||
+      createHash('sha256').update(rootPage.bytes).digest('hex') !== rootAsset.sha256) throw new Error('SYNTHETIC_WEB_SHELL_ENTRY_MISMATCH');
+  return totalBytes;
 }
 
 function webAuth(result) {
@@ -89,6 +132,7 @@ try {
   } else {
     const ready = await call('/ready');
     if (ready.status !== 200 || ready.value?.status !== 'ok') throw new Error('PROTECTED_PREVIEW_NOT_READY');
+    const webShellBytes = await checkWebShell();
     credentials = { name: 'Synthetic preview audit ' + randomUUID().slice(0, 8), password: 'Synthetic audit passphrase ' + randomUUID() };
     await mkdir(dirname(pending), { recursive: true, mode: 0o700 });
     await writeFile(pending, JSON.stringify(credentials), { flag: 'wx', mode: 0o600 });
@@ -112,13 +156,13 @@ try {
     const pack = await verifyRelease(release.value, trust.value.keys, { mode: 'local', market: 'LOCAL' });
     if (pack.id !== plan.content.id || pack.version !== plan.content.version) throw new Error('SYNTHETIC_CONTENT_MISMATCH');
     for (const asset of pack.assets) {
-      const media = await contentAsset(asset.path);
+      const media = await publicBytes(asset.path);
       if (media.status !== 200 || !/^cache-control:\s*no-store\s*$/im.test(media.headers) || !/^x-request-id:\s*[^\r\n]+$/im.test(media.headers)) throw new Error('SYNTHETIC_ASSET_ROUTING_FAILED');
       await verifyAsset(asset, new Uint8Array(media.bytes));
     }
     const recalledBytes = await readFile(join(root, 'packages/visuals/archive/objects-sheet-512-preview.png'));
     const recalledHash = createHash('sha256').update(recalledBytes).digest('hex');
-    const recalled = await contentAsset(`/content-assets/${recalledHash}.png`);
+    const recalled = await publicBytes(`/content-assets/${recalledHash}.png`);
     if (recalled.status !== 404 || !/^x-request-id:\s*[^\r\n]+$/im.test(recalled.headers)) throw new Error('SYNTHETIC_RECALLED_ASSET_AVAILABLE');
     const events = completeEvents(plan);
     for (let offset = 0; offset < events.length; offset += 100) {
@@ -137,7 +181,7 @@ try {
     if (await removeSyntheticFamily()) await unlink(pending);
     const revoked = await call('/me', 'GET', undefined, original);
     if (revoked.status !== 401 || revoked.value?.code !== 'UNAUTHENTICATED') throw new Error('SYNTHETIC_SESSION_STILL_ACTIVE');
-    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', databaseReady: true, familyCreated: true, childRead: true, billingPreviewRead: true, signedMediaVerified: true, recalledMediaRejected: true, practiceFinalized: true, parentReportRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
+    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', databaseReady: true, webShellVerified: true, webShellBytes, familyCreated: true, childRead: true, billingPreviewRead: true, signedMediaVerified: true, recalledMediaRejected: true, practiceFinalized: true, parentReportRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
   }
 } catch (error) {
   if (credentials && !cleanupOnly) {
