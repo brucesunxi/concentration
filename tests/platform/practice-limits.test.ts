@@ -52,7 +52,9 @@ test('all four age defaults are read-only, family scoped and children may read o
     assert.equal((await api.practiceLimits(child, f.c.id)).canEdit, false);
     await assert.rejects(api.practiceLimits(child, sibling.id), denied('NOT_FOUND'));
     await assert.rejects(api.setPracticeLimit(child, f.c.id, { minutes: 1, acknowledged: true, effectiveDay: overview.nextDay }, '"1"'), denied('PARENT_REQUIRED'));
+    await assert.rejects(api.pausePracticeToday(child, f.c.id, { day: overview.day, acknowledged: true }, '"1"'), denied('PARENT_REQUIRED'));
     const other = await fixture(); await assert.rejects(api.practiceLimits(other.p, f.c.id), denied('NOT_FOUND'));
+    await assert.rejects(api.pausePracticeToday(other.p, f.c.id, { day: overview.day, acknowledged: true }, '"1"'), denied('NOT_FOUND'));
   }
 });
 
@@ -111,6 +113,48 @@ test('a pause blocks new Web and native practice after rollover but permits reco
   const exported = await api.exportChild(f.p, f.c.id); assert.equal(exported.practiceLimits.currentMinutes, 2); assert.equal((exported.sessions[0].daily_limit_snapshot as { minutes: number }).minutes, 2);
 });
 
+test('parent can pause new practice immediately without changing a signed session or tomorrow’s plan', async () => {
+  const f = await fixture(); const active = await start(f), grant = JSON.stringify(active.session.continuation_grant);
+  f.p = await login(f);
+  const before = await api.practiceLimits(f.p, f.c.id);
+  const paused = await api.pausePracticeToday(f.p, f.c.id, { day: before.day, acknowledged: true }, `"${before.settingsVersion}"`);
+  assert.equal(paused.currentMinutes, 0); assert.equal(paused.status, 'paused'); assert.equal(paused.availableMs, 0);
+  assert.equal(paused.reservedMs, 480000); assert.deepEqual(paused.next, { minutes: 8, day: before.nextDay });
+  assert.equal(practiceInvitationDay(paused, 'en').mayStart, false);
+  assert.equal(JSON.stringify((await db.query<{ continuation_grant: unknown }>('SELECT continuation_grant FROM sessions WHERE id=$1', [active.session.id])).rows[0].continuation_grant), grant);
+  const activeChild = (await api.authenticate(active.auth.value))!;
+  assert.equal((await api.active(activeChild))?.id, active.session.id);
+  const events: EngineEvent[] = [
+    { id: randomUUID(), seq: 1, at: 0, type: 'present', trialId: active.session.plan.trials[0].id, presentation: { frameDeltaMs: 16, assetsReady: true, method: 'raf-pair' } },
+    { id: randomUUID(), seq: 2, at: 10000, type: 'interrupt', reason: 'pause' },
+    { id: randomUUID(), seq: 3, at: 110000, type: 'end', reason: 'child_stopped' },
+  ];
+  await api.append(activeChild, active.session.id, { events }); await api.finalize(activeChild, active.session.id, { lastSeq: 3 });
+  await assert.rejects(start(f), denied('PRACTICE_PAUSED'));
+  const native = (await api.authenticate((await api.login(f.credentials, 'native')).value, 'native'))!;
+  await assert.rejects(api.start(native, f.c.id, { task: 'search', environment: { ...TEST_ENVIRONMENT, platform: 'ios', input: 'touch', deviceClass: 'phone' }, deviceId: randomUUID() }, randomUUID()), denied('PRACTICE_PAUSED'));
+  assert.equal((await api.report(f.p, f.c.id)).child.id, f.c.id);
+  const repeated = await api.pausePracticeToday(f.p, f.c.id, { day: paused.day, acknowledged: true }, `"${paused.settingsVersion}"`);
+  assert.equal(repeated.settingsVersion, paused.settingsVersion);
+  clock = nextFamilyDay(clock, 'UTC'); f.p = await login(f);
+  const tomorrow = await api.practiceLimits(f.p, f.c.id);
+  assert.equal(tomorrow.currentMinutes, 8); assert.equal(tomorrow.next, null);
+});
+
+test('immediate pause preserves an already scheduled next-day change and rejects stale confirmation', async () => {
+  const f = await fixture('9-11', 'Asia/Shanghai'); await set(f, 3);
+  const before = await api.practiceLimits(f.p, f.c.id);
+  await assert.rejects(api.pausePracticeToday(f.p, f.c.id, { day: before.day, acknowledged: true }, undefined), denied('VERSION_REQUIRED'));
+  await assert.rejects(api.pausePracticeToday(f.p, f.c.id, { day: before.day, acknowledged: false }, `"${before.settingsVersion}"`));
+  await assert.rejects(api.pausePracticeToday(f.p, f.c.id, { day: before.day, acknowledged: true, familyId: randomUUID() }, `"${before.settingsVersion}"`));
+  const paused = await api.pausePracticeToday(f.p, f.c.id, { day: before.day, acknowledged: true }, `"${before.settingsVersion}"`);
+  assert.equal(paused.currentMinutes, 0); assert.deepEqual(paused.next, { minutes: 3, day: before.nextDay });
+  await assert.rejects(api.pausePracticeToday(f.p, f.c.id, { day: before.day, acknowledged: true }, `"${before.settingsVersion}"`), denied('LIMIT_VERSION_CONFLICT'));
+  clock = nextFamilyDay(clock, 'Asia/Shanghai'); f.p = await login(f);
+  await assert.rejects(api.pausePracticeToday(f.p, f.c.id, { day: before.day, acknowledged: true }, `"${paused.settingsVersion}"`), denied('LIMIT_DAY_CHANGED'));
+  assert.equal((await api.practiceLimits(f.p, f.c.id)).currentMinutes, 3);
+});
+
 test('pending plans can be replaced or cancelled without changing today, and two editors cannot silently overwrite', async () => {
   const f = await fixture(); const results = await Promise.allSettled([2, 3].map(minutes => api.setPracticeLimit(f.p, f.c.id, { minutes, acknowledged: true, effectiveDay: '2026-10-02' }, '"1"')));
   assert.equal(results.filter(r => r.status === 'fulfilled').length, 1); assert.equal((results.find(r => r.status === 'rejected') as PromiseRejectedResult).reason.code, 'LIMIT_VERSION_CONFLICT');
@@ -154,6 +198,20 @@ test('client protects pending writes, clears stale conflict and unknown results,
   assert.deepEqual(input, { minutes: 2, acknowledged: true, effectiveDay: '2026-10-02' }); assert.deepEqual(headers, { 'If-Match': '"1"' });
   reject(new Error('lost response')); await pending; assert.equal(c.state.data, null); assert.equal(c.state.saved, false); assert.equal(c.state.error, 'RESULT_UNCONFIRMED');
   await c.load(); const conflict = c.save(3); reject({ code: 'LIMIT_VERSION_CONFLICT' }); await conflict; assert.equal(c.state.data, null); assert.equal(c.state.error, 'LIMIT_VERSION_CONFLICT');
+});
+
+test('client sends an acknowledged same-day pause and requires reload after an unknown result', async () => {
+  let writes = 0, input: unknown, headers: unknown, path = '', method = '';
+  const c = new PracticeLimitClient(snapshot.childId, true, async <T>(requestedPath: string, requestedMethod?: string, body?: unknown, head?: Record<string, string>): Promise<T> => {
+    if (!requestedMethod) return snapshot as T;
+    writes++; path = requestedPath; method = requestedMethod; input = body; headers = head;
+    throw new Error('lost response');
+  }, () => {});
+  await c.load(); await c.pauseToday();
+  assert.equal(writes, 1); assert.equal(path, `/children/${snapshot.childId}/practice-limits/pause-today`); assert.equal(method, 'POST');
+  assert.deepEqual(input, { day: snapshot.day, acknowledged: true }); assert.deepEqual(headers, { 'If-Match': '"1"' });
+  assert.equal(c.state.data, null); assert.equal(c.state.error, 'RESULT_UNCONFIRMED');
+  await c.pauseToday(); assert.equal(writes, 1);
 });
 
 test('automatic reads preserve drafts through a transient failure, block unconfirmed writes, and clear revoked or mismatched snapshots', async () => {

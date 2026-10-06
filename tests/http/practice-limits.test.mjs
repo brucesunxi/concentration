@@ -43,6 +43,7 @@ test('Web and native practice plans require parent scope, current versions and c
     assert.equal((await call(path, child)).body.canEdit, false);
     assert.equal((await call(`/children/${sibling.id}/practice-limits`, child)).response.status, 404);
     assert.equal((await call(path, child, 'PATCH', input, { 'If-Match': '"1"' })).body.code, 'PARENT_REQUIRED');
+    assert.equal((await call(`${path}/pause-today`, child, 'POST', { day: first.body.day, acknowledged: true }, { 'If-Match': '"1"' })).body.code, 'PARENT_REQUIRED');
     p = web(await call('/auth/login', {}, 'POST', credentials));
     const native = { native: true, token: (await call('/auth/login', { native: true }, 'POST', credentials)).body.accessToken };
     const race = await Promise.all([call(path, p, 'PATCH', input, { 'If-Match': '"1"' }), call(path, native, 'PATCH', { ...input, minutes: 2 }, { 'If-Match': '"1"' })]);
@@ -50,10 +51,18 @@ test('Web and native practice plans require parent scope, current versions and c
     const version = (await call(path, native)).body.settingsVersion;
     const paused = await call(path, native, 'PATCH', { ...input, minutes: 0 }, { 'If-Match': `"${version}"` });
     assert.equal(paused.body.next.minutes, 0); assert.equal(paused.body.currentMinutes, 8); assert.equal(paused.response.headers.get('set-cookie'), null);
+    const pausePath = `${path}/pause-today`, pauseInput = { day: paused.body.day, acknowledged: true };
+    assert.equal((await call(pausePath, p, 'POST', pauseInput)).response.status, 428);
+    assert.equal((await call(pausePath, p, 'POST', pauseInput, { 'If-Match': `"${paused.body.settingsVersion}"`, 'X-CSRF-Token': 'wrong' })).body.code, 'CSRF_REJECTED');
+    assert.equal((await call(pausePath, p, 'POST', { ...pauseInput, acknowledged: false }, { 'If-Match': `"${paused.body.settingsVersion}"` })).body.code, 'INVALID_REQUEST');
+    const rested = await call(pausePath, p, 'POST', pauseInput, { 'If-Match': `"${paused.body.settingsVersion}"` });
+    assert.equal(rested.body.currentMinutes, 0); assert.equal(rested.body.status, 'paused'); assert.deepEqual(rested.body.next, paused.body.next);
+    assert.equal((await call(pausePath, native, 'POST', pauseInput, { 'If-Match': `"${paused.body.settingsVersion}"` })).body.code, 'LIMIT_VERSION_CONFLICT');
     const other = web(await call('/auth/setup', {}, 'POST', { ...credentials, name: 'Other synthetic limits', timezone: 'UTC', locale: 'en', acknowledgedLocalUse: true }));
     assert.equal((await call(path, other)).response.status, 404);
+    assert.equal((await call(pausePath, other, 'POST', pauseInput, { 'If-Match': `"${rested.body.settingsVersion}"` })).response.status, 404);
     await stop(); await boot();
-    const restored = (await call(path, p)).body; assert.deepEqual(restored.next, paused.body.next); assert.equal(restored.settingsVersion, paused.body.settingsVersion);
+    const restored = (await call(path, p)).body; assert.deepEqual(restored.next, rested.body.next); assert.equal(restored.settingsVersion, rested.body.settingsVersion); assert.equal(restored.currentMinutes, 0);
     const exported = (await call(`/children/${c.id}/export`, p)).body; assert.deepEqual(exported.practiceLimits.next, restored.next);
     await call(`/children/${c.id}/withdraw`, p, 'POST', {});
     assert.equal((await call(path, p)).body.status, 'collection-stopped');

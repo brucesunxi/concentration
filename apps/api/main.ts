@@ -144,6 +144,8 @@ const server = http.createServer(async (req, res) => {
     const limitRoute = url.pathname.match(/^\/api\/children\/([a-f0-9-]{36})\/practice-limits$/);
     if (limitRoute && method === 'GET') { json(await api.practiceLimits(principal, limitRoute[1])); return; }
     if (limitRoute && method === 'PATCH') { json(await api.setPracticeLimit(principal, limitRoute[1], await body(req), req.headers['if-match'])); return; }
+    const pauseTodayRoute = url.pathname.match(/^\/api\/children\/([a-f0-9-]{36})\/practice-limits\/pause-today$/);
+    if (pauseTodayRoute && method === 'POST') { json(await api.pausePracticeToday(principal, pauseTodayRoute[1], await body(req), req.headers['if-match'])); return; }
     const ageReviewRoute = url.pathname.match(/^\/api\/children\/([a-f0-9-]{36})\/age-review(?:\/(apply))?$/);
     if (ageReviewRoute) {
       const [,id,action]=ageReviewRoute;

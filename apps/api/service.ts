@@ -22,7 +22,7 @@ import { nextFamilyDay } from '../../packages/session-runtime/day-boundary.ts';
 import { practiceWindowPolicy } from '../../packages/session-runtime/practice-window.ts';
 import { effectiveMinutes, usageTotals } from './practice-limits.ts';
 import type { LimitSettings } from './practice-limits.ts';
-import { practiceLimitInput } from '../../packages/contracts/practice-limits.ts';
+import { pausePracticeTodayInput, practiceLimitInput } from '../../packages/contracts/practice-limits.ts';
 import type { PracticeLimits } from '../../packages/contracts/practice-limits.ts';
 import { familyMembers, memberContext, identity } from './family-members.ts';
 import type { MemberRow } from './family-members.ts';
@@ -292,6 +292,27 @@ export function service(source: Database, now: () => number = Date.now, content?
       await db.query(`UPDATE children SET daily_limit_minutes=$2,next_daily_limit_minutes=$3,daily_limit_effective_day=$4,
         daily_limit_version=daily_limit_version+1,daily_limit_updated_at=$5 WHERE id=$1`,
         [childId, current, next, next === null ? null : nextDay, new Date(at).toISOString()]);
+      return operations.practiceLimits(p, childId);
+    },
+    async pausePracticeToday(p: Principal, childId: string, raw: unknown, ifMatch: unknown): Promise<PracticeLimits> {
+      recentParent(p, now()); const input = pausePracticeTodayInput.parse(raw);
+      if (ifMatch === undefined) fail(428, 'VERSION_REQUIRED', '请先读取当前设置。');
+      if (typeof ifMatch !== 'string' || !/^"[1-9][0-9]{0,8}"$/.test(ifMatch)) fail(400, 'INVALID_VERSION', '设置版本无效。');
+      const c = await child(db, p, childId, true);
+      if (!collecting(c)) fail(403, 'CONSENT_REVOKED', '这份档案已停止采集。');
+      if (c.daily_limit_version !== Number(ifMatch.slice(1, -1))) fail(409, 'LIMIT_VERSION_CONFLICT', '设置已改变，请读取后重新确认。');
+      const f = (await one<Family>(db, 'SELECT timezone FROM families WHERE id=$1', [p.family_id]))!;
+      const at = now(), today = day(f.timezone, at);
+      if (input.day !== today) fail(409, 'LIMIT_DAY_CHANGED', '家庭日期已改变，请重新读取今天的安排。');
+      const current = effectiveMinutes(c, today);
+      if (current === 0) return operations.practiceLimits(p, childId);
+      const nextDay = day(f.timezone, nextFamilyDay(at, f.timezone));
+      const pending = c.daily_limit_effective_day && c.daily_limit_effective_day > today
+        ? { minutes: c.next_daily_limit_minutes!, day: c.daily_limit_effective_day }
+        : { minutes: current, day: nextDay };
+      await db.query(`UPDATE children SET daily_limit_minutes=0,next_daily_limit_minutes=$2,daily_limit_effective_day=$3,
+        daily_limit_version=daily_limit_version+1,daily_limit_updated_at=$4 WHERE id=$1`,
+        [childId, pending.minutes, pending.day, new Date(at).toISOString()]);
       return operations.practiceLimits(p, childId);
     },
     changePassword: (p: Principal, raw: unknown) => accountCommand(p, raw, true),
@@ -729,7 +750,7 @@ export function service(source: Database, now: () => number = Date.now, content?
   // Public authentication methods establish their narrower context above. Every
   // other operation receives a server-authenticated Principal, never body fields.
   const selfScopedMethods = new Set(['setup', 'login', 'join', 'authenticate', 'sessionAuthorities', 'changePassword', 'logoutAll', 'deleteFamily', 'grantGuardianConsent']);
-  const ownerMethods = new Set(['billingStatus','addChild','withdraw','deleteChild','exportChild','setPracticeLimit','handover','lifeSpace','lifeHistory','createLifeGoal','actLifeGoal','inviteMember','cancelInvitation','actMember','requestAgeReview','applyAgeReview']);
+  const ownerMethods = new Set(['billingStatus','addChild','withdraw','deleteChild','exportChild','setPracticeLimit','pausePracticeToday','handover','lifeSpace','lifeHistory','createLifeGoal','actLifeGoal','inviteMember','cancelInvitation','actMember','requestAgeReview','applyAgeReview']);
   const pendingMethods = new Set(['me','logout','accountSecurity','familyMembers']);
   return Object.fromEntries(Object.entries(operations).map(([name, action]) => [name,
     selfScopedMethods.has(name) ? action : (p: Principal, ...args: unknown[]) => authenticated(p, current => {

@@ -10,10 +10,11 @@ export function usePracticeLimits(childId: string, parent: boolean, request: Con
   const reload = useCallback(() => client.current?.refresh(), []);
   const refresh = useCallback(() => client.current?.refresh(), []);
   const save = useCallback((minutes: number) => client.current?.save(minutes), []);
+  const pauseToday = useCallback(() => client.current?.pauseToday(), []);
   useEffect(() => {
     if (state.busy || state.needsParent) return;
     const timer = setTimeout(() => { if (isActive()) void refresh(); }, practiceLimitsRefreshDelay(state.stale ? null : state.data));
     return () => clearTimeout(timer);
   }, [state.busy, state.needsParent, state.stale, state.data, isActive, refresh]);
-  return { state, reload, refresh, save };
+  return { state, reload, refresh, save, pauseToday };
 }

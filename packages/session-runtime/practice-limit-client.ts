@@ -37,5 +37,17 @@ export class PracticeLimitClient {
       this.update({ data: null, stale: false, error: code, needsParent: ['UNAUTHENTICATED', 'PARENT_REQUIRED', 'REAUTH_REQUIRED'].includes(code) });
     } finally { this.update({ busy: false }); }
   }
+  async pauseToday() {
+    const current = this.state.data;
+    if (this.disposed || this.state.busy || this.state.stale || !current?.canEdit || !current.collectionActive || current.currentMinutes === 0) return;
+    this.update({ busy: true, refreshing: false, error: '', saved: false });
+    try {
+      const next = await this.request<PracticeLimits>(`/children/${this.childId}/practice-limits/pause-today`, 'POST', { day: current.day, acknowledged: true }, { 'If-Match': `"${current.settingsVersion}"` });
+      this.update({ data: this.check(next), saved: true });
+    } catch (error) {
+      const code = (error as { code?: string }).code ?? 'RESULT_UNCONFIRMED';
+      this.update({ data: null, stale: false, error: code, needsParent: ['UNAUTHENTICATED', 'PARENT_REQUIRED', 'REAUTH_REQUIRED'].includes(code) });
+    } finally { this.update({ busy: false }); }
+  }
   dispose() { this.disposed = true; }
 }
