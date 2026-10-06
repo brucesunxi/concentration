@@ -1,16 +1,23 @@
-import { mkdir, readFile, rename, writeFile } from 'node:fs/promises';
-import { createHash } from 'node:crypto';
+import { link, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { createHash, randomUUID } from 'node:crypto';
 import { resolve, dirname } from 'node:path';
 import { CONTENT_NARRATIONS, narrationText } from '../packages/content/voice-catalogue.ts';
 import { processMedia } from '../apps/api/media-processor.ts';
 
 const root = resolve(import.meta.dirname, '..');
 const args = process.argv.slice(2);
+const missingRules = args.includes('--missing-rules');
 const dryRun = args.includes('--dry-run');
 const onlyIndex = args.indexOf('--only');
-if (onlyIndex >= 0 && (!args[onlyIndex + 1] || onlyIndex !== args.length - 2)) throw new Error('Usage: node scripts/generate-content-voice-assets.mjs [--dry-run] [--only filename-without-mp3]');
+const usage = 'Usage: node scripts/generate-content-voice-assets.mjs [--dry-run] [--missing-rules] [--only filename-without-mp3]';
+if (onlyIndex >= 0 && (!args[onlyIndex + 1] || onlyIndex !== args.length - 2)) throw new Error(usage);
+if (args.filter(arg => arg === '--dry-run').length > 1 || args.filter(arg => arg === '--missing-rules').length > 1 || args.filter(arg => arg === '--only').length > 1 || args.some((arg, index) => arg !== '--dry-run' && arg !== '--missing-rules' && arg !== '--only' && !(onlyIndex >= 0 && index === onlyIndex + 1))) throw new Error(usage);
 const only = onlyIndex >= 0 ? args[onlyIndex + 1] : undefined;
-const entries = CONTENT_NARRATIONS.filter(item => !item.existing && (!only || item.relativePath.endsWith(`/${only}.mp3`)));
+const catalogue = missingRules
+  ? CONTENT_NARRATIONS.filter(item => item.task === 'stop').map(item => ({ ...item, copyKey:'rule', existing:false,
+      relativePath:`dist/content-rule-candidates/stop-rule-${item.cohort}-${item.locale === 'en' ? 'en' : 'zh'}.mp3` }))
+  : CONTENT_NARRATIONS.filter(item => !item.existing);
+const entries = catalogue.filter(item => !only || item.relativePath.endsWith(`/${only}.mp3`));
 if (only && entries.length !== 1) throw new Error('Unknown or existing narration ID');
 if (dryRun) {
   for (const item of entries) console.log(`${item.relativePath} | ${item.voice} | ${narrationText(item)}`);
@@ -54,6 +61,7 @@ for (const item of entries) {
   try {
     const existing = await readFile(path);
     if (existing.length < 1024) throw new Error(`Existing recording is too small: ${item.relativePath}`);
+    if (missingRules) throw new Error(`Rule candidate already exists; inspect it before retrying: ${item.relativePath}`);
     console.log(`Existing: ${item.relativePath}`);
     continue;
   } catch (error) {
@@ -70,13 +78,15 @@ for (const item of entries) {
   const source = Buffer.from(await response.arrayBuffer());
   const processed = await processMedia('guide', source);
   await mkdir(dirname(path), { recursive:true });
-  const temporary = `${path}.${process.pid}.tmp`;
+  const temporary = `${path}.${randomUUID()}.tmp`;
+  await writeFile(temporary, processed.body, { flag:'wx' });
   try {
-    await writeFile(temporary, processed.body, { flag:'wx' });
-    await rename(temporary, path);
+    await link(temporary, path);
   } catch (error) {
-    await import('node:fs/promises').then(fs => fs.rm(temporary,{force:true}));
+    if (error.code === 'EEXIST') throw new Error(`Recording already exists; inspect it before retrying: ${item.relativePath}`);
     throw error;
+  } finally {
+    await rm(temporary,{force:true});
   }
   const sha256 = createHash('sha256').update(processed.body).digest('hex');
   console.log(`Generated ${item.relativePath} | ${processed.body.length} bytes | ${processed.inspection.durationMs} ms | sha256 ${sha256}`);
