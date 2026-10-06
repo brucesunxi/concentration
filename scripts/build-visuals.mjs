@@ -18,9 +18,10 @@ for (const asset of source.assets) {
   const metadata = await sharp(master).metadata();
   if (!metadata.hasAlpha || metadata.format !== 'png') throw new Error(`Expected transparent PNG master: ${asset.id}`);
   for (const output of asset.exports) {
-    if (output.format === 'webp' && (!Number.isInteger(output.quality) || output.quality < 1 || output.quality > 100)) throw new Error(`WebP quality must be explicit: ${output.path}`);
+    if (output.format === 'webp' && output.lossless !== true && (!Number.isInteger(output.quality) || output.quality < 1 || output.quality > 100)) throw new Error(`WebP quality or lossless mode must be explicit: ${output.path}`);
+    if (output.lossless === true && (output.format !== 'webp' || output.quality !== undefined)) throw new Error(`Invalid lossless export: ${output.path}`);
     const pipeline = sharp(master).resize({ width: output.width, withoutEnlargement: true, kernel: 'lanczos3' });
-    const encoded = output.format === 'png' ? pipeline.png({ compressionLevel: 9 }) : pipeline.webp({ quality: output.quality, alphaQuality: 100, effort: 6 });
+    const encoded = output.format === 'png' ? pipeline.png({ compressionLevel: 9 }) : pipeline.webp(output.lossless ? { lossless: true, effort: 6 } : { quality: output.quality, alphaQuality: 100, effort: 6 });
     const bytes = await encoded.toBuffer();
     if (checkOnly && !(await readFile(resolve(directory, output.path))).equals(bytes)) throw new Error(`Delivery bytes differ from the declared source and encoder: ${output.path}`);
     const info = await sharp(bytes).metadata();
@@ -43,11 +44,23 @@ for (const asset of source.assets) {
         cells.push({ item: asset.cells[index], index, bounds: { left, top, right, bottom }, cellPixels: side });
       }
     }
-    const entry = { id: asset.id, path: output.path, format: info.format, width: info.width, height: info.height, bytes: bytes.length, sha256: hash(bytes), sourceSha256: hash(master), review: source.review, ...(output.format === 'webp' ? { quality: output.quality } : {}), ...(cells.length ? { cells } : {}) };
+    const entry = { id: asset.id, path: output.path, format: info.format, width: info.width, height: info.height, bytes: bytes.length, sha256: hash(bytes), sourceSha256: hash(master), review: source.review, ...(output.lossless ? { lossless: true } : output.format === 'webp' ? { quality: output.quality } : {}), ...(cells.length ? { cells } : {}) };
     outputs.push({ entry, bytes });
   }
 }
-const webPaths = ['runtime/hero-island.webp', 'runtime/bridge-scene.webp', 'runtime/characters-sheet.png', 'runtime/objects-sheet.png'];
+for (const id of ['characters-sheet', 'objects-sheet']) {
+  const png = outputs.find(o => o.entry.id === id && o.entry.format === 'png');
+  const webp = outputs.find(o => o.entry.id === id && o.entry.lossless === true);
+  if (!png || !webp) throw new Error(`Missing PNG or lossless WebP stimulus atlas: ${id}`);
+  const a = await sharp(png.bytes).ensureAlpha().raw().toBuffer();
+  const b = await sharp(webp.bytes).ensureAlpha().raw().toBuffer();
+  if (a.length !== b.length) throw new Error(`Stimulus atlas geometry changed: ${id}`);
+  for (let offset = 0; offset < a.length; offset += 4) {
+    if (a[offset + 3] !== b[offset + 3]) throw new Error(`Stimulus atlas alpha changed: ${id}`);
+    if (a[offset + 3] && (a[offset] !== b[offset] || a[offset + 1] !== b[offset + 1] || a[offset + 2] !== b[offset + 2])) throw new Error(`Visible stimulus pixels changed: ${id}`);
+  }
+}
+const webPaths = ['runtime/hero-island.webp', 'runtime/bridge-scene.webp', 'runtime/characters-sheet.webp', 'runtime/objects-sheet.webp'];
 const webImageBytes = outputs.filter(o => webPaths.includes(o.entry.path)).reduce((sum, o) => sum + o.bytes.length, 0);
 if (webImageBytes > 1250000) throw new Error(`Web image budget exceeded: ${webImageBytes}`);
 const manifest = { schemaVersion: 1, version: source.version, encoder: { sharp: sharp.versions.sharp, vips: sharp.versions.vips }, webImageBytes, retainedAssets: source.retainedPreviewAssets, assets: outputs.map(o => o.entry) };

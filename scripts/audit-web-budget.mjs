@@ -24,6 +24,12 @@ visit(entries[0][0]);
 for (const [key, entry] of Object.entries(manifest)) {
   if (key.startsWith('../../src/assets/') && files.has(entry.file)) throw new Error('Historical artwork entered the current first-screen graph');
 }
+for (const name of ['characters', 'objects']) {
+  const preview = manifest[`../../packages/visuals/runtime/${name}-sheet.webp`];
+  if (!preview || !files.has(preview.file)) throw new Error(`Lossless ${name} preview is missing from the first-screen graph`);
+  const png = manifest[`../../packages/visuals/runtime/${name}-sheet.png`];
+  if (png && files.has(png.file)) throw new Error(`Full-size ${name} PNG entered the first-screen graph`);
+}
 const assets = [];
 for (const file of [...files].sort()) {
   const bytes = await readFile(resolve(directory, file));

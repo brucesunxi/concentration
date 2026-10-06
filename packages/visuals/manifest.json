@@ -1,11 +1,11 @@
 {
   "schemaVersion": 1,
-  "version": "visual-2026-10-01-v4",
+  "version": "visual-2026-10-06-v5",
   "encoder": {
     "sharp": "0.35.4",
     "vips": "8.18.6"
   },
-  "webImageBytes": 1014744,
+  "webImageBytes": 729568,
   "retainedAssets": [
     {
       "path": "../../src/assets/characters-sheet.png",
@@ -137,6 +137,64 @@
       ]
     },
     {
+      "id": "characters-sheet",
+      "path": "runtime/characters-sheet.webp",
+      "format": "webp",
+      "width": 640,
+      "height": 640,
+      "bytes": 171572,
+      "sha256": "2566ff52e6358cb72952d8154ee741f0e58e70fdf06e538972e428b2718cc0ee",
+      "sourceSha256": "1eadc000300172779dad4ec8204f1fb3eb4f7197c97c7edccd24c998f6ab3409",
+      "review": "unreviewed",
+      "lossless": true,
+      "cells": [
+        {
+          "item": "rabbit",
+          "index": 0,
+          "bounds": {
+            "left": 107,
+            "top": 59,
+            "right": 219,
+            "bottom": 287
+          },
+          "cellPixels": 320
+        },
+        {
+          "item": "fox",
+          "index": 1,
+          "bounds": {
+            "left": 81,
+            "top": 69,
+            "right": 259,
+            "bottom": 284
+          },
+          "cellPixels": 320
+        },
+        {
+          "item": "bear",
+          "index": 2,
+          "bounds": {
+            "left": 76,
+            "top": 56,
+            "right": 260,
+            "bottom": 267
+          },
+          "cellPixels": 320
+        },
+        {
+          "item": "cat",
+          "index": 3,
+          "bounds": {
+            "left": 96,
+            "top": 60,
+            "right": 249,
+            "bottom": 266
+          },
+          "cellPixels": 320
+        }
+      ]
+    },
+    {
       "id": "objects-sheet",
       "path": "runtime/objects-sheet.png",
       "format": "png",
@@ -146,6 +204,64 @@
       "sha256": "4de5b743ff2ceec1720bd1bc340bbb83fae145d46d866e0f361f60a1d588ec57",
       "sourceSha256": "404abe8fe6751876f156b75e318367d53a6de8aff2de43de7ef8859d070e12b5",
       "review": "unreviewed",
+      "cells": [
+        {
+          "item": "apple",
+          "index": 0,
+          "bounds": {
+            "left": 42,
+            "top": 36,
+            "right": 237,
+            "bottom": 232
+          },
+          "cellPixels": 256
+        },
+        {
+          "item": "leaf",
+          "index": 1,
+          "bounds": {
+            "left": 38,
+            "top": 37,
+            "right": 210,
+            "bottom": 236
+          },
+          "cellPixels": 256
+        },
+        {
+          "item": "flower",
+          "index": 2,
+          "bounds": {
+            "left": 38,
+            "top": 12,
+            "right": 241,
+            "bottom": 219
+          },
+          "cellPixels": 256
+        },
+        {
+          "item": "berry",
+          "index": 3,
+          "bounds": {
+            "left": 31,
+            "top": 39,
+            "right": 222,
+            "bottom": 203
+          },
+          "cellPixels": 256
+        }
+      ]
+    },
+    {
+      "id": "objects-sheet",
+      "path": "runtime/objects-sheet.webp",
+      "format": "webp",
+      "width": 512,
+      "height": 512,
+      "bytes": 188690,
+      "sha256": "0d5fcfebbebd0d2f24b2c27fdcbf9adf7b6db789704ea4e7de454eaeb00379f2",
+      "sourceSha256": "404abe8fe6751876f156b75e318367d53a6de8aff2de43de7ef8859d070e12b5",
+      "review": "unreviewed",
+      "lossless": true,
       "cells": [
         {
           "item": "apple",

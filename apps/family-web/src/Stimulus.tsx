@@ -2,8 +2,8 @@ import { createContext, useContext } from 'react';
 import { Star, Moon, Circle, Diamond, Triangle, Square } from 'lucide-react';
 import type { Item, Locale } from '../../../packages/task-engine/index.ts';
 import { itemLabel } from './content.ts';
-import characters from '../../../packages/visuals/runtime/characters-sheet.png';
-import objects from '../../../packages/visuals/runtime/objects-sheet.png';
+import characters from '../../../packages/visuals/runtime/characters-sheet.webp';
+import objects from '../../../packages/visuals/runtime/objects-sheet.webp';
 
 // Null is the decorative home preview. A practice provider must supply the
 // artwork from its frozen plan, including when that plan uses an older version.

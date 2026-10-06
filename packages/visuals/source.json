@@ -1,6 +1,6 @@
 {
   "schemaVersion": 1,
-  "version": "visual-2026-10-01-v4",
+  "version": "visual-2026-10-06-v5",
   "generator": "Codex built-in image_gen",
   "createdOn": "2026-09-30",
   "review": "unreviewed",
@@ -72,6 +72,13 @@
           "width": 640,
           "format": "png",
           "maxBytes": 600000
+        },
+        {
+          "path": "runtime/characters-sheet.webp",
+          "width": 640,
+          "format": "webp",
+          "lossless": true,
+          "maxBytes": 220000
         }
       ]
     },
@@ -95,6 +102,13 @@
           "width": 512,
           "format": "png",
           "maxBytes": 600000
+        },
+        {
+          "path": "runtime/objects-sheet.webp",
+          "width": 512,
+          "format": "webp",
+          "lossless": true,
+          "maxBytes": 220000
         }
       ]
     }
