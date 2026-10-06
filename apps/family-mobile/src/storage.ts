@@ -14,6 +14,7 @@ import { hashObject } from '../../../packages/content/index.ts';
 import { nativeVerifier } from '../../../packages/content/native-verifier.ts';
 import { UNSYNCED_RETENTION_MS, UNSYNCED_WARNING_MS, retentionClock } from '../../../packages/session-runtime/journal-retention.ts';
 import { nativeDatabaseDirectoryUri } from '../../../packages/session-runtime/native-database-path.ts';
+import type { CollectionStatus } from '../../../packages/contracts/collection-status.ts';
 
 let pending: Promise<SQLite.SQLiteDatabase> | undefined;
 const operations = new SerialQueue();
@@ -120,13 +121,14 @@ export async function readChildJournals(familyId: string, childId: string) {
     return { sessionId: row.id, events };
   });
 }
-/** Only call with the complete, server-authenticated parent family profile list. */
-export async function reconcileFamilyJournals(familyId: string, children: { id: string; consentActive: boolean }[]) {
+/** Only an active owner receives a complete family list. Other parents may
+ * remove explicitly withdrawn profiles, but absence is not deletion proof. */
+export async function reconcileFamilyJournals(familyId: string, children: { id: string; collectionStatus: CollectionStatus }[], complete: boolean) {
   await pruneExpiredJournals();
-  const allowed = new Set(children.filter(child => child.consentActive).map(child => child.id));
+  const allowed = new Set(children.filter(child => child.collectionStatus !== 'collection-withdrawn').map(child => child.id));
   await withDatabase(db => db.withTransactionAsync(async () => {
     const rows = await db.getAllAsync<{ child_id: string }>('SELECT DISTINCT child_id FROM journal WHERE family_id=?', familyId);
-    const candidates = new Set([...rows.map(row => row.child_id), ...children.filter(c => !c.consentActive).map(c => c.id)]);
+    const candidates = new Set([...(complete ? rows.map(row => row.child_id) : []), ...children.filter(c => c.collectionStatus === 'collection-withdrawn').map(c => c.id)]);
     for (const childId of candidates) if (!allowed.has(childId)) {
       await db.runAsync(BLOCK_PROFILE, familyId, childId);
       await db.runAsync(DELETE_CHILD_JOURNALS, familyId, childId);

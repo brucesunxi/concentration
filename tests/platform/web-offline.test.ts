@@ -96,6 +96,27 @@ test('revoked profiles cannot reappear after clearing, even with a fresh generat
   await assert.rejects(reopened.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,generation),OfflinePreparationChanged);
 });
 
+test('an owner refresh clears withdrawn and deleted browser journals while a partial parent list preserves unseen profiles',async()=>{
+  const {factory,store,generation}=await prepared();
+  const sibling={id:randomUUID(),sessionId:randomUUID()},pending={id:randomUUID(),sessionId:randomUUID()},other={familyId:randomUUID(),childId:randomUUID(),sessionId:randomUUID()};
+  await store.write(sibling.sessionId,sibling.id,capsule.familyId,events,generation);
+  await store.write(pending.sessionId,pending.id,capsule.familyId,events,generation);
+  await store.write(other.sessionId,other.childId,other.familyId,events,generation);
+  await store.reconcileFamily(capsule.familyId,[{id:sibling.id,collectionStatus:'local-preview-enabled'}],false);
+  assert.deepEqual(await store.read(capsule.session.id,capsule.session.child_id,capsule.familyId),events,'a support member cannot infer deletion from a partial list');
+  await store.reconcileFamily(capsule.familyId,[{id:capsule.session.child_id,collectionStatus:'collection-withdrawn'},{id:pending.id,collectionStatus:'guardian-verification-required'}],true);
+  const reopened=new WebJournal(factory),nextGeneration=await reopened.generation();
+  assert.equal(await reopened.resume(),null);
+  assert.deepEqual(await reopened.read(capsule.session.id,capsule.session.child_id,capsule.familyId),[]);
+  assert.deepEqual(await reopened.read(sibling.sessionId,sibling.id,capsule.familyId),[]);
+  assert.deepEqual(await reopened.read(pending.sessionId,pending.id,capsule.familyId),events,'temporary verification gaps retain recoverable records');
+  assert.deepEqual(await reopened.read(other.sessionId,other.childId,other.familyId),events);
+  await assert.rejects(reopened.write(capsule.session.id,capsule.session.child_id,capsule.familyId,events,nextGeneration),OfflinePreparationChanged);
+  await assert.rejects(reopened.write(sibling.sessionId,sibling.id,capsule.familyId,events,nextGeneration),OfflinePreparationChanged);
+  await reopened.write(pending.sessionId,pending.id,capsule.familyId,events,nextGeneration);
+  await reopened.write(other.sessionId,other.childId,other.familyId,events,nextGeneration);
+});
+
 test('deleting a family clears its browser recovery data without erasing another family',async()=>{
   const {factory,store,generation}=await prepared();
   const other={familyId:randomUUID(),childId:randomUUID(),sessionId:randomUUID()};

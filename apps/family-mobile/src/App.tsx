@@ -61,7 +61,7 @@ function FamilyApp() {
     setBusy(true); setError('');setOfflineOffer(null);setPracticeInvitation(null);
     try {
       const next = await client.request<Me>('/me');
-      if (next.role === 'parent') await reconcileFamilyJournals(next.family.id, next.children);
+      if (next.role === 'parent') await reconcileFamilyJournals(next.family.id, next.children, next.member?.role === 'owner' && next.member.state === 'active');
       const active = next.role === 'child' ? await client.request<Session | null>('/sessions/active') : null;
       if (!mounted.current || version !== identityVersion.current) return;
       setMe(next); setFamilyName(next.family.name); setLocale(next.family.locale); setSession(resume ? active : null);
@@ -168,7 +168,7 @@ function FamilyApp() {
     <Button quiet disabled={busy} title={t('退出离线入口','Leave offline access')} onPress={()=>void action(async()=>{const version=++identityVersion.current;try{await client.logout()}finally{if(mounted.current&&version===identityVersion.current){setOfflineOffer(null);setSession(null);setMe(null)}}})} />
   </Page>;
   if(!me && view==='join')return <JoinFamily locale={locale} client={client} onBack={()=>setView('home')} onJoined={next=>{setMe(next);setFamilyName(next.family.name);setView('home');}}/>;
-  if (!me) return <Login onJoin={()=>setView('join')} locale={locale} setLocale={setLocale} name={familyName} busy={busy} error={error} storageUnavailable={storageUnavailable} onRetry={() => void restoreEntry()} onSubmit={(name, password, create, memberLogin) => void action(async () => { const version = ++identityVersion.current; const next = create ? await client.setup(name, password, locale) : await client.login(name, password, memberLogin); if (next.role === 'parent') await reconcileFamilyJournals(next.family.id, next.children); if (!mounted.current || version !== identityVersion.current) return; setMe(next); setFamilyName(next.family.name); setLocale(next.family.locale); })} />;
+  if (!me) return <Login onJoin={()=>setView('join')} locale={locale} setLocale={setLocale} name={familyName} busy={busy} error={error} storageUnavailable={storageUnavailable} onRetry={() => void restoreEntry()} onSubmit={(name, password, create, memberLogin) => void action(async () => { const version = ++identityVersion.current; const next = create ? await client.setup(name, password, locale) : await client.login(name, password, memberLogin); if (next.role === 'parent') await reconcileFamilyJournals(next.family.id, next.children, next.member?.role === 'owner' && next.member.state === 'active'); if (!mounted.current || version !== identityVersion.current) return; setMe(next); setFamilyName(next.family.name); setLocale(next.family.locale); })} />;
   if(practiceInvitation){
     const invitedChild=me.children.find(child=>child.id===practiceInvitation.childId);
     if(invitedChild){

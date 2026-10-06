@@ -80,7 +80,7 @@ export function ParentSpace({ child, family, mode, locale, client, onBack, onCha
     if (!action || !value || !acknowledged || (action === 'delete' && confirmation !== child.alias)) return;
     await run(async () => {
       const outcome = await performProfileAction(action, family.id, child.id, {
-        authenticate: async () => { const me = await client.login(family.name, value); requireCurrent(current); if (me.role === 'parent' && me.family.id === family.id) await reconcileFamilyJournals(me.family.id, me.children); return me; }, identity: () => client.request<Me>('/me'), current,
+        authenticate: async () => { const me = await client.login(family.name, value); requireCurrent(current); if (me.role === 'parent' && me.family.id === family.id) await reconcileFamilyJournals(me.family.id, me.children, me.member?.role === 'owner' && me.member.state === 'active'); return me; }, identity: () => client.request<Me>('/me'), current,
         request: (path, method) => client.request(path, method, method === 'POST' ? {} : undefined),
         cleanup: () => removeChildJournals(family.id, child.id),
         share: async data => {

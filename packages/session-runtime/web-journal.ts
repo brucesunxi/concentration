@@ -4,6 +4,7 @@ import type { ClockCheckpoint } from './authorization.ts';
 import { offlineCapsuleSchema, OfflinePreparationChanged } from './offline-session.ts';
 import type { OfflineCapsule, OfflineSaved } from './offline-session.ts';
 import { journalExpired, journalExpiringSoon, retentionClock } from './journal-retention.ts';
+import type { CollectionStatus } from '../contracts/collection-status.ts';
 
 interface Journal { id: string; childId: string; familyId?: string; events: EngineEvent[]; hash?: string; createdAt: number }
 interface Resume extends OfflineSaved { id: string; generation: number }
@@ -106,6 +107,30 @@ export class WebJournal {
         else if(resume.generation===meta.generation)tx.objectStore('offline').put({...resume,generation});
       }
       done();
+    },fail));
+  }
+  /** Reconcile only against a server-authenticated parent list. Support and
+   * pending members see a partial list, so absence proves deletion only for
+   * the active owner. Explicitly withdrawn profiles are safe in either list. */
+  async reconcileFamily(familyId:string,children:{id:string;collectionStatus:CollectionStatus}[],complete:boolean) {
+    const visible=new Set(children.map(child=>child.id));
+    const withdrawn=new Set(children.filter(child=>child.collectionStatus==='collection-withdrawn').map(child=>child.id));
+    await this.transaction<void>(stores,'readwrite',(tx,done,fail)=>reads(tx,[['meta',singleton]],([meta])=>{
+      tx.objectStore('meta').put({...meta,generation:meta.generation+1});
+      tx.objectStore('offline').clear();
+      for(const id of withdrawn)tx.objectStore('blocked').put({id});
+      const cursor=tx.objectStore('sessions').openCursor();
+      cursor.onerror=()=>{fail(cursor.error);tx.abort();};
+      cursor.onsuccess=()=>{
+        const row=cursor.result;
+        if(!row){done();return;}
+        const journal=row.value as Journal;
+        if(withdrawn.has(journal.childId)||(complete&&journal.familyId===familyId&&!visible.has(journal.childId))){
+          tx.objectStore('blocked').put({id:journal.childId});
+          row.delete();
+        }
+        row.continue();
+      };
     },fail));
   }
   async read(id:string,childId:string,familyId?:string):Promise<EngineEvent[]> {

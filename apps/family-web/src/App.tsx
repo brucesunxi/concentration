@@ -118,7 +118,8 @@ export function App() {
       const next = await request<Me>('/me');if(!current())return null;
       const active=next.role==='child'?await request<Session|null>('/sessions/active'):null;
       if(!current())return null;
-      if(next.role==='parent'||!active)await journal().invalidate();
+      if(next.role==='parent')await journal().reconcileFamily(next.family.id,next.children,next.member?.role==='owner'&&next.member.state==='active');
+      else if(!active)await journal().invalidate();
       if(!current())return null;setMe(next);
       if (next.role === 'child') {  setPage('home'); setLocale(next.children[0]?.locale ?? next.family.locale); }
       setSelected(prev => next.children.some(c => c.id === prev) ? prev : next.children[0]?.id ?? '');
