@@ -86,6 +86,7 @@ export function App() {
   const [error, setError] = useState(''), [pending, setPending] = useState(false), [notice, setNotice] = useState('');
   const [accountNotice, setAccountNotice] = useState<'password' | 'signout' | 'uncertain' | 'delete-uncertain' | 'signin' | 'deleted' | 'deleted-local-pending' | null>(null);
   const [unavailable,setUnavailable]=useState(false);
+  const [storageProblem,setStorageProblem]=useState(false), deviceReady=useRef(true);
   const accessVersion = useRef(0);
   const refreshVersion=useRef(0), mounted=useRef(true);
   const parentDestination = useRef<typeof page>('home');
@@ -120,12 +121,20 @@ export function App() {
       const next = await request<Me>('/me');if(!current())return null;
       const active=next.role==='child'?await request<Session|null>('/sessions/active'):null;
       if(!current())return null;
-      if(next.role==='parent')await journal().reconcileFamily(next.family.id,next.children,next.member?.role==='owner'&&next.member.state==='active');
-      else if(!active)await journal().invalidate();
+      let localReady=deviceReady.current;
+      if(next.role==='parent') {
+        try { await journal().reconcileFamily(next.family.id,next.children,next.member?.role==='owner'&&next.member.state==='active'); }
+        catch { localReady=false; }
+      }
+      else {
+        try { if(active)await journal().generation();else await journal().invalidate(); }
+        catch { localReady=false; }
+      }
+      setStorageProblem(!localReady);
       if(!current())return null;setMe(next);
       if (next.role === 'child') {  setPage('home'); setLocale(next.children[0]?.locale ?? next.family.locale); }
       setSelected(prev => next.children.some(c => c.id === prev) ? prev : next.children[0]?.id ?? '');
-      if (resume && next.role === 'child' && active) setSession(active);
+      if (resume && next.role === 'child' && active && localReady) setSession(active);
       return next;
     } catch (e) {
       if(!current())return null;setMe(null);setSession(null);setModal(null);
@@ -142,7 +151,7 @@ export function App() {
       if(current())setError(e instanceof RequestError ? familyErrorCopy(e,localeRef.current) : t('暂时连接不上家庭服务。未到期的本机记录会保留。','The family service is unavailable. Unexpired local records are preserved.'));return null;
     } finally { if(current())setLoading(false); }
   }
-  useEffect(() => { mounted.current=true;void prepareBrowserIdentity().then(()=>refresh()).catch(e => { if(mounted.current){setError(familyErrorCopy(e,localeRef.current));setLoading(false);} });return()=>{mounted.current=false;refreshVersion.current++;accessVersion.current++;}; }, []);
+  useEffect(() => { mounted.current=true;void prepareBrowserIdentity().catch(()=>{deviceReady.current=false;if(mounted.current)setStorageProblem(true);}).then(()=>refresh());return()=>{mounted.current=false;refreshVersion.current++;accessVersion.current++;}; }, []);
   useEffect(() => {
     if (typeof BroadcastChannel === 'undefined') return;
     const channel = new BroadcastChannel('focus-family-access');
@@ -162,6 +171,17 @@ export function App() {
     const timer=window.setInterval(()=>void check(),30000);const focus=()=>void check();window.addEventListener('focus',focus);return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',focus);};
   },[me?.role,me?.member?.id,me?.member?.role,me?.member?.state,parentProfiles]);
   const safely = async (fn: () => Promise<void>) => { if (pending) return; setPending(true); setError(''); try { await fn(); } catch (e) { setError(familyErrorCopy(e, locale)); if (e instanceof RequestError && ['PARENT_REQUIRED', 'REAUTH_REQUIRED'].includes(e.code)) setModal('login'); } finally { setPending(false); } };
+  async function retryBrowserStorage() {
+    if(pending)return;
+    setPending(true);
+    try {
+      await prepareBrowserIdentity();deviceReady.current=true;
+      await journal().invalidate();
+      setStorageProblem(false);
+      await refresh(false);
+    } catch { setStorageProblem(true); }
+    finally { setPending(false); }
+  }
   function navigate(next: typeof page) { accessVersion.current++; setError(''); setLifeSuggestion(null); if (['report', 'family', 'recovery', 'guide'].includes(next) && me?.role === 'child') { parentDestination.current = next; setModal('login'); return; } focusPage.current = true; if (next === page && !modal) { focusPage.current = false; pageTitle.current?.focus({ preventScroll: true }); } setPage(next); window.scrollTo({ top: 0 }); }
 
   async function authenticate(event: FormEvent<HTMLFormElement>, unlock = false) {
@@ -181,6 +201,7 @@ export function App() {
   }
   function inviteToPractice(task: TaskId) {
     if (pending) return;
+    if (storageProblem) return;
     if (!child) { setModal('profile'); return; }
     if (!collectionStatusAllowsPractice(child.collectionStatus,child.consentActive)) { setError(collectionStatusCopy(child.collectionStatus,locale).detail); return; }
     setError(''); setPracticeInvitation({childId:child.id,task,identity:accessVersion.current}); setModal('practice-invitation');
@@ -189,6 +210,7 @@ export function App() {
     const candidate=me?.children.find(c=>c.id===invitation.childId);
     setModal(null); setPracticeInvitation(null);
     if (!candidate || invitation.identity !== accessVersion.current) { setError(t('家庭状态已更新，请重新选择练习。','Your family space changed. Choose the practice again.')); return; }
+    if (storageProblem) return;
     if (review.availableMs < 5000 || !review.currentMinutes || (inputMode === 'assistive' && ['stop','sustain'].includes(invitation.task))) return;
     if (!collectionStatusAllowsPractice(candidate.collectionStatus,candidate.consentActive)) { setError(collectionStatusCopy(candidate.collectionStatus,locale).detail); return; }
     await safely(async () => {
@@ -258,6 +280,7 @@ export function App() {
     }
     if(!mounted.current||identity!==accessVersion.current)return;
     if(!outcome.localCleared){
+      setStorageProblem(true);
       setError(t('服务端已确认处理，但此浏览器的记录尚未清理。请保持浏览器打开并再次点击以重试本机清理。','The service confirmed the change, but this browser still has records to clear. Keep this browser open and retry local cleanup.'));
       return;
     }
@@ -274,6 +297,7 @@ export function App() {
 
   if(unavailable&&!me)return <main className="offline-recovery"><section className="family-card stack-form"><span className="eyebrow">FOCUS ISLAND</span><h1>{t('重新连接，再一起开始','Reconnect before you begin')}</h1><p>{error||t('家庭服务暂时无法连接，此浏览器没有可恢复的练习。未到期的本机记录会保留。','The family service is unavailable and this browser has no practice to restore. Unexpired local records are preserved.')}</p><button className="primary" disabled={pending} onClick={()=>void safely(async()=>{await refresh();})}>{pending?t('正在连接…','Connecting…'):t('重新连接家庭服务','Reconnect to the family service')}</button></section></main>;
 
+  const storageAlert = storageProblem && <div className="notice error" role="alert"><p>{t('此浏览器的本机记录暂时无法安全读取或清理。家长仍可登录、导出及管理云端档案；新练习已暂停。请重试本机存储，若仍失败可换用浏览器。', 'This browser cannot safely read or clear local records right now. Parents can still sign in, export and manage server records; new practice is paused. Retry browser storage or use another browser.')}</p><button type="button" className="quiet" disabled={pending} onClick={() => void retryBrowserStorage()}>{t('重试本机存储', 'Retry browser storage')}</button></div>;
   const authFields = (unlock = false) => <form onSubmit={e => void authenticate(e, unlock)} className="stack-form">
     <label>{t('家庭名称', 'Family name')}<input name="name" required maxLength={40} defaultValue={unlock ? me?.family.name : ''} autoComplete="username" placeholder={t('给你们的空间起个名字', 'A name for your space')} /></label>
     {(unlock || authMode === 'login') && <label>{t('家长登录名', 'Parent username')}<input name="memberLogin" required defaultValue={me?.member?.loginName ?? 'owner'} maxLength={32} autoComplete="username" /><small>{t('创建者使用 owner；受邀家长使用自己设置的登录名。','Creators use owner; invited parents use the username they chose.')}</small></label>}
@@ -283,20 +307,21 @@ export function App() {
     <button className="primary large" disabled={pending}>{pending ? t('请稍等…', 'One moment…') : unlock || authMode === 'login' ? t('进入家庭空间', 'Open family space') : t('建立我们的空间', 'Create our space')}<ArrowRight size={18} /></button>
   </form>;
 
-  if (!me) return <div className="welcome-page"><header className="welcome-header"><div className="wordmark"><span className="logo-mark"><Leaf /></span><div>{t('专注岛', 'Focus Island')}<small>SPACE TO GROW</small></div></div><button className="quiet" onClick={() => { setError(''); setLocale(locale === 'en' ? 'zh-CN' : 'en'); }}><Globe2 size={17} />{locale === 'en' ? '简体中文' : 'English'}</button></header><main className="welcome-layout"><section className="welcome-story"><span className="eyebrow">{t('为每个家庭，留一处从容', 'A little room to grow, together')}</span><h1>{t('专注于眼前，', 'Find your focus.')}<br />{t('慢慢长出力量。', 'Grow at your pace.')}</h1><p>{t('短短几分钟，练习一个小策略。然后，把它带回真实的生活。', 'A few calm minutes to practise one useful strategy. Then take it into everyday life.')}</p><img src={hero} width={896} height={896} decoding="async" alt="" /><div className="welcome-values"><span><Check size={16} />{t('6–17 岁分龄设计', 'Designed for ages 6–17')}</span><span><Check size={16} />{t('没有排名和广告', 'No rankings or ads')}</span></div></section><section className="auth-card"><div className="segmented"><button disabled={pending} className={authMode === 'setup' ? 'selected' : ''} onClick={() => { setAuthMode('setup'); setError(''); }}>{t('第一次来', 'New here')}</button><button disabled={pending} className={authMode === 'login' ? 'selected' : ''} onClick={() => { setAuthMode('login'); setError(''); }}>{t('回到小岛', 'Welcome back')}</button><button disabled={pending} className={authMode === 'join' ? 'selected' : ''} onClick={() => { setAuthMode('join'); setError(''); }}>{t('接受邀请','Accept invitation')}</button></div><h2>{authMode === 'setup' ? t('从一个家庭空间开始', 'Start with a family space') : authMode === 'join' ? t('一起支持孩子成长','Support your child together') : t('很高兴再次见到你', 'Good to see you again')}</h2><p className="subtle">{t('由家长建立空间，再为孩子选择适合的体验。', 'A parent sets up the space and chooses an experience for each child.')}</p>{accountNotice && <p className="notice" role="status">{accountNotice === 'password' ? securityCopy(locale).changed : accountNotice === 'signout' ? securityCopy(locale).signedOut : accountNotice === 'deleted' ? securityCopy(locale).deleted : accountNotice === 'deleted-local-pending' ? securityCopy(locale).deletedLocalPending : accountNotice === 'delete-uncertain' ? securityCopy(locale).deletionUncertain : accountNotice === 'uncertain' ? securityCopy(locale).uncertain : securityCopy(locale).ended}</p>}{authMode === 'join' ? <Suspense fallback={<p role="status">{t('正在打开…','Opening…')}</p>}><JoinFamily locale={locale} onBusyChange={setPending} onJoined={async () => { await refresh(false); setAccountNotice(null); setPage('home'); }} /></Suspense> : authFields()}<div className="local-note"><ShieldCheck size={18} /><p>{hostedPreview ? t('受限线上预览：请勿填写真实儿童资料。测试记录保存在云端家庭服务；尚未开放正式家庭使用。', 'Restricted hosted preview: do not enter real child details. Test records are stored in a cloud family service. Not yet open to families.') : t('本机开发版。记录保存在这台电脑的家庭服务中；尚未开放正式商业服务。', 'Local development preview. Records stay in the family service on this computer. Not yet a commercial release.')}</p></div></section></main></div>;
+  if (!me) return <div className="welcome-page"><header className="welcome-header"><div className="wordmark"><span className="logo-mark"><Leaf /></span><div>{t('专注岛', 'Focus Island')}<small>SPACE TO GROW</small></div></div><button className="quiet" onClick={() => { setError(''); setLocale(locale === 'en' ? 'zh-CN' : 'en'); }}><Globe2 size={17} />{locale === 'en' ? '简体中文' : 'English'}</button></header><main className="welcome-layout"><section className="welcome-story"><span className="eyebrow">{t('为每个家庭，留一处从容', 'A little room to grow, together')}</span><h1>{t('专注于眼前，', 'Find your focus.')}<br />{t('慢慢长出力量。', 'Grow at your pace.')}</h1><p>{t('短短几分钟，练习一个小策略。然后，把它带回真实的生活。', 'A few calm minutes to practise one useful strategy. Then take it into everyday life.')}</p><img src={hero} width={896} height={896} decoding="async" alt="" /><div className="welcome-values"><span><Check size={16} />{t('6–17 岁分龄设计', 'Designed for ages 6–17')}</span><span><Check size={16} />{t('没有排名和广告', 'No rankings or ads')}</span></div></section><section className="auth-card"><div className="segmented"><button disabled={pending} className={authMode === 'setup' ? 'selected' : ''} onClick={() => { setAuthMode('setup'); setError(''); }}>{t('第一次来', 'New here')}</button><button disabled={pending} className={authMode === 'login' ? 'selected' : ''} onClick={() => { setAuthMode('login'); setError(''); }}>{t('回到小岛', 'Welcome back')}</button><button disabled={pending} className={authMode === 'join' ? 'selected' : ''} onClick={() => { setAuthMode('join'); setError(''); }}>{t('接受邀请','Accept invitation')}</button></div><h2>{authMode === 'setup' ? t('从一个家庭空间开始', 'Start with a family space') : authMode === 'join' ? t('一起支持孩子成长','Support your child together') : t('很高兴再次见到你', 'Good to see you again')}</h2><p className="subtle">{t('由家长建立空间，再为孩子选择适合的体验。', 'A parent sets up the space and chooses an experience for each child.')}</p>{accountNotice && <p className="notice" role="status">{accountNotice === 'password' ? securityCopy(locale).changed : accountNotice === 'signout' ? securityCopy(locale).signedOut : accountNotice === 'deleted' ? securityCopy(locale).deleted : accountNotice === 'deleted-local-pending' ? securityCopy(locale).deletedLocalPending : accountNotice === 'delete-uncertain' ? securityCopy(locale).deletionUncertain : accountNotice === 'uncertain' ? securityCopy(locale).uncertain : securityCopy(locale).ended}</p>}{storageAlert}{authMode === 'join' ? <Suspense fallback={<p role="status">{t('正在打开…','Opening…')}</p>}><JoinFamily locale={locale} onBusyChange={setPending} onJoined={async () => { await refresh(false); setAccountNotice(null); setPage('home'); }} /></Suspense> : authFields()}<div className="local-note"><ShieldCheck size={18} /><p>{hostedPreview ? t('受限线上预览：请勿填写真实儿童资料。测试记录保存在云端家庭服务；尚未开放正式家庭使用。', 'Restricted hosted preview: do not enter real child details. Test records are stored in a cloud family service. Not yet open to families.') : t('本机开发版。记录保存在这台电脑的家庭服务中；尚未开放正式商业服务。', 'Local development preview. Records stay in the family service on this computer. Not yet a commercial release.')}</p></div></section></main></div>;
 
   if(me.role === 'parent' && me.member?.state === 'pending') return <main className="offline-recovery"><section className="family-card stack-form"><h1>{t('等待家庭创建者确认','Waiting for the family creator')}</h1><p>{me.family.name} · {me.member.displayName} · {me.member.loginName}</p><p>{t('请与创建者核对登录名。确认之前，这里不会显示孩子资料。','Check your username with the creator. Child records stay hidden until they confirm.')}</p>{error&&<p role="alert">{error}</p>}<button className="primary" disabled={pending} onClick={()=>void safely(async()=>{await refresh(false);})}>{t('重新读取','Reload')}</button><button className="quiet" onClick={()=>void safely(async()=>{await request('/auth/logout','POST',{});accountEnded('signin');})}>{t('退出登录','Sign out')}</button></section></main>;
 
   const navigation = ([['home', Compass, t('今日探索', 'Today')], ['life', Leaf, t('生活小目标', 'Everyday goals')], ['limits', Clock3, t('练习与休息', 'Practice & rest')], ['report', BarChart3, t('成长记录', 'Our progress')], ['family', Users, t('家庭空间', 'Family space')], ['guide', BookOpen, t('家长陪伴小课', 'Parent guide')], ['method', BookOpen, t('方法与陪伴', 'Our approach')], ['help', CircleHelp, t('需要帮助', 'Need help')]] as const).filter(([id])=>!support || id!=='life');
   const primaryNavigation = navigation.filter(([id]) => ['home', support ? 'limits' : 'life', 'report'].includes(id));
   const recommended = child?.course.task ?? 'search', meta = taskContent(recommended, locale, child?.ageBand);
-  const practiceAllowed = !!child && child.ageReview.state==='current' && collectionStatusAllowsPractice(child.collectionStatus,child.consentActive);
+  const practiceAllowed = !storageProblem && !!child && child.ageReview.state==='current' && collectionStatusAllowsPractice(child.collectionStatus,child.consentActive);
   return <div key={me.member?.id ?? me.role} className={`app-layout ${teen ? 'teen' : ''}`}>
     <a className="skip-link" href="#main-content">{t('跳到当前页面内容', 'Skip to page content')}</a><aside className="sidebar"><a className="wordmark" href="#" onClick={e => { e.preventDefault(); navigate('home'); }}><span className="logo-mark"><Leaf /></span><div>{teen ? 'Focus Studio' : t('专注岛', 'Focus Island')}<small>SPACE TO GROW</small></div></a><div className="nav-label">{t('我们的空间', 'OUR SPACE')}</div><nav aria-label={t('主导航', 'Main navigation')}>
       {navigation.map(([id, Icon, label]) => <button key={id} className={page === id ? 'active' : ''} onClick={() => navigate(id)} aria-current={page === id ? 'page' : undefined}><Icon size={20} />{label}{(id === 'report' || id === 'family' || id === 'guide') && me.role === 'child' && <LockKeyhole size={13} />}</button>)}
     </nav><div className="sidebar-note"><Leaf size={24} /><p>{t('每次一小步，', 'One small step.')}<br />{t('也值得被看见。', 'Worth noticing.')}</p></div><div className="sidebar-account"><span className="avatar small">{me.family.name.slice(0, 1)}</span><div><strong>{me.family.name}</strong><small>{me.role === 'parent' ? t('家长空间已解锁', 'Parent space unlocked') : t('孩子的探索时间', 'Your own exploring time')}</small></div></div></aside>
     <div className="workspace"><header className="topbar"><div className="breadcrumb"><span className="breadcrumb-root">{t('家庭成长空间', 'Your family space')}</span><span className="breadcrumb-separator">/</span>{page === 'home' ? t('今日探索', 'Today') : page === 'limits' ? t('练习与休息', 'Practice & rest') : page === 'guide' ? t('家长陪伴小课', 'Parent guide') : page === 'recovery' ? t('未结束练习', 'Unfinished practice') : page === 'life' ? t('生活小目标', 'Everyday goals') : page === 'report' ? t('成长记录', 'Progress') : page === 'strategy' ? t('我的策略足迹', 'My strategy trail') : page === 'family' ? t('家庭空间', 'Family') : page === 'help' ? t('需要帮助', 'Need help') : t('方法与陪伴', 'Our approach')}</div><div className="topbar-actions"><span className="preview-chip">{me.mode === 'local-development' ? hostedPreview ? t('线上测试预览', 'Hosted test preview') : t('本机预览', 'Local preview') : t('监护核验', 'Guardian verification')}</span><button className="quiet" onClick={() => { setError(''); setLocale(locale === 'en' ? 'zh-CN' : 'en'); }} aria-label={t('切换到英文', 'Switch to Chinese')}><Globe2 size={17} />{locale === 'en' ? '中' : 'EN'}</button><button className="avatar small" aria-label={t('家长验证', 'Parent access')} onClick={() => setModal('login')}><LockKeyhole size={17} /></button></div></header>
       <main id="main-content" className="main-content" tabIndex={-1}><div className="page-heading"><div><span className="eyebrow">{page === 'home' ? 'A LITTLE FOCUS, EVERY DAY' : 'GROW TOGETHER'}</span><h1 id="page-title" ref={pageTitle} tabIndex={-1}>{page === 'home' ? t('今天，发现一点小进步', 'A small discovery today') : page === 'limits' ? t('把休息也安排进来', 'Make room for rest') : page === 'guide' ? t('给孩子留空间，也给家长方法', 'Room for your child, support for you') : page === 'recovery' ? t('记录留好，再安心继续', 'Preserve the record, then continue') : page === 'life' ? t('把一个小策略，带到生活里', 'Take one small strategy into everyday life') : page === 'report' ? t('看见尝试，也看见方法', 'Notice the effort and the strategy') : page === 'strategy' ? t('回看我试过的策略', 'Look back at strategies I tried') : page === 'family' ? t('每个孩子，都有自己的节奏', 'A different pace for every child') : page === 'help' ? t('遇到困难，我们一起慢慢处理', 'When things get difficult, take one step at a time') : t('陪伴，从理解开始', 'Support starts with understanding')}</h1></div><div className="profile-switcher">{me.children.map((c, i) => <button key={c.id} aria-pressed={child?.id === c.id} className={child?.id === c.id ? 'selected' : ''} onClick={() => { accessVersion.current++; setSelected(c.id); setLocale(c.locale); setNotice(''); }}><span className={`avatar tone-${i}`}>{c.alias.slice(0, 1)}</span><span>{c.alias}<small>{c.ageBand}{t(' 岁', ' years')}</small></span></button>)}{owner && me.children.length < 3 && <button className="add-profile" onClick={() => setModal('profile')} aria-label={t('添加孩子', 'Add a child')}><Plus size={18} /></button>}</div></div>
+      {storageAlert}
       {error && !modal && <div className="notice error" role="alert">{error}<button className="icon-button" onClick={() => setError('')} aria-label="Close"><X size={16} /></button></div>}{notice && <div className="notice" role="status">{notice}</div>}
       {!child && owner && page === 'home' && <section className="empty-state"><div className="feedback-icon"><Users size={36} /></div><h2>{t('先认识一下今天的小探索家', 'Meet your first explorer')}</h2><p>{t('一个昵称和年龄段就够了，不需要真实姓名、照片或学校。', 'A nickname and age band are enough. No real name, photo or school needed.')}</p><button className="primary" onClick={() => setModal('profile')}><Plus size={18} />{t('建立孩子档案', 'Add a child')}</button></section>}
       {child && page === 'home' && <button className="quiet" onClick={() => navigate('recovery')}>{t('未结束练习与换设备', 'Unfinished practice & changing devices')}</button>}

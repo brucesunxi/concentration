@@ -22,10 +22,12 @@ export async function request<T>(path: string, method = 'GET', data?: unknown, h
   const deletingFamily=method==='DELETE'&&path==='/family'?options?.deletingFamily:undefined;
   if(method==='DELETE'&&path==='/family'&&!deletingFamily)throw new Error('LOCAL_DELETION_CONTEXT_REQUIRED');
   const identityChange=accountChange||(method==='POST'&&(/^\/auth\/(login|setup|join|logout)$/.test(path)||/^\/children\/[^/]+\/(enter|sessions|withdraw)$/.test(path)||/^\/children\/[^/]+\/recovery\/[^/]+\/(resume|handover)$/.test(path)))||(method==='DELETE'&&/^\/children\/[^/]+$/.test(path));
+  const parentAccessOrRightsChange=accountChange||(method==='POST'&&(/^\/auth\/(login|setup|join|logout)$/.test(path)||/^\/children\/[^/]+\/withdraw$/.test(path)))||(method==='DELETE'&&/^\/children\/[^/]+$/.test(path));
   if(identityChange) {
-    // A broken browser store must not prevent a parent from deleting records
-    // on the server. The confirmed response separately reports local cleanup.
+    // Parent access and data rights must reach the server even if this browser's
+    // journal is broken. Child entry and practice still require a valid journal.
     if(deletingFamily)await journal().invalidateFamily(deletingFamily.id,deletingFamily.childIds).catch(()=>undefined);
+    else if(parentAccessOrRightsChange)await journal().invalidate().catch(()=>undefined);
     else await journal().invalidate();
   }
   if(method!=='GET'&&!csrf&&!/^\/auth\/(login|setup|join)$/.test(path))await request('/me');
