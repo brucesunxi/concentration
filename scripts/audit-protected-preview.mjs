@@ -1,4 +1,4 @@
-import { spawn } from 'node:child_process';
+import { execFileSync, spawn } from 'node:child_process';
 import { createHash, randomUUID } from 'node:crypto';
 import { mkdtemp, mkdir, readFile, rm, unlink, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
@@ -6,6 +6,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { verifyAsset, verifyRelease } from '../packages/content/index.ts';
 import { completeEvents } from '../tests/platform/fixtures.ts';
+import { verifyAliasUnchanged, verifyDeploymentIdentity } from './deployment-identity.mjs';
 
 // Synthetic data only. This fixed target remains behind Vercel Authentication.
 const origin = 'https://concentration-two.vercel.app';
@@ -16,7 +17,7 @@ if (process.argv.length > (cleanupOnly ? 3 : 2)) throw new Error('UNEXPECTED_ARG
 const temporary = await mkdtemp(join(tmpdir(), 'focus-preview-audit-'));
 let credentials;
 
-async function runCurl(args) {
+async function runVercel(args) {
   return new Promise((done, reject) => {
     const child = spawn('vercel', args, { cwd: root, signal: AbortSignal.timeout(45000), stdio: ['ignore', 'pipe', 'pipe'] });
     const parts = [];
@@ -44,7 +45,7 @@ async function call(path, method = 'GET', body, auth, options = {}) {
     await writeFile(dataFile, JSON.stringify(body), { mode: 0o600 });
     args.push('--data-binary', '@' + dataFile);
   }
-  const output = await runCurl(args);
+  const output = await runVercel(args);
   const marker = '\n__FOCUS_HTTP_STATUS__', position = output.lastIndexOf(marker);
   if (position < 0) throw new Error('PROTECTED_PREVIEW_STATUS_MISSING');
   const status = Number(output.slice(position + marker.length).trim());
@@ -60,12 +61,27 @@ async function publicBytes(path) {
       !/^\/assets\/[A-Za-z0-9_.-]+\.(js|css|webp)$/.test(path) &&
       !['/', '/index.html', '/offline-shell.json', '/budget.json'].includes(path)) throw new Error('SYNTHETIC_ASSET_PATH_INVALID');
   const requestId = randomUUID(), headerFile = join(temporary, requestId + '.headers'), bodyFile = join(temporary, requestId + '.body');
-  const output = await runCurl(['curl', path, '--deployment', origin, '--', '--silent', '--show-error', '--dump-header', headerFile,
+  const output = await runVercel(['curl', path, '--deployment', origin, '--', '--silent', '--show-error', '--dump-header', headerFile,
     '--output', bodyFile, '--write-out', '__FOCUS_HTTP_STATUS__%{http_code}']);
   const status = Number(output.match(/__FOCUS_HTTP_STATUS__(\d{3})\s*$/)?.[1]);
   const headers = await readFile(headerFile, 'utf8'), bytes = await readFile(bodyFile);
   await Promise.all([unlink(headerFile), unlink(bodyFile)]);
   return { status, headers, bytes };
+}
+
+async function deploymentInfo() {
+  try { return JSON.parse(await runVercel(['inspect', origin, '--format=json'])); }
+  catch { throw new Error('PROTECTED_PREVIEW_INSPECTION_FAILED'); }
+}
+
+async function checkDeploymentIdentity() {
+  const inspection = await deploymentInfo();
+  if (!/^dpl_[A-Za-z0-9]+$/.test(inspection?.id ?? '')) throw new Error('PROTECTED_PREVIEW_INSPECTION_FAILED');
+  let deployment;
+  try { deployment = JSON.parse(await runVercel(['api', `/v13/deployments/${inspection.id}`, '--raw'])); }
+  catch { throw new Error('PROTECTED_PREVIEW_DEPLOYMENT_SOURCE_UNAVAILABLE'); }
+  const expectedSha = execFileSync('git', ['rev-parse', 'HEAD'], { cwd: root, encoding: 'utf8' }).trim();
+  return verifyDeploymentIdentity(inspection, deployment, expectedSha);
 }
 
 async function checkWebShell() {
@@ -130,6 +146,7 @@ try {
     if (await removeSyntheticFamily()) await unlink(pending);
     process.stdout.write('Synthetic preview family cleanup confirmed.\n');
   } else {
+    const deployed = await checkDeploymentIdentity();
     const ready = await call('/ready');
     if (ready.status !== 200 || ready.value?.status !== 'ok') throw new Error('PROTECTED_PREVIEW_NOT_READY');
     const webShellBytes = await checkWebShell();
@@ -181,7 +198,8 @@ try {
     if (await removeSyntheticFamily()) await unlink(pending);
     const revoked = await call('/me', 'GET', undefined, original);
     if (revoked.status !== 401 || revoked.value?.code !== 'UNAUTHENTICATED') throw new Error('SYNTHETIC_SESSION_STILL_ACTIVE');
-    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', databaseReady: true, webShellVerified: true, webShellBytes, familyCreated: true, childRead: true, billingPreviewRead: true, signedMediaVerified: true, recalledMediaRejected: true, practiceFinalized: true, parentReportRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
+    verifyAliasUnchanged(await deploymentInfo(), deployed.deploymentId);
+    process.stdout.write(JSON.stringify({ event: 'PROTECTED_PREVIEW_AUDIT', deploymentId: deployed.deploymentId, commit: deployed.commit, databaseReady: true, webShellVerified: true, webShellBytes, familyCreated: true, childRead: true, billingPreviewRead: true, signedMediaVerified: true, recalledMediaRejected: true, practiceFinalized: true, parentReportRead: true, familyDeleted: true, oldSessionRevoked: true }) + '\n');
   }
 } catch (error) {
   if (credentials && !cleanupOnly) {
