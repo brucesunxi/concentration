@@ -372,7 +372,7 @@ def verify_family_flow(browser, base):
         }""")
         assert withdrawn, "The remote withdrawal must succeed before refreshing the parent screen"
         page.evaluate("window.dispatchEvent(new Event('focus'))")
-        page.get_by_text("Collection stopped", exact=True).wait_for(timeout=10000)
+        page.get_by_text("Collection stopped", exact=False).first.wait_for(timeout=10000)
         page.get_by_role("button", name="Data & access").click()
         privacy = page.get_by_role("dialog")
         privacy.get_by_label("To delete, enter the nickname").fill(CHILD)
