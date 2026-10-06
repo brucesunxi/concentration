@@ -1,0 +1,73 @@
+{
+  "version": "content-rule-candidates-1",
+  "status": "unreviewed",
+  "createdOn": "2026-10-06",
+  "source": {
+    "provider": "Azure Speech",
+    "region": "eastus",
+    "generator": "scripts/generate-content-voice-assets.mjs --missing-rules",
+    "format": "audio/mpeg"
+  },
+  "entries": [
+    {
+      "file": "stop-rule-child-zh.mp3",
+      "task": "stop",
+      "cohort": "child",
+      "ageBands": ["6-8", "9-11"],
+      "locale": "zh-CN",
+      "copyKey": "rule",
+      "transcript": "小兔出现时点一下。其他动物出现时，等它离开。",
+      "voice": "zh-CN-XiaoxiaoNeural",
+      "rate": "-8%",
+      "pitch": "+1st",
+      "bytes": 34704,
+      "durationMs": 5784,
+      "sha256": "d2f3391b5e8be90fac8ed4c3930bd1aafd7bf4d16d197fe1f360d91fbe0f8de5"
+    },
+    {
+      "file": "stop-rule-child-en.mp3",
+      "task": "stop",
+      "cohort": "child",
+      "ageBands": ["6-8", "9-11"],
+      "locale": "en",
+      "copyKey": "rule",
+      "transcript": "Tap when a rabbit appears. Wait for the other animals to leave.",
+      "voice": "en-US-JennyNeural",
+      "rate": "-7%",
+      "pitch": "+1st",
+      "bytes": 33120,
+      "durationMs": 5520,
+      "sha256": "401587bd6bf131b51916761e7f34ae1643818a8b86cf47c77b4749fbaaa1e1fe"
+    },
+    {
+      "file": "stop-rule-teen-zh.mp3",
+      "task": "stop",
+      "cohort": "teen",
+      "ageBands": ["12-14", "15-17"],
+      "locale": "zh-CN",
+      "copyKey": "rule",
+      "transcript": "圆环出现时点一下。其他图形出现时，等它离开。",
+      "voice": "zh-CN-XiaoxiaoNeural",
+      "rate": "-2%",
+      "pitch": "medium",
+      "bytes": 32832,
+      "durationMs": 5472,
+      "sha256": "a75f7afd8d69ed66ae6345f650653ff3358b9f04b8694fc8672cd79319ad10b4"
+    },
+    {
+      "file": "stop-rule-teen-en.mp3",
+      "task": "stop",
+      "cohort": "teen",
+      "ageBands": ["12-14", "15-17"],
+      "locale": "en",
+      "copyKey": "rule",
+      "transcript": "Tap when you see a ring. Wait when you see another shape.",
+      "voice": "en-US-JennyNeural",
+      "rate": "-2%",
+      "pitch": "medium",
+      "bytes": 28656,
+      "durationMs": 4776,
+      "sha256": "0fad5b91175921f10a80e1f5f0041e6999bb3bc6bea8430f87e351066962489e"
+    }
+  ]
+}
