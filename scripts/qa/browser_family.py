@@ -417,8 +417,9 @@ def verify_family_flow(browser, base):
         page.get_by_label("Parent password").fill(PASSWORD)
         page.get_by_role("button", name="Open family space").click()
         page.get_by_role("heading", name="A small discovery today").wait_for(timeout=10000)
-        page.get_by_text("This browser cannot safely read or clear local records", exact=False).wait_for()
-        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, separate screen reader condition, server confirmation, storage-failure sign-out and parent sign-in")
+        assert not page.evaluate("document.cookie.includes('focus-offline-access-blocked=1')"), "Verified parent sign-in should release the offline block after journal reconciliation"
+        assert page.evaluate("localStorage.getItem('focus-offline-access-blocked')") is None
+        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, separate screen reader condition, server confirmation, storage-failure sign-out, offline block and verified parent sign-in")
     except Exception:
         artifact = ROOT / "dist/browser-qa/failure.png"
         artifact.parent.mkdir(parents=True, exist_ok=True)
