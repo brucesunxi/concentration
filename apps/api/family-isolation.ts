@@ -107,36 +107,59 @@ async function verifyRuntimeRoleChecks(db: Queryable, kind: 'family' | 'studio')
   if (!(await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.schema_migrations','SELECT') AS yes")).rows[0].yes) throw new Error('DATABASE_SCHEMA_UPGRADE_REQUIRED');
   const version = (await db.query<{ version: number }>('SELECT max(version) AS version FROM schema_migrations')).rows[0].version;
   if (version !== REQUIRED_SCHEMA_VERSION) throw new Error('DATABASE_SCHEMA_UPGRADE_REQUIRED');
-  const tables = (await db.query<{ name: string; protected: boolean; owner_access: boolean; policies: number; expected: boolean; confirmation_read: boolean }>(`SELECT c.relname AS name,c.relrowsecurity AS protected,pg_has_role(current_user,c.relowner,'MEMBER') AS owner_access,
-    (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policies,
-    EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_isolation_v1') AS expected,
-    EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_local_confirmation_read' AND p.polcmd='r') AS confirmation_read
-    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])`, [FAMILY_TABLES])).rows;
-  if (tables.length !== FAMILY_TABLES.length || tables.some(row => row.owner_access || !row.protected || !row.expected ||
-    (row.name === 'local_confirmations' ? row.policies !== 2 || !row.confirmation_read : row.policies !== 1 || row.confirmation_read))) throw new Error('DATABASE_FAMILY_ISOLATION_REQUIRED');
-  const billing = (await db.query<{ name: string; protected: boolean; owner_access: boolean; policies: number; expected: boolean }>(`SELECT c.relname AS name,c.relrowsecurity AS protected,pg_has_role(current_user,c.relowner,'MEMBER') AS owner_access,
-    (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policies,
-    EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_isolation_v1' AND p.polcmd='r') AS expected
-    FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])`, [[...BILLING_READ_TABLES,...BILLING_OPERATOR_TABLES]])).rows;
-  if (billing.length !== 2 || billing.some(row => row.owner_access || !row.protected || (row.name === 'billing_ledgers' ? !row.expected || row.policies !== 1 : row.expected || row.policies !== 0))) throw new Error('DATABASE_BILLING_ISOLATION_REQUIRED');
-  const canCreate = (await db.query<{ yes: boolean }>("SELECT has_schema_privilege(current_user,'public','CREATE') AS yes")).rows[0].yes;
-  if (canCreate) throw new Error('DATABASE_RUNTIME_DDL_FORBIDDEN');
   const crossTables = kind === 'family' ? [...STUDIO_TABLES.filter(x => !(CONTENT_READ_TABLES as readonly string[]).includes(x)),...BILLING_OPERATOR_TABLES] : [...FAMILY_TABLES,...BILLING_READ_TABLES,...BILLING_OPERATOR_TABLES];
-  const crossAccess = (await db.query<{ yes: boolean }>("SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')),false) AS yes FROM unnest($1::text[]) t", [crossTables])).rows[0];
-  if (crossAccess.yes) throw new Error('DATABASE_CROSS_ROLE_PRIVILEGE');
-  if (kind === 'family' && (await db.query<{ yes: boolean }>("SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')),false) AS yes FROM unnest($1::text[]) t", [CONTENT_READ_TABLES])).rows[0].yes) throw new Error('DATABASE_CONTENT_WRITE_FORBIDDEN');
-  if (kind === 'family') {
-    if (!(await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.billing_ledgers','SELECT') AS yes")).rows[0].yes) throw new Error('DATABASE_BILLING_READ_REQUIRED');
-    if ((await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.billing_ledgers','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS yes")).rows[0].yes) throw new Error('DATABASE_BILLING_WRITE_FORBIDDEN');
-  }
   const required = kind === 'family' ? FAMILY_TABLES : STUDIO_TABLES;
-  if ((await db.query<{ yes: boolean }>("SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'TRUNCATE,REFERENCES,TRIGGER')),false) AS yes FROM unnest($1::text[]) t", [required])).rows[0].yes) throw new Error('DATABASE_RUNTIME_PRIVILEGE_UNSAFE');
-  if ((await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.schema_migrations','INSERT,UPDATE,DELETE,TRUNCATE') AS yes")).rows[0].yes) throw new Error('DATABASE_MIGRATION_WRITE_FORBIDDEN');
   const functions = ['focus_locked_release(text)', 'focus_locked_family_content(text)', ...(kind === 'family' ? ['focus_auth_take_slot(text,text,timestamptz)'] : ['focus_revoke_recalled_sessions(text)'])];
-  if (!(await db.query<{ yes: boolean }>("SELECT bool_and(has_function_privilege(current_user,'public.' || f,'EXECUTE')) AS yes FROM unnest($1::text[]) f", [functions])).rows[0].yes) throw new Error('DATABASE_RUNTIME_GRANT_MISSING');
-  if (kind === 'family' && (await db.query<{ yes: boolean }>("SELECT has_function_privilege(current_user,'public.focus_revoke_recalled_sessions(text)','EXECUTE') AS yes")).rows[0].yes) throw new Error('DATABASE_CROSS_ROLE_PRIVILEGE');
-  if (kind === 'family' && (await db.query<{ yes: boolean }>("SELECT has_table_privilege(current_user,'public.auth_rate_limits','SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AS yes")).rows[0].yes) throw new Error('DATABASE_RATE_LIMIT_PRIVILEGE_UNSAFE');
-  const privileges = (await db.query<{ yes: boolean }>(`SELECT bool_and(has_table_privilege(current_user,t,p)) AS yes
-    FROM unnest($1::text[]) t CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) p`, [required.map(x => 'public.' + x)])).rows[0];
-  if (!privileges.yes) throw new Error('DATABASE_RUNTIME_GRANT_MISSING');
+  // Each PostgreSQL catalogue query is a network round trip. Keep the initial
+  // role/schema gates explicit, then evaluate independent grant and RLS guards
+  // from one catalogue snapshot without relaxing any existing decision.
+  const snapshot = (await db.query<{
+    family_ok: boolean; billing_ok: boolean; can_create: boolean; cross_access: boolean; content_write: boolean;
+    billing_read: boolean; billing_write: boolean; unsafe_privileges: boolean; migration_write: boolean;
+    functions_required: boolean; cross_function: boolean; rate_unsafe: boolean; required_privileges: boolean;
+  }>(`WITH family_policy AS (
+      SELECT c.relname AS name,c.relrowsecurity AS protected,pg_has_role(current_user,c.relowner,'MEMBER') AS owner_access,
+        (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policies,
+        EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_isolation_v1') AS expected,
+        EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_local_confirmation_read' AND p.polcmd='r') AS confirmation_read
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($1::text[])
+    ), billing_policy AS (
+      SELECT c.relname AS name,c.relrowsecurity AS protected,pg_has_role(current_user,c.relowner,'MEMBER') AS owner_access,
+        (SELECT count(*)::int FROM pg_policy p WHERE p.polrelid=c.oid) AS policies,
+        EXISTS(SELECT 1 FROM pg_policy p WHERE p.polrelid=c.oid AND p.polname='family_isolation_v1' AND p.polcmd='r') AS expected
+      FROM pg_class c JOIN pg_namespace n ON n.oid=c.relnamespace WHERE n.nspname='public' AND c.relname=ANY($2::text[])
+    ) SELECT
+      (SELECT count(*)=cardinality($1::text[]) AND coalesce(bool_and(
+        NOT owner_access AND protected AND expected AND
+        CASE WHEN name='local_confirmations' THEN policies=2 AND confirmation_read ELSE policies=1 AND NOT confirmation_read END
+      ),false) FROM family_policy) AS family_ok,
+      (SELECT count(*)=cardinality($2::text[]) AND coalesce(bool_and(
+        NOT owner_access AND protected AND
+        CASE WHEN name='billing_ledgers' THEN expected AND policies=1 ELSE NOT expected AND policies=0 END
+      ),false) FROM billing_policy) AS billing_ok,
+      has_schema_privilege(current_user,'public','CREATE') AS can_create,
+      (SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'SELECT,INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')),false) FROM unnest($3::text[]) t) AS cross_access,
+      (SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER')),false) FROM unnest($4::text[]) t) AS content_write,
+      has_table_privilege(current_user,'public.billing_ledgers','SELECT') AS billing_read,
+      has_table_privilege(current_user,'public.billing_ledgers','INSERT,UPDATE,DELETE,TRUNCATE,REFERENCES,TRIGGER') AS billing_write,
+      (SELECT coalesce(bool_or(has_table_privilege(current_user,'public.' || t,'TRUNCATE,REFERENCES,TRIGGER')),false) FROM unnest($5::text[]) t) AS unsafe_privileges,
+      has_table_privilege(current_user,'public.schema_migrations','INSERT,UPDATE,DELETE,TRUNCATE') AS migration_write,
+      (SELECT bool_and(has_function_privilege(current_user,'public.' || f,'EXECUTE')) FROM unnest($6::text[]) f) AS functions_required,
+      has_function_privilege(current_user,'public.focus_revoke_recalled_sessions(text)','EXECUTE') AS cross_function,
+      has_table_privilege(current_user,'public.auth_rate_limits','SELECT,INSERT,UPDATE,DELETE,TRUNCATE') AS rate_unsafe,
+      (SELECT bool_and(has_table_privilege(current_user,t,p)) FROM unnest($7::text[]) t CROSS JOIN unnest(ARRAY['SELECT','INSERT','UPDATE','DELETE']) p) AS required_privileges`,
+    [FAMILY_TABLES, [...BILLING_READ_TABLES,...BILLING_OPERATOR_TABLES], crossTables, CONTENT_READ_TABLES, required, functions, required.map(x => 'public.' + x)])).rows[0];
+  if (!snapshot?.family_ok) throw new Error('DATABASE_FAMILY_ISOLATION_REQUIRED');
+  if (!snapshot.billing_ok) throw new Error('DATABASE_BILLING_ISOLATION_REQUIRED');
+  if (snapshot.can_create) throw new Error('DATABASE_RUNTIME_DDL_FORBIDDEN');
+  if (snapshot.cross_access) throw new Error('DATABASE_CROSS_ROLE_PRIVILEGE');
+  if (kind === 'family' && snapshot.content_write) throw new Error('DATABASE_CONTENT_WRITE_FORBIDDEN');
+  if (kind === 'family' && !snapshot.billing_read) throw new Error('DATABASE_BILLING_READ_REQUIRED');
+  if (kind === 'family' && snapshot.billing_write) throw new Error('DATABASE_BILLING_WRITE_FORBIDDEN');
+  if (snapshot.unsafe_privileges) throw new Error('DATABASE_RUNTIME_PRIVILEGE_UNSAFE');
+  if (snapshot.migration_write) throw new Error('DATABASE_MIGRATION_WRITE_FORBIDDEN');
+  if (!snapshot.functions_required) throw new Error('DATABASE_RUNTIME_GRANT_MISSING');
+  if (kind === 'family' && snapshot.cross_function) throw new Error('DATABASE_CROSS_ROLE_PRIVILEGE');
+  if (kind === 'family' && snapshot.rate_unsafe) throw new Error('DATABASE_RATE_LIMIT_PRIVILEGE_UNSAFE');
+  if (!snapshot.required_privileges) throw new Error('DATABASE_RUNTIME_GRANT_MISSING');
 }

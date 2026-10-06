@@ -28,9 +28,11 @@ try {
   const mode = await client.query<{ transaction_read_only: string }>('SHOW transaction_read_only');
   if (mode.rows[0]?.transaction_read_only !== 'on') throw new Error('READ_ONLY_TRANSACTION_REQUIRED');
   // The server's own role, policy and grant checks run inside a read-only transaction.
+  const verificationStarted = performance.now();
   await verifyRuntimeRole({ query: client.query.bind(client) } as unknown as Database, 'family');
+  const verificationMs = Math.round(performance.now() - verificationStarted);
   await client.query('ROLLBACK');
-  console.log(JSON.stringify({ event: 'NEON_RUNTIME_READONLY_AUDIT', schema: REQUIRED_SCHEMA_VERSION, role: 'family-runtime', tlsPeerVerified: true, readOnly: true, isolationVerified: true }));
+  console.log(JSON.stringify({ event: 'NEON_RUNTIME_READONLY_AUDIT', schema: REQUIRED_SCHEMA_VERSION, role: 'family-runtime', tlsPeerVerified: true, readOnly: true, isolationVerified: true, verificationMs }));
 } catch (error) {
   if (connected) await client.query('ROLLBACK').catch(() => {});
   const code = error instanceof Error && /^[A-Z][A-Z0-9_]+$/.test(error.message) ? error.message : 'CONNECTION_OR_QUERY_FAILED';

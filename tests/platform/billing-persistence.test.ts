@@ -136,7 +136,7 @@ test('runtime verification shares one transaction and still rejects a missing bi
     try {
       await verifyRuntimeRole(scoped, 'family');
       assert.equal(transactions, 1);
-      assert.ok(checks >= 15);
+      assert.equal(checks, 4);
       await db.transaction(tx => verifyRuntimeRole(tx, 'family'));
     } finally { await db.query('RESET ROLE'); }
     await db.query('REVOKE SELECT ON public.billing_ledgers FROM focus_verification_test');
@@ -144,6 +144,42 @@ test('runtime verification shares one transaction and still rejects a missing bi
     try {
       await assert.rejects(verifyRuntimeRole(scoped, 'family'), /DATABASE_BILLING_READ_REQUIRED/);
       assert.equal(transactions, 2);
+      assert.equal(checks, 8);
     } finally { await db.query('RESET ROLE'); }
+  } finally { await db.close(); }
+});
+
+test('runtime catalogue snapshot rejects disabled family isolation and cross-role access', async () => {
+  const db = await openDatabase('memory://');
+  try {
+    await migrate(db);
+    await db.query('CREATE ROLE focus_catalogue_test');
+    await db.query('CREATE ROLE focus_catalogue_studio_test');
+    await grantRuntimeRoles(db, 'focus_catalogue_test', 'focus_catalogue_studio_test');
+    async function check(expected?: RegExp) {
+      await db.query('SET ROLE focus_catalogue_test');
+      try {
+        if (expected) await assert.rejects(verifyRuntimeRole(db, 'family'), expected);
+        else await verifyRuntimeRole(db, 'family');
+      } finally { await db.query('RESET ROLE'); }
+    }
+    await check();
+    await db.query('ALTER TABLE public.children DISABLE ROW LEVEL SECURITY');
+    await check(/DATABASE_FAMILY_ISOLATION_REQUIRED/);
+    await db.query('ALTER TABLE public.children ENABLE ROW LEVEL SECURITY');
+    await db.query('GRANT SELECT ON public.studio_users TO focus_catalogue_test');
+    await check(/DATABASE_CROSS_ROLE_PRIVILEGE/);
+    await db.query('REVOKE SELECT ON public.studio_users FROM focus_catalogue_test');
+    await db.query('REVOKE EXECUTE ON FUNCTION public.focus_auth_take_slot(text,text,timestamptz) FROM focus_catalogue_test');
+    await check(/DATABASE_RUNTIME_GRANT_MISSING/);
+    await db.query('GRANT EXECUTE ON FUNCTION public.focus_auth_take_slot(text,text,timestamptz) TO focus_catalogue_test');
+    await check();
+    await db.query('SET ROLE focus_catalogue_studio_test');
+    try { await verifyRuntimeRole(db, 'studio'); }
+    finally { await db.query('RESET ROLE'); }
+    await db.query('GRANT SELECT ON public.children TO focus_catalogue_studio_test');
+    await db.query('SET ROLE focus_catalogue_studio_test');
+    try { await assert.rejects(verifyRuntimeRole(db, 'studio'), /DATABASE_CROSS_ROLE_PRIVILEGE/); }
+    finally { await db.query('RESET ROLE'); }
   } finally { await db.close(); }
 });
