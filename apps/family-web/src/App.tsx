@@ -10,6 +10,7 @@ import { lifeTemplateForTask } from '../../../packages/family-support/model.ts';
 import { translate, taskContent, isTeen } from './content.ts';
 import { Play } from './Play.tsx';
 import { clearChildJournals, journal } from './journal.ts';
+import { allowOfflineRecovery, blockOfflineRecovery, offlineRecoveryBlocked } from './offline-access.ts';
 import { LocalJournalWarning } from './LocalJournalWarning.tsx';
 import { isNetworkFailure, verifyOfflineSession } from '../../../packages/session-runtime/offline-session.ts';
 import { Stimulus } from './Stimulus.tsx';
@@ -98,6 +99,7 @@ export function App() {
   const owner = me?.role === 'parent' && me.member?.role === 'owner', support = me?.role === 'parent' && me.member?.role === 'support';
   const t = translate(locale), teen = child ? isTeen(child.ageBand) : false, hostedPreview = isHostedPreview();
   function accountEnded(outcome: AccountAccessOutcome, deletingFamily?: DeletedFamily, fromRequest = false) {
+    blockOfflineRecovery();
     accessVersion.current++; refreshVersion.current++;
     setMe(null); setSession(null);  setOfflineOffer(null); setModal(null); setPracticeInvitation(null); setSelected(''); setPage('home'); setLoading(false); setUnavailable(false); setAuthMode('login'); setAccountNotice(outcome); setError('');
     if (!fromRequest || !deletingFamily) void (deletingFamily
@@ -123,15 +125,20 @@ export function App() {
       if(!current())return null;
       let localReady=deviceReady.current;
       if(next.role==='parent') {
-        try { await journal().reconcileFamily(next.family.id,next.children,next.member?.role==='owner'&&next.member.state==='active'); }
+        try {
+          await journal().reconcileFamily(next.family.id,next.children,next.member?.role==='owner'&&next.member.state==='active');
+          if(!current())return null;
+          if(localReady&&!allowOfflineRecovery())localReady=false;
+        }
         catch { localReady=false; }
       }
       else {
         try { if(active)await journal().generation();else await journal().invalidate(); }
         catch { localReady=false; }
+        if(offlineRecoveryBlocked())localReady=false;
       }
-      setStorageProblem(!localReady);
-      if(!current())return null;setMe(next);
+      if(!current())return null;
+      setStorageProblem(!localReady);setMe(next);
       if (next.role === 'child') {  setPage('home'); setLocale(next.children[0]?.locale ?? next.family.locale); }
       setSelected(prev => next.children.some(c => c.id === prev) ? prev : next.children[0]?.id ?? '');
       if (resume && next.role === 'child' && active && localReady) setSession(active);
@@ -140,11 +147,16 @@ export function App() {
       if(!current())return null;setMe(null);setSession(null);setModal(null);
       if(isNetworkFailure(e)){
         setUnavailable(true);
+        if(offlineRecoveryBlocked()) {
+          setError(t('此浏览器的家长登录已结束或本机状态无法确认。请联网重新登录后再恢复练习。','Parent access ended or this browser’s local state cannot be confirmed. Reconnect and sign in again before restoring practice.'));
+          return null;
+        }
         try{
           const saved=await journal().resume();
           if(saved){await verifyOfflineSession(saved,deviceId(),'web',saved.events);if(current()){setOfflineOffer(saved);setLocale(saved.capsule.session.plan.locale);}return null;}
         }catch{if(current())setError(t('本机练习已过期、资料不完整或时间发生变化。请联网恢复，未到期的本机记录会保留。','The saved practice has expired, is incomplete, or the clock changed. Reconnect to recover; unexpired local records are preserved.'));return null;}
       }else{
+        if(e instanceof RequestError&&e.status===401)blockOfflineRecovery();
         try{await journal().invalidate();}catch{if(current())setError(t('本机访问清理尚未完成，请联网后重试。','Local access cleanup is pending. Reconnect and retry.'));return null;}
       }
       if(e instanceof RequestError&&e.status===401)return null;
@@ -185,6 +197,7 @@ export function App() {
   async function signOut() {
     if(pending)return;
     setPending(true);setError('');
+    blockOfflineRecovery();
     let localCleared=false;
     try { await clearChildJournals();localCleared=true; }
     catch { setStorageProblem(true); }

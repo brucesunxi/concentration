@@ -403,6 +403,16 @@ def verify_family_flow(browser, base):
         assert signed_out.value.status == 200, "Broken browser storage must not block server sign-out"
         page.get_by_text("This browser cannot safely read or clear local records", exact=False).wait_for()
         page.get_by_role("button", name="Open family space").wait_for()
+        assert page.evaluate("document.cookie.includes('focus-offline-access-blocked=1')"), "Sign-out must persist an offline recovery block"
+        me_url = re.compile(r".*/api/me$")
+        def disconnect_me(route):
+            route.abort()
+        page.route(me_url, disconnect_me)
+        page.reload(wait_until="domcontentloaded")
+        page.get_by_text("Parent access ended or this browser’s local state cannot be confirmed", exact=False).wait_for(timeout=10000)
+        page.unroute(me_url, disconnect_me)
+        page.reload(wait_until="networkidle")
+        page.get_by_role("button", name="Welcome back").click()
         page.get_by_label("Family name").fill(FAMILY)
         page.get_by_label("Parent password").fill(PASSWORD)
         page.get_by_role("button", name="Open family space").click()
