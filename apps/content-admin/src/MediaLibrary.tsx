@@ -2,12 +2,14 @@ import {useRef,useState} from 'react';
 import {Upload,Image as ImageIcon,Headphones,ShieldCheck} from 'lucide-react';
 import {MEDIA_UPLOAD_LIMIT,mediaMime,mediaPath} from '../../../packages/content/media-library.ts';
 import type {LibraryMedia,MediaMetadata} from '../../../packages/content/media-library.ts';
+import {RuleVoiceCandidates} from './RuleVoiceCandidates.tsx';
 export type StudioRequest=<T>(path:string,method?:string,data?:unknown,headers?:Record<string,string>)=>Promise<T>;
 interface Props {items:LibraryMedia[];canEdit:boolean;pending:boolean;request:StudioRequest;upload:(path:string,file:File,mime:string)=>Promise<LibraryMedia>;run:(fn:()=>Promise<void>)=>Promise<void>;refresh:()=>Promise<void>;onDirty:(value:boolean)=>void}
 export function MediaLibrary({items,canEdit,pending,request,upload,run,refresh,onDirty}:Props){
   const [kind,setKind]=useState<MediaMetadata['kind']>('characters'),[file,setFile]=useState<File|null>(null),[step,setStep]=useState(''),[latest,setLatest]=useState<string|null>(null);
   const attempt=useRef<{body:string;key:string}|null>(null);
   return <div className="library-layout"><section className="panel library-intro"><span className="eyebrow">A HOME FOR EVERY ASSET</span><h2>让图像、声音和来源一起入库。</h2><p>导入后先查看处理结果，再回到可编辑稿件中使用。每次换素材都会开启新稿次，随后重新试玩和审核。</p><p className="muted">当前支持任务四格 PNG 图集和固定 MP3 指引。语音在制作阶段完成，应用只播放已有文件。</p></section>
+    <RuleVoiceCandidates />
     {canEdit&&<section className="panel"><h3><Upload size={19}/>导入一份素材</h3><form className="form-stack" onChange={()=>onDirty(true)} onSubmit={e=>{
       e.preventDefault();const fields=new FormData(e.currentTarget),chosen=file;
       void run(async()=>{
