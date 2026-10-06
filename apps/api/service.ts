@@ -741,8 +741,8 @@ export function service(source: Database, now: () => number = Date.now, content?
           FROM sessions WHERE child_id=$1 ORDER BY created_at,id`, [childId]);
         const events = await tx.query('SELECT e.session_id AS "sessionId",e.body AS event FROM events e JOIN sessions s ON s.id=e.session_id WHERE s.child_id=$1 ORDER BY s.created_at,s.id,e.seq', [childId]);
         const observations = await tx.query('SELECT id,task,context,prompts,child_choice,created_at FROM observations WHERE child_id=$1 ORDER BY created_at,id', [childId]);
-        const confirmations = await tx.query('SELECT purpose,version,acknowledged_at,withdrawn_at FROM local_confirmations WHERE child_id=$1 ORDER BY acknowledged_at', [childId]);
-        const verifiedConsents = await tx.query('SELECT provider,country,age_band,locale,purpose,notice_version,notice_sha256,release_scope_identity,verified_at,granted_at,expires_at,withdrawn_at FROM guardian_consents WHERE child_id=$1 ORDER BY granted_at', [childId]);
+        const confirmations = await tx.query('SELECT purpose,version,acknowledged_at,withdrawn_at FROM local_confirmations WHERE child_id=$1 ORDER BY acknowledged_at,id', [childId]);
+        const verifiedConsents = await tx.query('SELECT provider,country,age_band,locale,purpose,notice_version,notice_sha256,release_scope_identity,verified_at,granted_at,expires_at,withdrawn_at FROM guardian_consents WHERE child_id=$1 ORDER BY granted_at,id', [childId]);
         const { generatedAt: _generatedAt, ...practiceLimits } = await operations.practiceLimits(p, childId);
         return { schemaVersion: 2, exportedAt: new Date(now()).toISOString(), child: publicChild(c), practiceLimits, sessions: sessions.rows, events: events.rows, observations: observations.rows, confirmations: confirmations.rows, verifiedConsents: verifiedConsents.rows, life: await life.export(tx, childId) };
       });
