@@ -2,14 +2,18 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { createHash, webcrypto } from 'node:crypto';
 import { runInNewContext } from 'node:vm';
-import { workerSource } from '../packages/offline-shell/worker.mjs';
+import { workerSource, workerVersion } from '../packages/offline-shell/worker.mjs';
 const origin='http://localhost:4181';
 const body=new Map([['/','<html>public shell</html>'],['/index.html','<html>public shell</html>'],['/assets/app-abc.js','public runtime code']]);
 const digest=data=>createHash('sha256').update(data).digest('hex');
 const manifest={version:'a'.repeat(64),assets:[...body].map(([url,data])=>({url,bytes:Buffer.byteLength(data),sha256:digest(data)}))};
+test('worker behavior contributes to the cache version even when the page files are unchanged',()=>{
+  assert.notEqual(workerVersion(manifest.assets),digest(JSON.stringify(manifest.assets)));
+  assert.notEqual(workerVersion(manifest.assets),workerVersion(manifest.assets.slice(1)));
+});
 function environment(){
   const listeners={},spaces=new Map(),downloads=[];let network=true,corrupt='';
-  const caches={async keys(){return [...spaces.keys()];},async delete(key){return spaces.delete(key);},async open(key){if(!spaces.has(key))spaces.set(key,new Map());const space=spaces.get(key);return {async match(url){return space.get(url)?.clone();},async put(url,response){space.set(url,response.clone());}};}};
+  const caches={async keys(){return [...spaces.keys()];},async delete(key){return spaces.delete(key);},async open(key){if(!spaces.has(key))spaces.set(key,new Map());const space=spaces.get(key);return {async match(url){return space.get(url)?.clone();},async put(url,response){space.set(url,response.clone());},async delete(url){return space.delete(url);}};}};
   const scope={crypto:webcrypto,location:{origin},caches,addEventListener:(name,fn)=>{listeners[name]=fn;},fetch:async(url,options)=>{downloads.push({url:String(url),options});if(!network)throw new TypeError('offline');return new Response(new URL(url).pathname===corrupt?'wrong content':body.get(new URL(url).pathname),{status:200,headers:{'Content-Type':'text/plain'}});},skipWaiting(){throw new Error('Must not force updates');},clients:{claim(){throw new Error('Must not replace an active page controller');}}};
   runInNewContext(workerSource(manifest),{self:scope,URL,Response,Uint8Array,Map,Error});
   const event=async(name,extra={})=>{let pending;listeners[name]({...extra,waitUntil:value=>{pending=value;}});await pending;};
@@ -56,6 +60,18 @@ test('evicted shell files fail clearly offline and can only be repaired with mat
   const env=environment();await env.event('install');env.spaces.get('focus-public-shell-'+manifest.version).delete(origin+'/assets/app-abc.js');env.setNetwork(false);
   assert.equal((await env.request('/assets/app-abc.js')).status,503);
   env.setNetwork(true);assert.equal((await env.request('/assets/app-abc.js')).status,200);
+});
+
+test('a cached file with changed bytes is not reported ready or served, and is repaired only from verified network bytes',async()=>{
+  const env=environment();await env.event('install');
+  const cache=env.spaces.get('focus-public-shell-'+manifest.version),url=origin+'/assets/app-abc.js';
+  cache.set(url,new Response('public runtime codf',{status:200,headers:{'Content-Type':'text/javascript'}}));
+  let result;const query=()=>env.event('message',{data:{type:'FOCUS_SHELL_STATUS',entryPath:'/assets/app-abc.js'},ports:[{postMessage:value=>{result=value;}}]});
+  await query();assert.equal(result.ready,false);
+  env.setNetwork(false);assert.equal((await env.request('/assets/app-abc.js')).status,503);
+  assert.equal(cache.has(url),false);
+  env.setNetwork(true);assert.equal(await (await env.request('/assets/app-abc.js')).text(),body.get('/assets/app-abc.js'));
+  await query();assert.equal(result.ready,true);
 });
 
 test('build-time worker generation rejects private or external cache manifest entries',()=>{

@@ -1,7 +1,7 @@
 import { readFile, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { createHash } from 'node:crypto';
-import { workerSource } from '../packages/offline-shell/worker.mjs';
+import { workerSource, workerVersion } from '../packages/offline-shell/worker.mjs';
 const args=process.argv.slice(2);
 if(args.length&&(args.length!==2||args[0]!=='--directory'))throw new Error('Usage: build-offline-shell.mjs [--directory path]');
 const root=args[1]?resolve(args[1]):resolve(import.meta.dirname,'../dist/web-candidate');
@@ -12,7 +12,7 @@ const entries=Object.entries(built).filter(([,v])=>v.isEntry);if(entries.length!
 const assets=[];
 for(const file of [...files].sort()){const bytes=await readFile(resolve(root,file));assets.push({url:'/'+file,bytes:bytes.length,sha256:createHash('sha256').update(bytes).digest('hex')});}
 assets.push({...assets.find(a=>a.url==='/index.html'),url:'/'});
-const version=createHash('sha256').update(JSON.stringify(assets)).digest('hex');
+const version=workerVersion(assets);
 const manifest={schemaVersion:1,version,assets,totalBytes:assets.filter(a=>a.url!=='/').reduce((sum,a)=>sum+a.bytes,0)};
 await writeFile(resolve(root,'focus-sw.js'),workerSource(manifest));
 await writeFile(resolve(root,'offline-shell.json'),JSON.stringify(manifest,null,2)+'\n');

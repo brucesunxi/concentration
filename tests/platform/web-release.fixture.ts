@@ -1,7 +1,7 @@
 import { mkdir, writeFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { createHash } from 'node:crypto';
-import { workerSource } from '../../packages/offline-shell/worker.mjs';
+import { workerSource, workerVersion } from '../../packages/offline-shell/worker.mjs';
 export const digest = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 export async function webFixture(directory: string, label: string, forcedLazyPath?: string) {
   const lazyBody = `export const label=${JSON.stringify(label)};`;
@@ -14,7 +14,7 @@ export async function webFixture(directory: string, label: string, forcedLazyPat
   const totalBytes = initial.reduce((sum, file) => sum + file.bytes, 0);
   const shellAssets = initial.map(({ path, ...file }) => ({ url: '/' + path, ...file }));
   shellAssets.push({ ...shellAssets.find(file => file.url === '/index.html')!, url: '/' });
-  const shell = { schemaVersion: 1, version: digest(JSON.stringify(shellAssets)), assets: shellAssets, totalBytes };
+  const shell = { schemaVersion: 1, version: workerVersion(shellAssets), assets: shellAssets, totalBytes };
   files.set('.vite/manifest.json', JSON.stringify({ 'index.html': { file: mainPath, isEntry: true, dynamicImports: ['lazy.ts'] }, 'lazy.ts': { file: lazyPath, isDynamicEntry: true, imports: ['index.html'] } }));
   files.set('budget.json', JSON.stringify({ totalBytes, limitBytes: 1500000, passed: true, assets: initial }));
   files.set('offline-shell.json', JSON.stringify(shell));

@@ -2,7 +2,7 @@ import { createHash, randomUUID } from 'node:crypto';
 import { lstat, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/promises';
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
-import { workerSource } from '../offline-shell/worker.mjs';
+import { workerSource, workerVersion } from '../offline-shell/worker.mjs';
 
 const hash = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -89,7 +89,7 @@ export async function inspectWebBuild(source: string, version: string) {
     const file = files.find(file => file.path === (asset.url === '/' ? 'index.html' : asset.url?.slice(1)));
     if (!file || !initial.has(file.path) || !asset.url.startsWith('/') || file.sha256 !== asset.sha256 || file.bytes !== asset.bytes) fail('WEB_RELEASE_SHELL_MISMATCH');
   }
-  if (hash(JSON.stringify(shell.assets)) !== shell.version || buffers.get('focus-sw.js')!.toString() !== workerSource(shell)) fail('WEB_RELEASE_SHELL_MISMATCH');
+  if (workerVersion(shell.assets) !== shell.version || buffers.get('focus-sw.js')!.toString() !== workerSource(shell)) fail('WEB_RELEASE_SHELL_MISMATCH');
   if (!buffers.get('index.html')!.toString().includes(`src="/${graph[entryKey].file}"`)) fail('WEB_RELEASE_ENTRY_MISMATCH');
   const manifest = manifestSchema.parse({ schemaVersion: 1, version, files });
   return { id: hash(JSON.stringify(manifest)), manifest, buffers, total };
