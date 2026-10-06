@@ -136,7 +136,7 @@ export function App() {
         try{await journal().invalidate();}catch{if(current())setError(t('本机访问清理尚未完成，请联网后重试。','Local access cleanup is pending. Reconnect and retry.'));return null;}
       }
       if(e instanceof RequestError&&e.status===401)return null;
-      if(current())setError(t('暂时连接不上家庭服务。未到期的本机记录会保留。','The family service is unavailable. Unexpired local records are preserved.'));return null;
+      if(current())setError(e instanceof RequestError ? familyErrorCopy(e,localeRef.current) : t('暂时连接不上家庭服务。未到期的本机记录会保留。','The family service is unavailable. Unexpired local records are preserved.'));return null;
     } finally { if(current())setLoading(false); }
   }
   useEffect(() => { mounted.current=true;void prepareBrowserIdentity().then(()=>refresh()).catch(e => { if(mounted.current){setError(familyErrorCopy(e,localeRef.current));setLoading(false);} });return()=>{mounted.current=false;refreshVersion.current++;accessVersion.current++;}; }, []);

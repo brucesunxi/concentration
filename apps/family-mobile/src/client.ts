@@ -5,20 +5,21 @@ import { fetch } from 'expo/fetch';
 import type { Session, Me, Child } from '../../../packages/contracts/models.ts';
 import type { TaskId } from '../../../packages/task-engine/index.ts';
 import { invalidateOffline } from './storage';
-import { NetworkUnavailable } from '../../../packages/session-runtime/offline-session.ts';
+import { NetworkUnavailable, isNetworkFailure } from '../../../packages/session-runtime/offline-session.ts';
 import { readMobileResponseJson } from '../../../packages/session-runtime/mobile-response.ts';
 import { CredentialInterrupted, CredentialStore } from '../../../packages/session-runtime/credential-store.ts';
 import type { AccountAction } from '../../../packages/contracts/account-security.ts';
 import type { PracticeStartReview } from '../../../packages/contracts/index.ts';
 import { mobileApiOrigin } from '../../../packages/contracts/mobile-api-origin.ts';
+import { validRequestReference } from '../../../packages/contracts/request-reference.ts';
 
 // Public build-time routing only. Server policy still decides which market may open.
 export const API_ORIGIN = mobileApiOrigin(process.env.EXPO_PUBLIC_FOCUS_API_ORIGIN).origin;
 const CHILD_TOKEN = 'focus.local.child-token.v1';
 const options = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 export class MobileRequestError extends Error {
-  code: string; status: number;
-  constructor(code: string, status: number) { super(code); this.code = code; this.status = status; }
+  code: string; status: number; requestId: string | null;
+  constructor(code: string, status: number, requestId: string | null = null) { super(code); this.code = code; this.status = status; this.requestId = requestId; }
 }
 export class MobileClient {
   private token: string | null = null;
@@ -36,8 +37,12 @@ export class MobileClient {
     const controller = new AbortController(), timer = setTimeout(() => controller.abort(), 12000);
     try {
       const response = await fetch(API_ORIGIN + '/api' + path, { method, credentials: 'omit', signal: controller.signal, headers: { 'Content-Type': 'application/json', 'X-Focus-Client': 'native-local-v1', ...(this.token ? { Authorization: `Bearer ${this.token}` } : {}), ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }) }).catch(() => { throw new NetworkUnavailable(); });
-      const body = await readMobileResponseJson<{ code?: string }>(response, controller.signal);
-      if (!response.ok) throw new MobileRequestError(body.code ?? 'REQUEST_FAILED', response.status);
+      const requestId = validRequestReference(response.headers.get('X-Request-ID'));
+      let body: unknown;
+      try { body = await readMobileResponseJson<unknown>(response, controller.signal); }
+      catch (error) { if (isNetworkFailure(error)) throw error; throw new MobileRequestError('RESPONSE_UNREADABLE', response.status, requestId); }
+      if (body !== null && (typeof body !== 'object' || Array.isArray(body))) throw new MobileRequestError('RESPONSE_UNREADABLE', response.status, requestId);
+      if (!response.ok) throw new MobileRequestError(body && typeof body === 'object' && 'code' in body && typeof body.code === 'string' ? body.code : 'REQUEST_FAILED', response.status, requestId);
       return body as T;
     } finally { clearTimeout(timer); }
   }

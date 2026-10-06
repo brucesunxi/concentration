@@ -1,6 +1,7 @@
 import type { Environment } from '../../../packages/task-engine/index.ts';
 import { NetworkUnavailable } from '../../../packages/session-runtime/offline-session.ts';
 import { journal } from './journal.ts';
+import { validRequestReference } from '../../../packages/contracts/request-reference.ts';
 export type { Child, Me, Session, Result, Report } from '../../../packages/contracts/models.ts';
 export type DeletedFamily = { id: string; childIds: string[] };
 export type AccountAccessOutcome = 'password' | 'signout' | 'uncertain' | 'delete-uncertain' | 'signin' | 'deleted' | 'deleted-local-pending';
@@ -15,7 +16,7 @@ function accountAccessEnded(outcome: AccountAccessOutcome, deletingFamily?: Dele
     const channel = new BroadcastChannel('focus-family-access'); channel.postMessage({ source: accessSender, reason: 'account-security', outcome, deletingFamily }); channel.close();
   }
 }
-export class RequestError extends Error { code: string; status: number; constructor(message: string, code: string, status: number) { super(message); this.code = code; this.status = status; } }
+export class RequestError extends Error { code: string; status: number; requestId: string | null; constructor(message: string, code: string, status: number, requestId: string | null = null) { super(message); this.code = code; this.status = status; this.requestId = requestId; } }
 export async function request<T>(path: string, method = 'GET', data?: unknown, headers: Record<string, string> = {}, options?: { deletingFamily?: DeletedFamily }): Promise<T> {
   const accountChange=(method==='POST' && /^\/auth\/(change-password|logout-all)$/.test(path)) || (method==='DELETE' && path==='/family');
   const deletingFamily=method==='DELETE'&&path==='/family'?options?.deletingFamily:undefined;
@@ -28,8 +29,15 @@ export async function request<T>(path: string, method = 'GET', data?: unknown, h
     else await journal().invalidate();
   }
   if(method!=='GET'&&!csrf&&!/^\/auth\/(login|setup|join)$/.test(path))await request('/me');
-  const res = await fetch('/api' + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal: AbortSignal.timeout(12000) }).catch(()=>{if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily);throw new NetworkUnavailable();});
-  const value = await res.json().catch(error=>{if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily);throw error;});
+  const signal = AbortSignal.timeout(12000);
+  const res = await fetch('/api' + path, { method, credentials: 'same-origin', headers: { 'Content-Type': 'application/json', 'X-CSRF-Token': csrf, ...headers }, ...(data === undefined ? {} : { body: JSON.stringify(data) }), signal }).catch(()=>{if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily);throw new NetworkUnavailable();});
+  const requestId = validRequestReference(res.headers.get('X-Request-ID'));
+  const unreadable = () => { if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily); return new RequestError('The service reply could not be confirmed.', 'RESPONSE_UNREADABLE', res.status, requestId); };
+  const value = await res.json().catch(()=>{
+    if (signal.aborted) { if(accountChange)accountAccessEnded(deletingFamily?'delete-uncertain':'uncertain',deletingFamily); throw new NetworkUnavailable(); }
+    throw unreadable();
+  });
+  if (value !== null && (typeof value !== 'object' || Array.isArray(value))) throw unreadable();
   if(accountChange && (res.status>=500 || res.ok)) {
     if (res.ok && value?.ok && value?.signInRequired && path==='/family') {
       let outcome: 'deleted' | 'deleted-local-pending' = 'deleted';
@@ -38,7 +46,7 @@ export async function request<T>(path: string, method = 'GET', data?: unknown, h
     } else accountAccessEnded(res.ok && value?.ok && value?.signInRequired ? path.endsWith('change-password') ? 'password' : 'signout' : deletingFamily ? 'delete-uncertain' : 'uncertain',deletingFamily);
   }
   if (res.status === 401 && path !== '/me' && !/^\/auth\/(login|setup|join)$/.test(path)) accountAccessEnded('signin',deletingFamily);
-  if (!res.ok) throw new RequestError(value.message || 'Unable to complete request', value.code, res.status);
+  if (!res.ok) throw new RequestError(typeof value?.message === 'string' ? value.message : 'Unable to complete request', typeof value?.code === 'string' ? value.code : 'REQUEST_FAILED', res.status, requestId);
   if (value?.csrf) csrf = value.csrf;
   if (identityChange && !accountChange) {
     // Cookies are shared between tabs. Invalidate cached parent screens too.

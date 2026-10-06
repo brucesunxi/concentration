@@ -31,6 +31,7 @@ import type { PracticeStartReview } from '../../../packages/contracts/index.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
 import { supportedDeviceLocale } from '../../../packages/contracts/device-locale.ts';
 import { connectionErrorCopy, requestErrorCopy } from '../../../packages/contracts/request-error-copy.ts';
+import { withRequestReference } from '../../../packages/contracts/request-reference.ts';
 import type { AgeBand, Locale, TaskId } from '../../../packages/task-engine/index.ts';
 import { TASKS } from '../../../packages/task-engine/index.ts';
 import { taskContent, translate, isTeen } from '../../../packages/content/copy.ts';
@@ -51,7 +52,7 @@ function FamilyApp() {
   const t = translate(locale);
   const timedScreenReaderMessage = t('读屏模式下，限时看图题目前不适合可靠计分。可以选无单题倒计时的找一找或记一记；今天不练也可以。', 'Timed visual tasks cannot be scored reliably with a screen reader yet. You can choose untimed Search or Memory, or stop for today.');
   const message = (e: unknown) => e instanceof MobileRequestError
-    ? requestErrorCopy(e.code, e.status, locale)
+    ? withRequestReference(requestErrorCopy(e.code, e.status, locale), e.requestId, locale, e.status, e.code)
     : isNetworkFailure(e)
       ? connectionErrorCopy(locale)
       : t('暂时无法完成，请重试。', 'Unable to complete. Please retry.');
@@ -89,7 +90,7 @@ function FamilyApp() {
         }
       }
       if(!mounted.current||version!==identityVersion.current)return;
-      if (!(e instanceof MobileRequestError && e.status === 401)) setError(t('还没有连接上家庭空间。未到期的本机记录会保留。', 'Could not connect to your family space. Unexpired local records are preserved.'));
+      if (!(e instanceof MobileRequestError && e.status === 401)) setError(e instanceof MobileRequestError ? message(e) : t('还没有连接上家庭空间。未到期的本机记录会保留。', 'Could not connect to your family space. Unexpired local records are preserved.'));
     } finally { if (mounted.current && version === identityVersion.current) setBusy(false); }
   }, [locale]);
   async function restoreEntry() {
