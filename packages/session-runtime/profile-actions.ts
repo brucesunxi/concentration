@@ -1,6 +1,8 @@
+import { isNetworkFailure } from './offline-session.ts';
+
 export type ProfileAction = 'export' | 'withdraw' | 'delete';
 export type ExportDelivery = 'saved' | 'share-sheet-closed' | 'cancelled';
-export interface ParentIdentity { role: string; family: { id: string }; children: { id: string }[] }
+export interface ParentIdentity { role: string; family: { id: string }; member?: { role: string; state: string }; children: { id: string; collectionStatus?: string }[] }
 export interface ProfileActionPorts {
   authenticate(): Promise<ParentIdentity>;
   identity(): Promise<ParentIdentity>;
@@ -14,6 +16,11 @@ export function requireCurrent(current: () => boolean) {
 }
 function assertParent(identity: ParentIdentity, familyId: string) {
   if (identity.role !== 'parent' || identity.family.id !== familyId) throw new Error('PARENT_IDENTITY_CHANGED');
+  if (identity.member?.role !== 'owner' || identity.member.state !== 'active') throw new Error('PARENT_SCOPE_INCOMPLETE');
+}
+function mutationMayNeedVerification(error: unknown) {
+  const response = error as { code?: unknown; status?: unknown } | null;
+  return isNetworkFailure(error) || response?.code === 'NOT_FOUND' || response?.code === 'RESPONSE_UNREADABLE' || response?.status === 404 || (typeof response?.status === 'number' && response.status >= 500);
 }
 export async function performProfileAction(action: ProfileAction, familyId: string, childId: string, ports: ProfileActionPorts) {
   const me = await ports.authenticate(); requireCurrent(ports.current); assertParent(me, familyId);
@@ -28,10 +35,14 @@ export async function performProfileAction(action: ProfileAction, familyId: stri
   if (exists) {
     try { await ports.request(`/children/${childId}${action === 'withdraw' ? '/withdraw' : ''}`, action === 'withdraw' ? 'POST' : 'DELETE'); }
     catch (error) {
-      if (action !== 'delete' || (error as { code?: string }).code !== 'NOT_FOUND') throw error;
+      if (!mutationMayNeedVerification(error)) throw error;
       requireCurrent(ports.current);
-      const current = await ports.identity(); requireCurrent(ports.current); assertParent(current, familyId);
-      if (current.children.some(child => child.id === childId)) throw error;
+      let current: ParentIdentity;
+      try { current = await ports.identity(); }
+      catch { throw error; }
+      requireCurrent(ports.current); assertParent(current, familyId);
+      const profile = current.children.find(child => child.id === childId);
+      if (action === 'delete' ? !!profile : profile?.collectionStatus !== 'collection-withdrawn') throw error;
     }
   }
   // A confirmed server mutation must still clean up even if the parent screen has closed.

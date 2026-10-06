@@ -362,6 +362,35 @@ def verify_family_flow(browser, base):
         }""")
         assert snapshot["confirmedMs"] > 0, "The service did not confirm active practice time"
         assert snapshot["status"] == "available", "A short practice should leave voluntary time"
+        page.get_by_role("button", name="Family space").click()
+        withdrawn = page.evaluate("""async () => {
+          const me = await (await fetch('/api/me')).json();
+          const response = await fetch(`/api/children/${me.children[0].id}/withdraw`, {
+            method: 'POST', headers: {'Content-Type':'application/json','X-CSRF-Token':me.csrf}, body: '{}'
+          });
+          return response.ok;
+        }""")
+        assert withdrawn, "The remote withdrawal must succeed before refreshing the parent screen"
+        page.evaluate("window.dispatchEvent(new Event('focus'))")
+        page.get_by_text("Collection stopped", exact=True).wait_for(timeout=10000)
+        page.get_by_role("button", name="Data & access").click()
+        privacy = page.get_by_role("dialog")
+        privacy.get_by_label("To delete, enter the nickname").fill(CHILD)
+
+        def lose_deletion_receipt(route):
+            if route.request.method != "DELETE":
+                route.continue_()
+                return
+            response = route.fetch()
+            assert response.status == 200, "The deletion must reach the service before its reply is lost"
+            route.abort()
+
+        deletion_url = re.compile(r".*/api/children/[0-9a-f-]+$")
+        page.route(deletion_url, lose_deletion_receipt)
+        privacy.get_by_role("button", name="Delete profile and records").click()
+        page.get_by_text("The profile, linked records and cached records in this browser have been deleted.").wait_for(timeout=10000)
+        assert page.evaluate("async () => (await (await fetch('/api/me')).json()).children.length") == 0
+        page.unroute(deletion_url, lose_deletion_receipt)
         print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, separate keyboard-operated screen reader condition, server confirmation, same-day rest cue")
     except Exception:
         artifact = ROOT / "dist/browser-qa/failure.png"

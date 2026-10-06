@@ -2,7 +2,8 @@ import test from 'node:test';
 import assert from 'node:assert/strict';
 import { performProfileAction, serializeChildExport } from '../../packages/session-runtime/profile-actions.ts';
 import type { ProfileActionPorts } from '../../packages/session-runtime/profile-actions.ts';
-const me = { role: 'parent', family: { id: 'family-a' }, children: [{ id: 'child-a' }] };
+import { NetworkUnavailable } from '../../packages/session-runtime/offline-session.ts';
+const me = { role: 'parent', family: { id: 'family-a' }, member: { role: 'owner', state: 'active' }, children: [{ id: 'child-a' }] };
 const exported = { schemaVersion: 1, child: { id: 'child-a' }, sessions: [], events: [], observations: [], confirmations: [] };
 function setup(override: Partial<ProfileActionPorts> = {}) {
   const calls: string[] = [];
@@ -32,6 +33,34 @@ test('lost deletion receipts require an authenticated same-family absence before
   assert.equal((await performProfileAction('delete', 'family-a', 'child-a', ports)).localCleared, true); assert.deepEqual(calls, ['cleanup']);
   const wrong = setup({ request: async () => { throw { code: 'NOT_FOUND' }; }, identity: async () => ({ ...me, family: { id: 'other' }, children: [] }) });
   await assert.rejects(performProfileAction('delete', 'family-a', 'child-a', wrong.ports), /PARENT_IDENTITY_CHANGED/); assert.deepEqual(wrong.calls, []);
+});
+test('a partial or pending parent list cannot certify deletion or clear local records', async () => {
+  for (const member of [{ role: 'support', state: 'active' }, { role: 'owner', state: 'pending' }]) {
+    const { ports, calls } = setup({ authenticate: async () => ({ ...me, member, children: [] }) });
+    await assert.rejects(performProfileAction('delete', 'family-a', 'child-a', ports), /PARENT_SCOPE_INCOMPLETE/);
+    assert.deepEqual(calls, []);
+  }
+  const changed = setup({ request: async () => { throw { code: 'NOT_FOUND' }; }, identity: async () => ({ ...me, member: { role: 'support', state: 'active' }, children: [] }) });
+  await assert.rejects(performProfileAction('delete', 'family-a', 'child-a', changed.ports), /PARENT_SCOPE_INCOMPLETE/);
+  assert.deepEqual(changed.calls, []);
+});
+test('a lost or unreadable deletion reply is confirmed only by a fresh owner list', async () => {
+  for (const cause of [new NetworkUnavailable(), { code: 'RESPONSE_UNREADABLE', status: 200 }, { code: 'REQUEST_FAILED', status: 404 }, { code: 'REQUEST_FAILED', status: 503 }]) {
+    const done = setup({ request: async () => { throw cause; }, identity: async () => ({ ...me, children: [] }) });
+    assert.equal((await performProfileAction('delete', 'family-a', 'child-a', done.ports)).localCleared, true);
+    assert.deepEqual(done.calls, ['cleanup']);
+    const pending = setup({ request: async () => { throw cause; } });
+    await assert.rejects(performProfileAction('delete', 'family-a', 'child-a', pending.ports), error => error === cause);
+    assert.deepEqual(pending.calls, []);
+  }
+});
+test('a lost withdrawal reply requires an explicit stopped-collection status', async () => {
+  const stopped = setup({ request: async () => { throw new NetworkUnavailable(); }, identity: async () => ({ ...me, children: [{ id: 'child-a', collectionStatus: 'collection-withdrawn' }] }) });
+  assert.equal((await performProfileAction('withdraw', 'family-a', 'child-a', stopped.ports)).localCleared, true);
+  assert.deepEqual(stopped.calls, ['cleanup']);
+  const active = setup({ request: async () => { throw new NetworkUnavailable(); } });
+  await assert.rejects(performProfileAction('withdraw', 'family-a', 'child-a', active.ports), { message: 'NETWORK_UNAVAILABLE' });
+  assert.deepEqual(active.calls, []);
 });
 test('exports never share after backgrounding and do not imply that a share sheet saved a file', async () => {
   let current = true;

@@ -48,6 +48,7 @@ export function ParentSpace({ child, family, mode, locale, client, onBack, onCha
       SHARING_UNAVAILABLE: t('此设备暂时无法打开系统分享，请稍后重试。', 'System sharing is unavailable. Please retry later.'),
       EXPORT_TOO_LARGE: t('记录超过本机导出大小限制，请使用网页端导出。', 'These records exceed the mobile export limit. Use the web app to export them.'),
       PROFILE_UNAVAILABLE: t('档案已不可用，请返回家庭空间。', 'This profile is unavailable. Return to your family space.'),
+      PARENT_SCOPE_INCOMPLETE: t('只有家庭创建者的完整档案列表才能确认删除结果。请用创建者账号重试。', 'Only the family creator’s complete profile list can confirm a deletion. Sign in as the creator and retry.'),
     };
     setError(text[code] ?? t('暂时无法完成。未确认的操作不会显示为成功，请检查连接后重试。', 'Unable to finish. Unconfirmed operations are not marked successful. Check your connection and retry.'));
   }

@@ -23,7 +23,7 @@ import { practiceInvitationCopy } from '../../../packages/contracts/practice-inv
 import type { PracticeStartReview } from '../../../packages/contracts/index.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
 import { supportedDeviceLocale } from '../../../packages/contracts/device-locale.ts';
-import { serializeChildExport } from '../../../packages/session-runtime/profile-actions.ts';
+import { performProfileAction, serializeChildExport } from '../../../packages/session-runtime/profile-actions.ts';
 import './practice-invitation.css';
 import './child-data-visibility.css';
 
@@ -41,6 +41,7 @@ const PracticeLimits = lazy(() => import('./PracticeLimits.tsx'));
 const PracticeInvitation = lazy(() => import('./PracticeInvitation.tsx'));
 const AgeReview = lazy(() => import('./AgeReview.tsx'));
 const FamilyHelp = lazy(() => import('./FamilyHelp.tsx'));
+const profileFingerprint = (snapshot:Me) => snapshot.children.map(child=>`${child.id}:${child.collectionStatus}`).join('|');
 function preferredLocale():Locale {
   try{const saved=localStorage.getItem('focus-ui-locale');if(saved==='zh-CN'||saved==='en')return saved;}catch{}
   return supportedDeviceLocale(navigator.languages?.length ? navigator.languages : [navigator.language]);
@@ -92,6 +93,7 @@ export function App() {
   const observationAttempt = useRef<{ body: string; key: string } | null>(null);
   const child = me?.children.find(c => c.id === selected) ?? me?.children[0];
   const invitedChild = practiceInvitation && me?.children.find(c => c.id === practiceInvitation.childId);
+  const parentProfiles = me?.role==='parent' ? profileFingerprint(me) : '';
   const owner = me?.role === 'parent' && me.member?.role === 'owner', support = me?.role === 'parent' && me.member?.role === 'support';
   const t = translate(locale), teen = child ? isTeen(child.ageBand) : false, hostedPreview = isHostedPreview();
   function accountEnded(outcome: AccountAccessOutcome, deletingFamily?: DeletedFamily, fromRequest = false) {
@@ -156,9 +158,9 @@ export function App() {
   useEffect(() => {
     if(me?.role !== 'parent')return;
     let live=true,checking=false;
-    const check=async()=>{if(document.hidden||checking)return;checking=true;try{const next=await request<Me>('/me');if(!live)return;if(next.role!=='parent'||next.member?.id!==me.member?.id){accountEnded('signin');return;}if(next.member?.state!==me.member?.state)await refresh(false);}catch(e){if(live&&e instanceof RequestError&&e.status===401)accountEnded('signin');}finally{checking=false;}};
+    const check=async()=>{if(document.hidden||checking)return;checking=true;try{const next=await request<Me>('/me');if(!live)return;if(next.role!=='parent'||next.family.id!==me.family.id||next.member?.id!==me.member?.id){accountEnded('signin');return;}if(next.member?.state!==me.member?.state||next.member?.role!==me.member?.role||profileFingerprint(next)!==parentProfiles)await refresh(false);}catch(e){if(live&&e instanceof RequestError&&e.status===401)accountEnded('signin');}finally{checking=false;}};
     const timer=window.setInterval(()=>void check(),30000);const focus=()=>void check();window.addEventListener('focus',focus);return()=>{live=false;clearInterval(timer);window.removeEventListener('focus',focus);};
-  },[me?.role,me?.member?.id,me?.member?.state]);
+  },[me?.role,me?.member?.id,me?.member?.role,me?.member?.state,parentProfiles]);
   const safely = async (fn: () => Promise<void>) => { if (pending) return; setPending(true); setError(''); try { await fn(); } catch (e) { setError(familyErrorCopy(e, locale)); if (e instanceof RequestError && ['PARENT_REQUIRED', 'REAUTH_REQUIRED'].includes(e.code)) setModal('login'); } finally { setPending(false); } };
   function navigate(next: typeof page) { accessVersion.current++; setError(''); setLifeSuggestion(null); if (['report', 'family', 'recovery', 'guide'].includes(next) && me?.role === 'child') { parentDestination.current = next; setModal('login'); return; } focusPage.current = true; if (next === page && !modal) { focusPage.current = false; pageTitle.current?.focus({ preventScroll: true }); } setPage(next); window.scrollTo({ top: 0 }); }
 
@@ -229,6 +231,38 @@ export function App() {
       const url = URL.createObjectURL(new Blob([serialized], { type: 'application/json' }));
       const a = document.createElement('a'); a.href = url; a.download = 'focus-family-records.json'; a.click(); setTimeout(() => URL.revokeObjectURL(url), 1000);
     });
+  }
+  async function mutateProfile(action:'withdraw'|'delete',target:Child) {
+    if(!me)return;
+    const familyId=me.family.id,childId=target.id,identity=accessVersion.current;
+    let attempted=false;
+    let outcome:Awaited<ReturnType<typeof performProfileAction>>;
+    try{
+      outcome=await performProfileAction(action,familyId,childId,{
+        authenticate:()=>request<Me>('/me'),identity:()=>request<Me>('/me'),
+        current:()=>mounted.current&&identity===accessVersion.current,
+        request:async(path,method)=>{attempted=true;return request(path,method,method==='POST'?{}:undefined);},
+        cleanup:()=>clearChildJournals(childId),
+        share:async()=>{throw new Error('EXPORT_NOT_SUPPORTED');},
+      });
+    }catch(cause){
+      if(cause instanceof Error&&cause.message==='PARENT_SCOPE_INCOMPLETE'){
+        setError(t('只有家庭创建者的完整档案列表才能确认这项操作。请用创建者账号重试。','Only the family creator’s complete profile list can confirm this action. Sign in as the creator and retry.'));
+        return;
+      }
+      if(attempted&&(isNetworkFailure(cause)||(cause instanceof RequestError&&(['NOT_FOUND','RESPONSE_UNREADABLE'].includes(cause.code)||cause.status===404||cause.status>=500)))){
+        setError(t('服务端结果还不能确认。本机记录已保留；连接恢复后再次点击，系统会核对档案状态。','The service result is still uncertain. Local records are kept. When connected, retry to check the profile status.'));
+        return;
+      }
+      throw cause;
+    }
+    if(!mounted.current||identity!==accessVersion.current)return;
+    if(!outcome.localCleared){
+      setError(t('服务端已确认处理，但此浏览器的记录尚未清理。请保持浏览器打开并再次点击以重试本机清理。','The service confirmed the change, but this browser still has records to clear. Keep this browser open and retry local cleanup.'));
+      return;
+    }
+    await refresh(false);setModal(null);
+    setNotice(action==='delete'?t('档案、关联记录和此浏览器中的缓存已删除。','The profile, linked records and cached records in this browser have been deleted.'):t('已停止采集，新练习和旧设备补传都会被拒绝。','Collection stopped. New practice and uploads from old sessions are blocked.'));
   }
   if (session && (me||offlineOffer)) return <Play key={session.id} session={session} familyId={me?.family.id??offlineOffer!.capsule.familyId} offline={!!offlineOffer} onExit={() => { setSession(null); void refresh(false).catch(e => setError(familyErrorCopy(e,localeRef.current))); }} onExploreLife={me?.role==='child'&&me.children.some(c=>c.id===session.child_id)?()=>{
     const childId=session.child_id,templateId=lifeTemplateForTask[session.plan.task],identity=accessVersion.current;
@@ -313,6 +347,6 @@ export function App() {
     {modal === 'profile' && owner && <Dialog locale={locale} title={t('认识一位小探索家', 'Meet an explorer')} onClose={() => setModal(null)}><form className="stack-form" onSubmit={e => void addProfile(e)}><p className="subtle">{t('昵称就够了。每个孩子的练习与记录各自保存。', 'A nickname is enough. Each child gets their own practice and records.')}</p><label>{t('孩子的昵称', 'Child’s nickname')}<input name="alias" autoFocus required maxLength={24} placeholder={t('例如：小树', 'For example: River')} /></label><label>{t('年龄段', 'Age band')}<select name="ageBand" defaultValue="6-8">{['6-8', '9-11', '12-14', '15-17'].map(v => <option key={v} value={v}>{v} {t('岁', 'years')}</option>)}</select></label><label>{t('练习语言', 'Practice language')}<select name="locale" defaultValue={locale}><option value="zh-CN">简体中文</option><option value="en">English</option></select></label>{me.mode === 'local-development' ? <label className="check-label"><input name="confirmation" type="checkbox" required />{hostedPreview ? t('我会只用虚构孩子昵称测试，知道新练习记录保存在云端，并会让参与测试的孩子每次自行选择是否参加。', 'I will use a fictional child nickname, understand that new practice records are stored in the cloud, and let any child taking part in testing choose each time whether to join.') : t('我同意在这台电脑保存本地测试记录，并会让孩子在每次练习前自己选择是否参加。', 'I agree to save local test records on this computer and let my child choose whether to take part before each practice.')}</label> : <p className="notice">{t('建立档案后仍需完成适用的监护核验，才能开始练习。当前版本尚未开放核验入口。', 'This profile will need guardian verification before practice. Verification is not yet available in this version.')}</p>}{error && <p className="notice error" role="alert">{error}</p>}<button className="primary" disabled={pending}>{t('为孩子准备好', 'Prepare their space')}<ArrowRight size={18} /></button></form></Dialog>}
     {modal === 'login' && <Dialog locale={locale} title={t('回到家长空间', 'Return to parent space')} onClose={() => setModal(null)}><p className="subtle">{t('家庭资料和设置需要家长密码。', 'Family records and settings need your parent password.')}</p>{authFields(true)}</Dialog>}
     {modal === 'observation' && child && practiceAllowed && <Dialog locale={locale} title={t('记下一次生活中的尝试', 'An everyday attempt')} onClose={() => setModal(null)}><form className="stack-form" onSubmit={e => void observation(e)}><label>{t('尝试了哪个策略', 'Which strategy?')}<select name="task" defaultValue={recommended}>{TASKS.map(k => <option value={k} key={k}>{taskContent(k, locale, child.ageBand).skill}</option>)}</select></label><label>{t('做了什么小事', 'What was the activity?')}<select name="context"><option value="packing">{t('准备物品', 'Getting things ready')}</option><option value="tidying">{t('整理小空间', 'Tidying a space')}</option><option value="reading">{t('短段阅读', 'A little reading')}</option><option value="project">{t('个人小项目', 'A small project')}</option></select></label><label>{t('大约提醒了几次', 'How many reminders?')}<input type="number" name="prompts" min={0} max={20} defaultValue={0} required /></label><label className="check-label"><input name="choice" type="checkbox" />{t('这个任务由孩子自己选择', 'The child chose this activity')}</label><p className="subtle">{t('只记录具体事件，不用这一条记录判断训练是否有效。', 'One observation cannot tell us whether training caused a change.')}</p><button className="primary" disabled={pending}>{t('保存这次观察', 'Save observation')}<Check size={18} /></button></form></Dialog>}
-    {modal === 'privacy' && owner && child && <Dialog locale={locale} title={`${child.alias} · ${t('数据与权限', 'Data & access')}`} onClose={() => setModal(null)}><div className="stack-form"><p>{me.mode === 'local-development' ? hostedPreview ? t('测试记录保存在云端家庭服务。你可以导出记录、停止新数据采集，或删除这个档案和相关练习。', 'Test records are stored in a cloud family service. Export them, stop new collection, or delete this profile and its practice records.') : t('记录保存在本机家庭服务。你可以导出记录、停止新数据采集，或删除这个档案和相关练习。', 'Records are stored in your local family service. Export them, stop new collection, or delete this profile and its practice records.') : t('你可以导出记录、停止新数据采集，或删除这个档案和相关练习。', 'You can export records, stop new collection, or delete this profile and its practice records.')}</p><p className="subtle">{t('导出包含家庭服务记录，并会尝试附上此浏览器仍保留的日志；其他设备请分别导出。','The export includes server records and attempts to add logs still held in this browser; export separately on other devices.')}</p><p className="notice">{collectionStatusCopy(child.collectionStatus,locale).detail}</p><button className="quiet" onClick={() => void exportRecords()} disabled={pending}><Download size={17} />{t('导出此档案记录', 'Export this profile')}</button><button className="quiet" disabled={pending} onClick={() => void safely(async () => { await request(`/children/${child.id}/withdraw`, 'POST', {}); await clearChildJournals(child.id); await refresh(false); setModal(null); setNotice(t('已停止采集，新练习和旧设备补传都会被拒绝。', 'Collection stopped. New practice and uploads from old sessions are blocked.')); })}>{t('停止此档案的数据采集', 'Stop collection for this profile')}</button><form className="stack-form danger-zone" onSubmit={e => { e.preventDefault(); if (new FormData(e.currentTarget).get('confirmation') !== child.alias) { setError(t('请完整输入孩子的昵称。', 'Please enter the exact nickname.')); return; } void safely(async () => { await request(`/children/${child.id}`, 'DELETE'); await clearChildJournals(child.id); await refresh(false); setModal(null);  setNotice(t('档案、关联记录和此浏览器中的缓存已删除。', 'The profile, linked records and cached records in this browser have been deleted.')); }); }}><label>{t('删除前，输入孩子昵称确认', 'To delete, enter the nickname')}<input name="confirmation" required placeholder={child.alias} /></label><button className="danger-button" disabled={pending}>{t('删除此档案和记录', 'Delete profile and records')}</button></form>{error && <p className="notice error" role="alert">{error}</p>}</div></Dialog>}
+    {modal === 'privacy' && owner && child && <Dialog locale={locale} title={`${child.alias} · ${t('数据与权限', 'Data & access')}`} onClose={() => setModal(null)}><div className="stack-form"><p>{me.mode === 'local-development' ? hostedPreview ? t('测试记录保存在云端家庭服务。你可以导出记录、停止新数据采集，或删除这个档案和相关练习。', 'Test records are stored in a cloud family service. Export them, stop new collection, or delete this profile and its practice records.') : t('记录保存在本机家庭服务。你可以导出记录、停止新数据采集，或删除这个档案和相关练习。', 'Records are stored in your local family service. Export them, stop new collection, or delete this profile and its practice records.') : t('你可以导出记录、停止新数据采集，或删除这个档案和相关练习。', 'You can export records, stop new collection, or delete this profile and its practice records.')}</p><p className="subtle">{t('导出包含家庭服务记录，并会尝试附上此浏览器仍保留的日志；其他设备请分别导出。','The export includes server records and attempts to add logs still held in this browser; export separately on other devices.')}</p><p className="notice">{collectionStatusCopy(child.collectionStatus,locale).detail}</p><button className="quiet" onClick={() => void exportRecords()} disabled={pending}><Download size={17} />{t('导出此档案记录', 'Export this profile')}</button><button className="quiet" disabled={pending} onClick={() => void safely(() => mutateProfile('withdraw', child))}>{t('停止此档案的数据采集', 'Stop collection for this profile')}</button><form className="stack-form danger-zone" onSubmit={e => { e.preventDefault(); if (new FormData(e.currentTarget).get('confirmation') !== child.alias) { setError(t('请完整输入孩子的昵称。', 'Please enter the exact nickname.')); return; } void safely(() => mutateProfile('delete', child)); }}><label>{t('删除前，输入孩子昵称确认', 'To delete, enter the nickname')}<input name="confirmation" required placeholder={child.alias} /></label><button className="danger-button" disabled={pending}>{t('删除此档案和记录', 'Delete profile and records')}</button></form>{error && <p className="notice error" role="alert">{error}</p>}</div></Dialog>}
   </div>;
 }
