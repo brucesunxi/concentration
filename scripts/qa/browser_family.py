@@ -136,6 +136,38 @@ def check_assistive_memory_focus(page):
     page.get_by_role("button", name="Done, time for a break").click()
 
 
+def verify_timed_help_pauses_without_a_result(page):
+    page.locator(".task-card").nth(1).click()
+    invitation = page.get_by_role("dialog")
+    invitation.get_by_label("Touch, mouse or keyboard").check()
+    invitation.get_by_role("button", name="I want to start").click()
+    page.get_by_role("button", name="I want to try").click()
+    page.get_by_role("button", name="I need help").click(timeout=15000)
+    page.get_by_role("heading", name="A break matters too").wait_for(timeout=10000)
+    page.get_by_text("Pause to review the rule, or ask a parent to help", exact=False).wait_for()
+    assert page.locator(".intro-stage p.rule.compact").inner_text().strip(), "The pause must show the rule"
+    page.get_by_role("button", name="That is enough for today").click()
+    page.get_by_text("You explored the rule today, with no formal step completed yet", exact=False).wait_for(timeout=15000)
+    page.get_by_role("button", name="Done, time for a break").click()
+
+
+def verify_parent_help(page):
+    page.get_by_role("button", name="Need help? Open family help").click()
+    page.get_by_role("region", name="Help for your family").wait_for()
+    page.get_by_role("button", name="View practice & rest").click()
+    page.get_by_role("heading", name="Make room for rest").wait_for()
+    page.get_by_role("button", name="Today", exact=True).first.click()
+
+
+def verify_child_help(page):
+    page.get_by_role("button", name="Need help", exact=True).first.click()
+    page.get_by_role("region", name="Need a hand?").wait_for()
+    assert page.get_by_role("button", name="View records & data").count() == 0
+    page.get_by_role("button", name="See practice & rest").click()
+    page.get_by_role("heading", name="Make room for rest").wait_for()
+    page.get_by_role("button", name="Today", exact=True).first.click()
+
+
 def verify_practice_limit_refresh(page):
     snapshot = page.evaluate("""async () => {
       const me = await (await fetch('/api/me')).json();
@@ -294,6 +326,7 @@ def verify_family_flow(browser, base):
         assert page.evaluate("document.body.scrollWidth <= innerWidth"), "Practice selection overflows a 320px viewport"
         page.set_viewport_size({"width": 1440, "height": 900})
 
+        verify_parent_help(page)
         verify_practice_limit_refresh(page)
         verify_invitation_refresh_and_race(page)
 
@@ -303,6 +336,7 @@ def verify_family_flow(browser, base):
         assert "This timed visual task is not available with a screen reader yet" in timed_invitation.inner_text()
         timed_invitation.get_by_role("button", name="Close").click()
         play_one_formal_step(page)
+        verify_child_help(page)
         page.get_by_role("button", name="Start today’s practice").click()
         page.get_by_role("dialog").get_by_text("You have already practised today", exact=False).wait_for()
         invitation = page.get_by_role("dialog").inner_text()
@@ -311,6 +345,7 @@ def verify_family_flow(browser, base):
         page.get_by_role("dialog").get_by_role("button", name="Close").click()
         play_assistive_search(page)
         check_assistive_memory_focus(page)
+        verify_timed_help_pauses_without_a_result(page)
         page.get_by_role("button", name="Parent access").click()
         parent_dialog = page.get_by_role("dialog")
         parent_dialog.get_by_label("Family name").fill(FAMILY)
