@@ -112,6 +112,15 @@ test('attachment enforces age, actual image slot, voice locale and exact rule tr
     m=await f.library.begin(f.users.editor,input(audio,{...voice,locale:'zh-CN'}),randomUUID());m=await f.library.finish(f.users.editor,m.id,audio,'audio/mpeg');
     d=await f.studio.attach(f.users.editor,d.draft.id,{mediaId:m.id,slot:'guide'},etag(d),randomUUID());assert.equal(d.draft.pack.audio?.copyKey,'rule');assert.equal(d.draft.pack.assets.find(a=>a.id==='guide')!.transcript,d.draft.pack.copy.rule);
     await assert.rejects(f.studio.attach(f.users.editor,d.draft.id,{mediaId:m.id,slot:'objects'},etag(d),randomUUID()),rejected('MEDIA_NOT_READY'));
+    const stopSource=await f.content.pick('stop','6-8','zh-CN');let stop=await f.studio.create(f.users.editor,{sourceHash:stopSource.sha256,version:'99.15.0-stop-rule'},randomUUID());
+    m=await f.library.begin(f.users.editor,input(audio,{...voice,locale:'zh-CN',transcript:stop.draft.pack.copy.strategy}),randomUUID());
+    m=await f.library.finish(f.users.editor,m.id,audio,'audio/mpeg');
+    await assert.rejects(f.studio.attach(f.users.editor,stop.draft.id,{mediaId:m.id,slot:'guide'},etag(stop),randomUUID()),rejected('MEDIA_TRANSCRIPT_MISMATCH'));
+    m=await f.library.begin(f.users.editor,input(audio,{...voice,locale:'zh-CN',transcript:stop.draft.pack.copy.rule}),randomUUID());
+    m=await f.library.finish(f.users.editor,m.id,audio,'audio/mpeg');
+    stop=await f.studio.attach(f.users.editor,stop.draft.id,{mediaId:m.id,slot:'guide'},etag(stop),randomUUID());
+    assert.equal(stop.draft.pack.audio?.copyKey,'rule');
+    assert.equal(stop.draft.pack.assets.find(a=>a.id==='guide')!.transcript,stop.draft.pack.copy.rule);
   }finally{await f.close();}
 });
 

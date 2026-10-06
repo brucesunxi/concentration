@@ -85,8 +85,8 @@ export function contentStudio(db:Database,content:LocalContent,auth:StudioAuth,n
         const {row:library,asset}=await importedAsset(tx,input.mediaId,input.slot),pack=structuredClone(d.pack);
         if(!library.metadata.ageBands.includes(pack.ageBand))studioFail(422,'MEDIA_AGE_MISMATCH','素材声明的适用年龄不包含这一稿。');
         if(input.slot==='guide'){
-          const copyKey=pack.task==='stop'?'strategy':'rule';
-          if(asset.locale!==pack.locale||asset.transcript!==pack.copy[copyKey])studioFail(422,'MEDIA_TRANSCRIPT_MISMATCH','语音语言与字幕必须逐字匹配本稿对应的规则或策略。');
+          const copyKey='rule';
+          if(asset.locale!==pack.locale||asset.transcript!==pack.copy.rule)studioFail(422,'MEDIA_TRANSCRIPT_MISMATCH','语音语言与字幕必须逐字匹配本稿规则。');
           if(pack.audio)pack.assets=pack.assets.filter(a=>a.id!==pack.audio!.assetId);
           pack.audio={assetId:'guide',copyKey};
         }else if(!pack.assets.some(a=>a.id===input.slot&&a.mime==='image/png'))studioFail(422,'MEDIA_SLOT_MISMATCH','这一任务不使用所选图集，请选择实际使用的素材。');

@@ -83,6 +83,7 @@ export async function verifyRelease(raw: unknown, trusted: TrustedKey[], options
     if (body.channel === 'published') {
       const narration = body.pack.assets.find(a => a.id === body.pack.audio?.assetId);
       check(body.pack.audio && narration?.mime === 'audio/mpeg' && narration.voice, 'AUDIO_COVERAGE_REQUIRED');
+      check(body.pack.audio?.copyKey === 'rule', 'RULE_NARRATION_REQUIRED');
     }
     const identities = new Set<string>(), roles = new Set<string>();
     for (const approval of body.approvals) {

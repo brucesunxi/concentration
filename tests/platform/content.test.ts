@@ -54,9 +54,10 @@ async function identity(subject: string, role: TrustedKey['role']) {
   const publicKey = trustedKeySchema.parse({ id: subject, subject, role, jwk: await crypto.subtle.exportKey('jwk', keys.publicKey) });
   return { privateKey: keys.privateKey, publicKey };
 }
-async function syntheticPublished() {
+async function syntheticPublished(task: 'memory' | 'stop' = 'memory') {
   const publisher = await identity('synthetic-publisher', 'publisher'), method = await identity('synthetic-method-reviewer', 'method-reviewer'), language = await identity('synthetic-language-reviewer', 'language-reviewer');
-  const pack = structuredClone(preview.body.pack); pack.review = 'approved'; pack.assets.forEach(a => { a.review = 'approved'; });
+  const source = task === 'memory' ? preview : await content.get((await content.pick('stop', '6-8', 'zh-CN')).sha256);
+  const pack = structuredClone(source.body.pack); pack.review = 'approved'; pack.assets.forEach(a => { a.review = 'approved'; });
   const packHash = await hashObject(pack), approvals: Release['body']['approvals'] = [];
   for (const reviewer of [method, language]) {
     const body = { packHash, reviewer: reviewer.publicKey.subject, role: reviewer.publicKey.role as 'method-reviewer' | 'language-reviewer', approvedAt: new Date(now - 1000).toISOString(), evidence: 'Synthetic unit-test fixture, not a real content approval' };
@@ -118,6 +119,16 @@ test('published content requires a fixed, attributed narration matching its inst
   delete narration.voice;
   await signChanged();
   await assert.rejects(verifyRelease(fixture.release, fixture.trust, { mode: 'production', market: 'US', now }), code('AUDIO_COVERAGE_REQUIRED'));
+});
+test('published stop content cannot substitute a strategy recording for its rule', async () => {
+  const fixture = await syntheticPublished('stop');
+  assert.equal(fixture.release.body.pack.audio?.copyKey, 'strategy');
+  await assert.rejects(verifyRelease(fixture.release, fixture.trust, { mode: 'production', market: 'US', now }), code('RULE_NARRATION_REQUIRED'));
+  // Reviewed development previews retain their original signed content.
+  fixture.release.body.channel = 'reviewed-preview';
+  fixture.release.body.markets = ['LOCAL'];
+  fixture.release.signature = await signObject(fixture.release.body, fixture.publisher.publicKey.id, fixture.publisher.privateKey);
+  assert.equal((await verifyRelease(fixture.release, fixture.trust, { mode: 'local', market: 'LOCAL', now })).audio?.copyKey, 'strategy');
 });
 test('a publisher or author cannot also supply one of the required reviews', async () => {
   const fixture = await syntheticPublished();
