@@ -66,6 +66,10 @@ if [[ "${RUN_OFFLINE_RECOVERY:-false}" == true && "${RUN_FAMILY_FLOW:-false}" !=
   echo 'Offline recovery requires the synthetic family flow' >&2
   exit 1
 fi
+if [[ "${RUN_BACKGROUND_RESUME:-false}" == true && "${RUN_FAMILY_FLOW:-false}" != true ]]; then
+  echo 'Background resume requires the synthetic family flow' >&2
+  exit 1
+fi
 if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
   export FOCUS_DATA_DIR="$RUNNER_TEMP/focus-family-qa-data"
   mkdir -p "$FOCUS_DATA_DIR"
@@ -79,6 +83,7 @@ if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
   test "$ready" = true
   acceptance_args=(--apk "$apk" --evidence-dir "$package_dir" --reset-synthetic-app)
   if [[ "${RUN_OFFLINE_RECOVERY:-false}" == true ]]; then acceptance_args+=(--offline-recovery); fi
+  if [[ "${RUN_BACKGROUND_RESUME:-false}" == true ]]; then acceptance_args+=(--background-resume); fi
   python3 scripts/qa/android_practice_life.py "${acceptance_args[@]}" > "$package_dir/family-flow-report.json"
 fi
 

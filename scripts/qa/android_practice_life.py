@@ -170,7 +170,8 @@ def complete_search(device: Device) -> None:
         raise AcceptanceError("Search step did not complete correctly")
 
 
-def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None, offline_recovery: bool = False) -> dict:
+def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
+             offline_recovery: bool = False, background_resume: bool = False) -> dict:
     suffix = secrets.token_hex(5)
     family, password = f"SyntheticAndroid{suffix}", f"SyntheticAndroidAcceptance{suffix}2026"
     created = False
@@ -179,6 +180,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None, of
               "apkSha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "formalIndependentSteps": 0,
               "parentReportFormalSteps": None,
               "offlineForcedRestart": False, "pendingBeforeSync": False, "syncedAfterReconnect": False,
+              "backgroundInterrupted": False, "backgroundResumed": False,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
     try:
@@ -218,6 +220,30 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None, of
             result["offlineForcedRestart"] = True
         device.tap("I want to try", scroll=True, timeout=25)
         for step in range(3):
+            if step == 2 and background_resume:
+                deadline = time.monotonic() + 25
+                while time.monotonic() < deadline:
+                    if any(RABBIT.fullmatch(n.get("content-desc", "")) for n in device.screen()):
+                        break
+                    time.sleep(0.3)
+                else:
+                    raise AcceptanceError("Formal search trial did not become active before backgrounding")
+                device.run("shell", "input", "keyevent", "3")  # HOME
+                time.sleep(1)
+                device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+                device.find("I am ready", timeout=30)
+                result["backgroundInterrupted"] = True
+                if evidence_dir:
+                    (evidence_dir / "android-background-pause.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+                device.tap("I am ready")
+                deadline = time.monotonic() + 25
+                while time.monotonic() < deadline:
+                    if any(RABBIT.fullmatch(n.get("content-desc", "")) for n in device.screen()):
+                        result["backgroundResumed"] = True
+                        break
+                    time.sleep(0.3)
+                if not result["backgroundResumed"]:
+                    raise AcceptanceError("Formal search trial did not resume after background pause")
             complete_search(device)
             if step < 2:
                 device.tap("Continue")
@@ -312,13 +338,15 @@ def main() -> int:
     parser.add_argument("--evidence-dir", type=Path)
     parser.add_argument("--reset-synthetic-app", action="store_true", help="Required acknowledgement: clears this app on FocusIslandQA")
     parser.add_argument("--offline-recovery", action="store_true", help="Remove the API port, force-stop, recover offline, then sync")
+    parser.add_argument("--background-resume", action="store_true", help="Background an active formal trial, then resume it")
     args = parser.parse_args()
     if not args.reset_synthetic_app:
         parser.error("--reset-synthetic-app is required because the dedicated emulator app data will be cleared")
     device = Device(args.adb, args.serial)
     try:
         validate_target(device, args.api_base, args.apk)
-        result = run_flow(device, args.api_base, args.apk, args.evidence_dir, args.offline_recovery)
+        result = run_flow(device, args.api_base, args.apk, args.evidence_dir,
+                          args.offline_recovery, args.background_resume)
         print(json.dumps(result, indent=2))
         if not result["familyDeleted"] or not result["appDataCleared"]:
             raise AcceptanceError("Synthetic data cleanup did not finish")

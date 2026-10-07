@@ -17,6 +17,11 @@ on:
         required: false
         default: false
         type: boolean
+      background_resume:
+        description: Background an active formal trial, then resume without scoring the interruption
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -66,6 +71,7 @@ jobs:
           PACKAGE_DIR: ${{ steps.package.outputs.package_dir }}
           RUN_FAMILY_FLOW: ${{ inputs.full_flow }}
           RUN_OFFLINE_RECOVERY: ${{ inputs.offline_recovery }}
+          RUN_BACKGROUND_RESUME: ${{ inputs.background_resume }}
         run: bash scripts/qa/android-emulator-smoke.sh "$PACKAGE_DIR"
       - uses: actions/upload-artifact@v7
         if: always()
@@ -82,5 +88,6 @@ jobs:
             dist/mobile-native/android-smoke-input/**/android-life-preselected.png
             dist/mobile-native/android-smoke-input/**/android-offline-offer.png
             dist/mobile-native/android-smoke-input/**/android-pending-sync.png
+            dist/mobile-native/android-smoke-input/**/android-background-pause.png
           if-no-files-found: warn
           retention-days: 14
