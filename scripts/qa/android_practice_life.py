@@ -169,6 +169,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None) ->
     token: str | None = None
     result = {"platform": "Android emulator", "avd": AVD, "mode": "local-development",
               "apkSha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "formalIndependentSteps": 0,
+              "parentReportFormalSteps": None,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
     try:
@@ -228,6 +229,17 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None) ->
         status, me = api(base, "/me", token=token)
         if status != 200 or len(me.get("children", [])) != 1:
             raise AcceptanceError("Synthetic family profile was not available")
+        status, report = api(base, f"/children/{me['children'][0]['id']}/report", token=token)
+        if status != 200 or not isinstance(report.get("sessions"), list):
+            raise AcceptanceError("Parent report was not available")
+        formal_in_report = sum(
+            1 for session in report["sessions"]
+            for trial in (session.get("result") or {}).get("trials", [])
+            if not trial.get("practice") and not trial.get("assisted")
+        )
+        if formal_in_report != result["formalIndependentSteps"]:
+            raise AcceptanceError("Parent report did not retain the independent practice step")
+        result["parentReportFormalSteps"] = formal_in_report
         status, space = api(base, f"/children/{me['children'][0]['id']}/life-goals", token=token)
         if status != 200 or space.get("goals") != [] or space.get("total") != 0:
             raise AcceptanceError("Opening the activity created a goal without the child's choice")
