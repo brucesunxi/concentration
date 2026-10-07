@@ -183,7 +183,8 @@ def background_and_return(device: Device) -> None:
 
 
 def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
-             offline_recovery: bool = False, background_resume: bool = False) -> dict:
+             offline_recovery: bool = False, background_resume: bool = False,
+             upgrade_from: Path | None = None) -> dict:
     suffix = secrets.token_hex(5)
     family, password = f"SyntheticAndroid{suffix}", f"SyntheticAndroidAcceptance{suffix}2026"
     created = False
@@ -195,12 +196,14 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "backgroundInterrupted": False, "backgroundResumed": False,
               "introRetainedAfterBackground": False, "feedbackRetainedAfterBackground": False,
               "backgroundPauseExplained": False,
+              "upgradeFromApkSha256": hashlib.sha256(upgrade_from.read_bytes()).hexdigest() if upgrade_from else None,
+              "upgradePreservedOfflineJournal": False,
               "backgroundExclusionsInParentReport": 0,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
     try:
         device.run("reverse", "tcp:4181", "tcp:4181")
-        device.run("install", "-r", str(apk), timeout=90)
+        device.run("install", "-r", str(upgrade_from or apk), timeout=90)
         device.run("shell", "pm", "clear", PACKAGE)
         device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
         device.tap("English", timeout=25)
@@ -232,16 +235,20 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             device.wait_text("Recovery information for this practice is saved on this device", timeout=30)
             device.run("reverse", "--remove", "tcp:4181")
             device.run("shell", "am", "force-stop", PACKAGE)
+            if upgrade_from:
+                device.run("install", "-r", str(apk), timeout=90)
             device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
             device.find("Restore this practice", scroll=True, timeout=35)
             visible = device.screen()
             if any(family in str(n) or "SyntheticWren" in str(n) for n in visible):
                 raise AcceptanceError("Offline recovery exposed a family identifier")
             if evidence_dir:
-                (evidence_dir / "android-offline-offer.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+                name = "android-upgrade-offline-offer.png" if upgrade_from else "android-offline-offer.png"
+                (evidence_dir / name).write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
             device.tap("Restore this practice", scroll=True)
             device.find("I want to try", scroll=True, timeout=30)
             result["offlineForcedRestart"] = True
+            result["upgradePreservedOfflineJournal"] = bool(upgrade_from)
         device.tap("I want to try", scroll=True, timeout=25)
         for step in range(3):
             if step == 2 and background_resume:
@@ -379,14 +386,19 @@ def main() -> int:
     parser.add_argument("--reset-synthetic-app", action="store_true", help="Required acknowledgement: clears this app on FocusIslandQA")
     parser.add_argument("--offline-recovery", action="store_true", help="Remove the API port, force-stop, recover offline, then sync")
     parser.add_argument("--background-resume", action="store_true", help="Background an active formal trial, then resume it")
+    parser.add_argument("--upgrade-from", type=Path, help="Older APK to install first, then replace offline with --apk")
     args = parser.parse_args()
     if not args.reset_synthetic_app:
         parser.error("--reset-synthetic-app is required because the dedicated emulator app data will be cleared")
+    if args.upgrade_from and not args.offline_recovery:
+        parser.error("--upgrade-from requires --offline-recovery")
+    if args.upgrade_from and not args.upgrade_from.is_file():
+        parser.error("--upgrade-from APK does not exist")
     device = Device(args.adb, args.serial)
     try:
         validate_target(device, args.api_base, args.apk)
         result = run_flow(device, args.api_base, args.apk, args.evidence_dir,
-                          args.offline_recovery, args.background_resume)
+                          args.offline_recovery, args.background_resume, args.upgrade_from)
         print(json.dumps(result, indent=2))
         if not result["familyDeleted"] or not result["appDataCleared"]:
             raise AcceptanceError("Synthetic data cleanup did not finish")

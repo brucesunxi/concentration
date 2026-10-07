@@ -22,6 +22,10 @@ on:
         required: false
         default: false
         type: boolean
+      upgrade_from_run_id:
+        description: Optional older Android test packages run ID; requires full_flow and offline_recovery
+        required: false
+        type: string
 
 permissions:
   actions: read
@@ -66,12 +70,41 @@ jobs:
             --output "$PACKAGE_DIR/apk-smoke-recheck.json"
           node scripts/qa/compare-android-smoke-input.mjs "$REPORT" "$PACKAGE_DIR/apk-smoke-recheck.json"
           echo "package_dir=$PACKAGE_DIR" >> "$GITHUB_OUTPUT"
+      - name: Download and reverify older APK for upgrade
+        if: inputs.upgrade_from_run_id != ''
+        id: previous_package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.upgrade_from_run_id }}
+          CURRENT_PACKAGE_DIR: ${{ steps.package.outputs.package_dir }}
+        run: |
+          [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]]
+          test "${{ inputs.full_flow }}" = true
+          test "${{ inputs.offline_recovery }}" = true
+          gh run download "$BUILD_RUN_ID" --dir dist/mobile-native/android-upgrade-input
+          REPORT="$(find dist/mobile-native/android-upgrade-input -type f -name apk-static-report.json -print -quit)"
+          test -n "$REPORT"
+          PACKAGE_DIR="${REPORT%/*}"
+          test -f "$PACKAGE_DIR/FocusIslandDev-local.apk"
+          test -f "$PACKAGE_DIR/aab-static-report.json"
+          SOURCE_REF="$(node -e 'const fs=require("node:fs");const report=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const ref=report.sourceSnapshot?.sourceCommit;if(!/^[a-f0-9]{40}$/.test(ref))process.exit(1);process.stdout.write(ref)' "$REPORT")"
+          ANDROID_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          node scripts/verify-android-local-artifact.mjs \
+            --apk "$PACKAGE_DIR/FocusIslandDev-local.apk" \
+            --snapshot "$PACKAGE_DIR/source-snapshot.json" \
+            --source-ref "$SOURCE_REF" --android-tools "$ANDROID_TOOLS" \
+            --aab-report "$PACKAGE_DIR/aab-static-report.json" \
+            --output "$PACKAGE_DIR/apk-smoke-recheck.json"
+          node scripts/qa/compare-android-smoke-input.mjs "$REPORT" "$PACKAGE_DIR/apk-smoke-recheck.json"
+          node scripts/qa/check-android-upgrade-pair.mjs "$PACKAGE_DIR/apk-smoke-recheck.json" "$CURRENT_PACKAGE_DIR/apk-smoke-recheck.json"
+          echo "package_dir=$PACKAGE_DIR" >> "$GITHUB_OUTPUT"
       - name: Install and restart on Android emulator
         env:
           PACKAGE_DIR: ${{ steps.package.outputs.package_dir }}
           RUN_FAMILY_FLOW: ${{ inputs.full_flow }}
           RUN_OFFLINE_RECOVERY: ${{ inputs.offline_recovery }}
           RUN_BACKGROUND_RESUME: ${{ inputs.background_resume }}
+          UPGRADE_FROM_PACKAGE_DIR: ${{ steps.previous_package.outputs.package_dir }}
         run: bash scripts/qa/android-emulator-smoke.sh "$PACKAGE_DIR"
       - uses: actions/upload-artifact@v7
         if: always()
@@ -91,5 +124,7 @@ jobs:
             dist/mobile-native/android-smoke-input/**/android-background-pause.png
             dist/mobile-native/android-smoke-input/**/android-background-intro.png
             dist/mobile-native/android-smoke-input/**/android-background-feedback.png
+            dist/mobile-native/android-smoke-input/**/android-upgrade-offline-offer.png
+            dist/mobile-native/android-upgrade-input/**/apk-smoke-recheck.json
           if-no-files-found: warn
           retention-days: 14

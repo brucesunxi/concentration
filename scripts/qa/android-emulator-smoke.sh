@@ -4,7 +4,10 @@ set -euo pipefail
 package_dir="${1:?Package directory is required}"
 apk="$package_dir/FocusIslandDev-local.apk"
 test -f "$apk"
-expected_app_version="$(node -e 'const fs=require("node:fs");const report=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(report.appVersion)' "$package_dir/apk-smoke-recheck.json")"
+startup_dir="${UPGRADE_FROM_PACKAGE_DIR:-$package_dir}"
+startup_apk="$startup_dir/FocusIslandDev-local.apk"
+test -f "$startup_apk"
+expected_app_version="$(node -e 'const fs=require("node:fs");const report=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(report.appVersion)' "$startup_dir/apk-smoke-recheck.json")"
 test -e /dev/kvm
 sudo chmod a+rw /dev/kvm
 sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
@@ -36,7 +39,7 @@ for _ in {1..60}; do
 done
 test "$booted" = true
 adb shell input keyevent 82
-adb install -r "$apk"
+adb install -r "$startup_apk"
 adb shell dumpsys package dev.focusisland.family | grep -F "versionName=$expected_app_version"
 
 check_launch() {
@@ -70,6 +73,10 @@ if [[ "${RUN_BACKGROUND_RESUME:-false}" == true && "${RUN_FAMILY_FLOW:-false}" !
   echo 'Background resume requires the synthetic family flow' >&2
   exit 1
 fi
+if [[ -n "${UPGRADE_FROM_PACKAGE_DIR:-}" && ( "${RUN_FAMILY_FLOW:-false}" != true || "${RUN_OFFLINE_RECOVERY:-false}" != true ) ]]; then
+  echo 'Upgrade requires the synthetic family flow and offline recovery' >&2
+  exit 1
+fi
 if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
   export FOCUS_DATA_DIR="$RUNNER_TEMP/focus-family-qa-data"
   mkdir -p "$FOCUS_DATA_DIR"
@@ -84,6 +91,7 @@ if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
   acceptance_args=(--apk "$apk" --evidence-dir "$package_dir" --reset-synthetic-app)
   if [[ "${RUN_OFFLINE_RECOVERY:-false}" == true ]]; then acceptance_args+=(--offline-recovery); fi
   if [[ "${RUN_BACKGROUND_RESUME:-false}" == true ]]; then acceptance_args+=(--background-resume); fi
+  if [[ -n "${UPGRADE_FROM_PACKAGE_DIR:-}" ]]; then acceptance_args+=(--upgrade-from "$startup_apk"); fi
   python3 scripts/qa/android_practice_life.py "${acceptance_args[@]}" > "$package_dir/family-flow-report.json"
 fi
 
@@ -105,6 +113,7 @@ await writeFile(join(root, 'emulator-smoke-report.json'), JSON.stringify({
   loginScreenVisible: true,
   coldRestartPassed: true,
   authenticatedFlowVerified: process.env.RUN_FAMILY_FLOW === 'true',
+  upgradedFromOlderPackage: !!process.env.UPGRADE_FROM_PACKAGE_DIR,
   notes: process.env.RUN_FAMILY_FLOW === 'true' ? ['Synthetic family and child data were deleted after the test'] : ['No family account or child data was entered', 'Local API is not connected in this smoke test'],
 }, null, 2) + '\n');
 NODE
