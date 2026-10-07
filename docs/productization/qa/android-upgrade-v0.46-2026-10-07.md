@@ -1,5 +1,13 @@
 # Android 覆盖升级与离线练习恢复
 
+## 最新验收：0.2.10 → 0.2.11
+
+2026-10-07。[Android 35 / x86_64 模拟器任务 37602326272](https://github.com/brucesunxi/concentration/actions/runs/37602326272)从 `0.2.10` / 版本码 `11` 的测试 APK 覆盖安装到 `0.2.11` / 版本码 `12`，新包由[构建任务 37599952352](https://github.com/brucesunxi/concentration/actions/runs/37599952352)从提交 `74cae7b9f908521fc56c110384b06af5c65aa6cd` 生成。两包的包名、签名证书一致；运行前重新核验了两包的源码快照、摘要与签名。新版 APK 的 SHA-256 为 `78bb02da7f544f7ea163799ef4c60b7d801f538188a7226d4942e9aa6125a284`。
+
+旧包准备虚构家庭的练习后断开本地 API、强制停止 App，再用 `adb install -r` 覆盖新版且保留 App 数据。新版离线显示原设备的恢复入口；恢复后完成两道示范题和一道正式题，先显示待同步，重连后得到服务端确认。孩子摘要与家长报告均为 **1 个独立正式步骤**，生活目标数 `0`；虚构家庭已删除，模拟器 App 数据已清理。[运行报告](../../../dist/mobile-native/v0.46/emulator-upgrade-37602326272/android-smoke-input/focus-island-android-aab-74cae7b9f908521fc56c110384b06af5c65aa6cd/family-flow-report.json)、[恢复入口截图](../../../dist/mobile-native/v0.46/emulator-upgrade-37602326272/android-smoke-input/focus-island-android-aab-74cae7b9f908521fc56c110384b06af5c65aa6cd/android-upgrade-offline-offer.png)、[同步后摘要](../../../dist/mobile-native/v0.46/emulator-upgrade-37602326272/android-smoke-input/focus-island-android-aab-74cae7b9f908521fc56c110384b06af5c65aa6cd/android-practice-summary.png)及[设备报告](../../../dist/mobile-native/v0.46/emulator-upgrade-37602326272/android-smoke-input/focus-island-android-aab-74cae7b9f908521fc56c110384b06af5c65aa6cd/emulator-smoke-report.json)保存在本机；恢复入口和完成页已目视核对。
+
+首次[设备任务 37601458892](https://github.com/brucesunxi/concentration/actions/runs/37601458892)在打开旧包的登录页前出现系统“Pixel Launcher isn't responding”弹窗，未进入产品流程；同一新旧包重试通过。此次实际覆盖安装不能证明低存储写入失败时的资料保留，也不代替真机、音频打断、更多旧版或商店签名升级。
+
 ## 直升验收：0.2.8 → 0.2.10
 
 2026-10-07 的[Android 35 / x86_64 模拟器任务 37597904850](https://github.com/brucesunxi/concentration/actions/runs/37597904850)从旧包 `0.2.8` / Android 版本码 `9` 直接覆盖到当前包 `0.2.10` / 版本码 `11`，跳过中间的 `0.2.9`。旧包来源为构建任务 `37584595512`，当前包来源为 `37591984293`；两包的包名均为 `dev.focusisland.family`，签名证书 SHA-256 均为 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`，APK SHA-256 分别为 `fb758b3e12f086f4e6ef188b970a97d07f9bdd92cbe5fd9376ed125ee55f868d` 与 `e50a5014a6e703c933914b5628ffefcba2ed9e03678fee40a8fb3a13d3a00d88`。运行前重新核验了两包、源码快照、签名和版本递增。
