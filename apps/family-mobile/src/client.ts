@@ -12,6 +12,7 @@ import type { AccountAction } from '../../../packages/contracts/account-security
 import type { PracticeStartReview } from '../../../packages/contracts/index.ts';
 import { mobileApiOrigin } from '../../../packages/contracts/mobile-api-origin.ts';
 import { validRequestReference } from '../../../packages/contracts/request-reference.ts';
+import { completeSignOut } from '../../../packages/session-runtime/complete-sign-out.ts';
 
 // Public build-time routing only. Server policy still decides which market may open.
 export const API_ORIGIN = mobileApiOrigin(process.env.EXPO_PUBLIC_FOCUS_API_ORIGIN).origin;
@@ -119,10 +120,11 @@ export class MobileClient {
   async logout() {
     this.authEpoch++;
     const token = this.token; this.token = null; this.role = null;
-    const erased = this.saved.update(null);
-    void erased.catch(() => undefined);
-    try { await invalidateOffline(); if (token) await this.request('/auth/logout', 'POST', {}, { Authorization: `Bearer ${token}` }); }
-    finally { await erased; }
+    await completeSignOut({
+      eraseCredential: () => this.saved.update(null),
+      invalidateOffline,
+      revokeRemote: async () => { if (token) await this.request('/auth/logout', 'POST', {}, { Authorization: `Bearer ${token}` }); },
+    });
   }
   async accountAction<T>(action: AccountAction, data: unknown): Promise<T> {
     const epoch = ++this.authEpoch;
