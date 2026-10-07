@@ -10,8 +10,13 @@ test('paged child export preserves observations, events, goals and consent recor
   const db = await openDatabase('memory://');
   try {
     await migrate(db);
+    let snapshotExports = 0;
+    const trackedDb = { ...db, transaction: <T>(fn: Parameters<typeof db.transaction<T>>[0], options?: { repeatableRead?: boolean }) => {
+      if (options?.repeatableRead) snapshotExports++;
+      return db.transaction(fn, options);
+    } };
     let now = Date.parse('2026-10-06T12:00:00Z');
-    const api = service(db, () => now), name = 'Paged export ' + randomUUID().slice(0, 8), password = 'synthetic-export-password';
+    const api = service(trackedDb, () => now), name = 'Paged export ' + randomUUID().slice(0, 8), password = 'synthetic-export-password';
     const auth = await api.setup({ name, password, timezone: 'UTC', locale: 'en', acknowledgedLocalUse: true });
     let parent = (await api.authenticate(auth.value))!;
     const child = await api.addChild(parent, { alias: 'Synthetic child', ageBand: '9-11', locale: 'en', localConfirmation: true });
@@ -62,5 +67,8 @@ test('paged child export preserves observations, events, goals and consent recor
     assert.equal(paged.verifiedConsents.length, 205);
     assert.equal(chunks.join('').includes('verification_ref_hash'), false);
     assert.deepEqual(paged, regular);
+    assert.equal(snapshotExports, 2, 'both export formats must hold one repeatable snapshot across all sections');
+    const isolation = await db.transaction(async tx => (await tx.query<{transaction_isolation:string}>('SHOW transaction_isolation')).rows[0].transaction_isolation, { repeatableRead: true });
+    assert.equal(isolation, 'repeatable read');
   } finally { await db.close(); }
 });

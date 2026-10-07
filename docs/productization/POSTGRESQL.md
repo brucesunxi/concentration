@@ -29,3 +29,5 @@
 现有受保护预览可执行非破坏性的运行账号审计：`npm run db:audit:runtime -- --url-file .focus-data/neon/runtime-url`。连接文件必须只允许本人读取；脚本要求 Neon 限权账号、验证客户端 TLS 对端证书，并在 PostgreSQL `READ ONLY` 事务内复查 schema 32、行级隔离与跨角色权限。当前结果见[Neon 只读验收](qa/neon-runtime-readonly-v0.46-qa.md)。应用代码会把 Neon 连接串的 SSL 模式固定为 `verify-full`，防止驱动升级后 `sslmode=require` 的证书验证语义变弱；非 Neon 数据库连接保持其原有配置。这个审计不能替代独立测试分支的故障与恢复演练。
 
 旧版本验收记录中提到的测试容器属于历史执行证据，不是当前的部署依赖。
+
+2026-10-07：家长档案导出的全部分页现在使用同一个 `REPEATABLE READ` 事务读取，身份检查和各栏目不能跨不同快照；见[一致读取验收](qa/child-export-snapshot-2026-10-07.md)。真实 Neon 的并发与大档案演练仍须在独立测试分支完成。

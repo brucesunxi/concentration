@@ -76,7 +76,7 @@ export function service(source: Database, now: () => number = Date.now, content?
   let authorityPromise: Promise<LocalSessionAuthority> | undefined;
   const contentReady = () => contentPromise ??= content ? Promise.resolve(content) : createLocalContent(db, { now });
   const authorityReady = () => authorityPromise ??= authority ? Promise.resolve(authority) : createSessionAuthority(db);
-  async function authenticated<T>(p: Principal, action: (current: Principal, tx: Queryable) => Promise<T>, allowPending = false) {
+  async function authenticated<T>(p: Principal, action: (current: Principal, tx: Queryable) => Promise<T>, allowPending = false, repeatableRead = false) {
     // Finish catalogue initialization before taking any family transaction lock.
     await contentReady(); await authorityReady();
     return context(memberContext(p), () => db.transaction(async tx => {
@@ -89,7 +89,7 @@ export function service(source: Database, now: () => number = Date.now, content?
       if (!member || member.state === 'revoked' || member.role !== p.member_role || canonical(member.child_ids) !== canonical(p.allowed_children)) fail(401,'UNAUTHENTICATED','家长权限已更新，请重新登录。');
       if (member.state !== 'active' && !allowPending) fail(403,'MEMBER_PENDING','请等待家庭创建者确认后再进入。');
       return action({...current, member_role:member.role, member_state:member.state, allowed_children:member.child_ids}, tx);
-    }));
+    }, repeatableRead ? { repeatableRead: true } : undefined));
   }
   async function passwordMatches(value: string, stored?: string) {
     const [salt, hash] = (stored ?? '00000000000000000000000000000000:' + '0'.repeat(128)).split(':');
@@ -192,6 +192,20 @@ export function service(source: Database, now: () => number = Date.now, content?
     return {childId,currentAgeBand:c.age_band,locale:c.locale,...ageReview(c),canEdit:p.member_role==='owner',
       unfinished:unfinished.map(s=>({id:s.id,state:s.state,createdAt:new Date(s.created_at).toISOString(),deviceId:s.device_id,uploadUntil:s.upload_until,uploadExpired:s.upload_expired}))};
   }
+  async function practiceLimitsIn(tx: Queryable, p: Principal, childId: string, lock = true): Promise<PracticeLimits> {
+    const c = await child(tx, p, childId, lock);
+    const f = (await one<Family>(tx, 'SELECT timezone FROM families WHERE id=$1', [p.family_id]))!;
+    const at = now(), today = day(f.timezone, at), minutes = effectiveMinutes(c, today);
+    const { confirmed, reserved } = await usageTotals(tx, childId, today);
+    const available = Math.max(0, minutes * 60000 - confirmed - reserved);
+    return { version: 'practice-limits-1', childId, ageBand: c.age_band, settingsVersion: c.daily_limit_version,
+      canEdit: p.scope === 'parent' && p.member_role === 'owner', collectionActive: collecting(c), timezone: f.timezone, day: today,
+      nextDay: day(f.timezone, nextFamilyDay(at, f.timezone)), generatedAt: new Date(at).toISOString(),
+      maximumMinutes: DAILY_LIMIT[c.age_band] / 60000, currentMinutes: minutes,
+      next: c.daily_limit_effective_day && c.daily_limit_effective_day > today ? { minutes: c.next_daily_limit_minutes!, day: c.daily_limit_effective_day } : null,
+      confirmedMs: confirmed, reservedMs: reserved, availableMs: collecting(c) ? available : 0,
+      status: !collecting(c) ? 'collection-stopped' : minutes === 0 ? 'paused' : reserved > 0 ? 'reserved' : available < 5000 ? 'daily-limit' : 'available' };
+  }
   const members = familyMembers(db,{now,fail,owner,hashPassword,context,token,releaseScope});
   const operations = {
     familyMembers:members.read, inviteMember:members.invite, cancelInvitation:members.cancel, actMember:members.act, join:members.join,
@@ -264,18 +278,7 @@ export function service(source: Database, now: () => number = Date.now, content?
       });
     },
     async practiceLimits(p: Principal, childId: string): Promise<PracticeLimits> {
-      const c = await child(db, p, childId, true);
-      const f = (await one<Family>(db, 'SELECT timezone FROM families WHERE id=$1', [p.family_id]))!;
-      const at = now(), today = day(f.timezone, at), minutes = effectiveMinutes(c, today);
-      const { confirmed, reserved } = await usageTotals(db, childId, today);
-      const available = Math.max(0, minutes * 60000 - confirmed - reserved);
-      return { version: 'practice-limits-1', childId, ageBand: c.age_band, settingsVersion: c.daily_limit_version,
-        canEdit: p.scope === 'parent' && p.member_role === 'owner', collectionActive: collecting(c), timezone: f.timezone, day: today,
-        nextDay: day(f.timezone, nextFamilyDay(at, f.timezone)), generatedAt: new Date(at).toISOString(),
-        maximumMinutes: DAILY_LIMIT[c.age_band] / 60000, currentMinutes: minutes,
-        next: c.daily_limit_effective_day && c.daily_limit_effective_day > today ? { minutes: c.next_daily_limit_minutes!, day: c.daily_limit_effective_day } : null,
-        confirmedMs: confirmed, reservedMs: reserved, availableMs: collecting(c) ? available : 0,
-        status: !collecting(c) ? 'collection-stopped' : minutes === 0 ? 'paused' : reserved > 0 ? 'reserved' : available < 5000 ? 'daily-limit' : 'available' };
+      return practiceLimitsIn(db, p, childId);
     },
     async setPracticeLimit(p: Principal, childId: string, raw: unknown, ifMatch: unknown): Promise<PracticeLimits> {
       parent(p); recentParent(p, now()); const input = practiceLimitInput.parse(raw);
@@ -743,7 +746,7 @@ export function service(source: Database, now: () => number = Date.now, content?
         const observations = await tx.query('SELECT id,task,context,prompts,child_choice,created_at FROM observations WHERE child_id=$1 ORDER BY created_at,id', [childId]);
         const confirmations = await tx.query('SELECT purpose,version,acknowledged_at,withdrawn_at FROM local_confirmations WHERE child_id=$1 ORDER BY acknowledged_at,id', [childId]);
         const verifiedConsents = await tx.query('SELECT provider,country,age_band,locale,purpose,notice_version,notice_sha256,release_scope_identity,verified_at,granted_at,expires_at,withdrawn_at FROM guardian_consents WHERE child_id=$1 ORDER BY granted_at,id', [childId]);
-        const { generatedAt: _generatedAt, ...practiceLimits } = await operations.practiceLimits(p, childId);
+        const { generatedAt: _generatedAt, ...practiceLimits } = await practiceLimitsIn(tx, p, childId, false);
         return { schemaVersion: 2, exportedAt: new Date(now()).toISOString(), child: publicChild(c), practiceLimits, sessions: sessions.rows, events: events.rows, observations: observations.rows, confirmations: confirmations.rows, verifiedConsents: verifiedConsents.rows, life: await life.export(tx, childId) };
       });
     },
@@ -751,7 +754,7 @@ export function service(source: Database, now: () => number = Date.now, content?
       recentParent(p, now());
       await db.transaction(async tx => {
         const c = await child(tx, p, childId, true);
-        const { generatedAt: _generatedAt, ...practiceLimits } = await operations.practiceLimits(p, childId);
+        const { generatedAt: _generatedAt, ...practiceLimits } = await practiceLimitsIn(tx, p, childId, false);
         const writeValue = async (value: unknown) => {
           assertExportSafe(value);
           const json = JSON.stringify(value);
@@ -845,12 +848,13 @@ export function service(source: Database, now: () => number = Date.now, content?
   const selfScopedMethods = new Set(['setup', 'login', 'join', 'authenticate', 'sessionAuthorities', 'changePassword', 'logoutAll', 'deleteFamily', 'grantGuardianConsent']);
   const ownerMethods = new Set(['billingStatus','addChild','withdraw','deleteChild','exportChild','exportChildToSink','setPracticeLimit','pausePracticeToday','handover','lifeSpace','lifeHistory','createLifeGoal','actLifeGoal','inviteMember','cancelInvitation','actMember','requestAgeReview','applyAgeReview']);
   const pendingMethods = new Set(['me','logout','accountSecurity','familyMembers']);
+  const snapshotMethods = new Set(['exportChild','exportChildToSink']);
   return Object.fromEntries(Object.entries(operations).map(([name, action]) => [name,
     selfScopedMethods.has(name) ? action : (p: Principal, ...args: unknown[]) => authenticated(p, current => {
       if(current.scope==='parent' && current.member_role!=='owner' && ownerMethods.has(name))fail(403,'OWNER_REQUIRED','这项操作需要家庭创建者确认。');
       if(name==='familyMembers')parent(current);
       return Reflect.apply(action, undefined, [current, ...args]);
-    },pendingMethods.has(name)),
+    },pendingMethods.has(name),snapshotMethods.has(name)),
   ])) as typeof operations;
 }
 export type FocusService = ReturnType<typeof service>;

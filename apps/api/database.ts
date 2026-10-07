@@ -15,7 +15,7 @@ import { migrateBilling } from './billing-schema.ts';
 import { verifiedPostgresUrl } from '../../packages/database/neon-tls.ts';
 
 export interface Queryable { query<T = Record<string, unknown>>(sql: string, params?: unknown[]): Promise<{ rows: T[] }> }
-export interface Database extends Queryable { transaction<T>(fn: (tx: Queryable) => Promise<T>): Promise<T>; close(): Promise<void>; context?<T>(context: DatabaseContext, action: () => Promise<T>): Promise<T> }
+export interface Database extends Queryable { transaction<T>(fn: (tx: Queryable) => Promise<T>, options?: { repeatableRead?: boolean }): Promise<T>; close(): Promise<void>; context?<T>(context: DatabaseContext, action: () => Promise<T>): Promise<T> }
 
 export async function openDatabase(location: string, postgresUrl?: string): Promise<Database> {
   if (postgresUrl) {
@@ -25,7 +25,7 @@ export async function openDatabase(location: string, postgresUrl?: string): Prom
     const database: Database = {
       query: <T>(sql: string, params?: unknown[]) => database.transaction(tx => tx.query<T>(sql, params)),
       context: context.run,
-      async transaction(fn) {
+      async transaction(fn, options) {
         const values = context.values();
         const client = await pool.connect();
         let broken: Error | undefined;
@@ -36,6 +36,7 @@ export async function openDatabase(location: string, postgresUrl?: string): Prom
         client.on('error', connectionError);
         try {
           await client.query('BEGIN');
+          if (options?.repeatableRead) await client.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
           await client.query("SET LOCAL statement_timeout='15s'; SET LOCAL lock_timeout='5s'; SET LOCAL idle_in_transaction_session_timeout='15s'");
           await client.query(CONTEXT_SQL, values);
           const result = await fn({ query: async <T>(sql: string, params?: unknown[]) => ({ rows: (await client.query(sql, params)).rows as T[] }) });
@@ -51,7 +52,10 @@ export async function openDatabase(location: string, postgresUrl?: string): Prom
   }
   if (location !== 'memory://') await mkdir(location, { recursive: true, mode: 0o700 });
   const db = new PGlite(location); await db.waitReady;
-  return { query: (sql, params) => db.query(sql, params), transaction: fn => db.transaction(tx => fn(tx)), close: () => db.close() };
+  return { query: (sql, params) => db.query(sql, params), transaction: (fn, options) => db.transaction(async tx => {
+    if (options?.repeatableRead) await tx.query('SET TRANSACTION ISOLATION LEVEL REPEATABLE READ');
+    return fn(tx);
+  }), close: () => db.close() };
 }
 
 export async function migrate(db: Database) {
