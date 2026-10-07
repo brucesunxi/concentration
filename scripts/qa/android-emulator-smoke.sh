@@ -7,6 +7,9 @@ test -f "$apk"
 expected_app_version="$(node -e 'const fs=require("node:fs");const report=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));process.stdout.write(report.appVersion)' "$package_dir/apk-smoke-recheck.json")"
 test -e /dev/kvm
 sudo chmod a+rw /dev/kvm
+sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+test -x "$sdkmanager_path"
+export PATH="$(dirname "$sdkmanager_path"):$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
 
 sdkmanager --install 'emulator' 'system-images;android-35;google_apis;x86_64'
 echo no | avdmanager create avd -n focus-smoke -k 'system-images;android-35;google_apis;x86_64' --device pixel_6 --force
