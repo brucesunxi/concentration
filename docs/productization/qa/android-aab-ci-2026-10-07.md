@@ -2,7 +2,15 @@
 
 2026-10-07。由于本机可用空间约 20 GiB，使用仓库的 [Android test packages 工作流](../../../.github/workflows/android-aab.yml)从同一 Git 提交远程构建可安装 APK 和 AAB，再下载交付包；未在本机生成大型 Android 工程，也未删除旧构建文件。工作流记录 App 源码逐文件摘要，编译、验证签名及包体，并上传产物与报告。没有 Docker 步骤。
 
-## 当前交付：后台返回修正版
+## 当前交付：0.2.10
+
+从提交 `816c711` 构建的 APK/AAB 将 Android 版本码增至 `11`，并在 Android 35 模拟器完成 `0.2.9 → 0.2.10` 的离线覆盖安装、恢复与补传。此版修正了无倒计时任务因慢帧被不必要暂停的问题；包体摘要、本机链接、设备报告及旧版失败原因见[覆盖升级验收](android-upgrade-v0.46-2026-10-07.md)。
+
+## 上一批：0.2.9
+
+`54daba0` 将 Android 版本码从 `9` 增至 `10`，用于发现升级后无倒计时任务的慢帧暂停问题；完整过程见[覆盖升级验收](android-upgrade-v0.46-2026-10-07.md)。
+
+## 上一批：后台返回修正版
 
 [构建任务 37584595512](https://github.com/brucesunxi/concentration/actions/runs/37584595512)从提交 `1c6e2d8b2ee431e915a78468067ddd2299fbc08e` 生成新版包；本机下载后重新计算摘要，均与构建报告一致。App 版本仍为 `0.2.8`、Android 版本码为 `9`，包名为 `dev.focusisland.family`。
 
@@ -12,7 +20,7 @@
 
 [Android 35 模拟器验收 37586520758](https://github.com/brucesunxi/concentration/actions/runs/37586520758)安装并运行这一 SHA-256 的 APK，实际按 Home 键验证规则页、反馈页和正式题的返回行为；结果与服务端家长报告一致，详见[后台返回验收](background-return-v0.46-2026-10-07.md)。这仍是使用本地 API 配置与调试证书的测试包，AAB 不能直接安装，也不适合上传应用商店。
 
-## 上一批交付
+## 更早一批交付
 
 [构建任务 37573726397](https://github.com/brucesunxi/concentration/actions/runs/37573726397)与[家庭质量检查 37573708547](https://github.com/brucesunxi/concentration/actions/runs/37573708547)均通过。包体源码提交为 `b8230d3958e921564c8a0a675e7edde4113a0381`，产品源码版本 `0.46.0`，App 版本 `0.2.8`、Android 版本码 `9`。本机副本位于 Git 忽略的 `dist/`，不会随 Git 推送：
 
