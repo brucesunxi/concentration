@@ -12,13 +12,15 @@
 
 下载后重新计算两包 SHA-256，均与报告一致。两包使用相同的签名证书指纹 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`；APK 签名验证通过，AAB 签名验证通过。包名为 `dev.focusisland.family`，均含 `arm64-v8a`、`armeabi-v7a`、`x86`、`x86_64` 四种架构，内置运行代码的摘要一致。源码快照逐文件与构建提交核对，包内敏感文件名、关键功能标记和权限也经过静态检查。
 
-这是**使用 Android Debug 证书签名的本地测试包**，配置为访问本地家庭 API，并允许本地开发网络连接；不是商店发行包。AAB 不能直接像 APK 一样安装。本机没有连接的 Android 真机或模拟器；远程模拟器只完成了下述启动验收，登录、离线恢复、加密存储、声音及升级体验尚未验证。内容的专业与母语审核、市场发布要求也未完成。GitHub 附件保留 14 天；本机 `dist/` 副本不受该期限影响。
+这是**使用 Android Debug 证书签名的本地测试包**，配置为访问本地家庭 API，并允许本地开发网络连接；不是商店发行包。AAB 不能直接像 APK 一样安装。本机没有连接的 Android 真机或模拟器；远程模拟器完成了下述安装启动和虚构家庭流程。真机、语音听感、低存储、升级安装及当前包的离线恢复尚未验证。内容的专业与母语审核、市场发布要求也未完成。GitHub 附件保留 14 天；本机 `dist/` 副本不受该期限影响。
 
 ## Android 虚拟设备实装
 
 [远程模拟器验收任务 37576980888](https://github.com/brucesunxi/concentration/actions/runs/37576980888)已在 Android 35 / x86_64 虚拟设备上重新核对相同 APK 的源码、签名和摘要，实际安装、打开英文家长登录入口、强制关闭及冷启动均通过。验收脚本见 [Android emulator startup 工作流](../../../.github/workflows/android-emulator-smoke.yml)。[运行报告](../../../dist/mobile-native/v0.46/emulator-smoke-37576980888/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/emulator-smoke-report.json)、[启动截图](../../../dist/mobile-native/v0.46/emulator-smoke-37576980888/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/emulator-first-launch.png)和界面结构文件保存在本机 Git 忽略目录。截图可见未连接本地 API 时的清晰错误提示，未输入家庭账号或孩子资料。
 
-这项验收只证明**安装、启动、离线提示和冷启动**，不证明登录、练习、语音、加密存储或网络恢复。后续仍需连接测试 API 后执行虚构家庭的完整流程，以及真实设备、升级安装和音频检查。
+这一批次只证明**安装、启动、离线提示和冷启动**，不证明登录或练习。随后在[完整家庭流程任务 37578189008](https://github.com/brucesunxi/concentration/actions/runs/37578189008)中，同一 SHA-256 的 APK 在 Android 35 / x86_64 虚拟设备连接临时本地 API，完成英文虚构家庭创建、6–8 岁虚构档案、规则示范、1 个独立正式找目标步骤，以及服务端确认。家长报告中的独立正式步骤同样为 1。孩子离开练习后，相关生活建议被预选，但服务端家庭目标数仍为 0；共有 4 个适龄模板。流程结束后，虚构家庭已删除，专用模拟器的 App 数据已清空。
+
+[完整流程报告](../../../dist/mobile-native/v0.46/emulator-family-37578189008/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/family-flow-report.json)、[练习结果截图](../../../dist/mobile-native/v0.46/emulator-family-37578189008/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/android-practice-summary.png)与[生活建议预选截图](../../../dist/mobile-native/v0.46/emulator-family-37578189008/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/android-life-preselected.png)已保存到本机 Git 忽略目录。此验收使用临时本地数据服务，不能证明 Vercel/Neon、真机声音、安全存储或完整离线恢复；后续仍需对应环境和设备的独立验收。
 
 ## 上一轮 AAB 记录
 
