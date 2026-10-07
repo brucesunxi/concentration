@@ -22,7 +22,7 @@ import { Stimulus } from './Stimulus';
 import { RuleExamples } from './RuleExamples';
 import { Page, Button, Notice, s, colors } from './ui';
 
-import { makeOfflineCapsule, verifyOfflineSession, isNetworkFailure, OfflinePreparationChanged } from '../../../packages/session-runtime/offline-session.ts';
+import { makeOfflineCapsule, verifyOfflineSession, OfflinePreparationChanged } from '../../../packages/session-runtime/offline-session.ts';
 
 import { PracticeCheckIn, practiceWindowCopy } from '../../../packages/session-runtime/practice-window.ts';
 import { backgroundPauseCopy, shouldPauseForBackground } from '../../../packages/session-runtime/background-pause-copy.ts';
@@ -180,6 +180,7 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
     void setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false, playsInSilentMode: false, interruptionMode: 'doNotMix' }).catch(() => undefined);
     void (async () => {
       let preparationStage = 'local-storage';
+      let preparedRuntime: SessionRuntime | null = null;
       try {
         const generation=await offlineGeneration(),deviceId=await client.deviceId();
         let proof:AuthorizationProof|undefined,loaded:MobileContent;
@@ -200,6 +201,7 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
         if(!live.current)return;
         preparationStage = 'event-journal';
         const current = new SessionRuntime(session, { now: () => performance.now(), uuid: randomUUID, authorize: actions => authorization.current?.assert(actions), journal: journalFor(familyId, session.child_id, session.id, () => authorization.current?.checkpoint() ?? {highest:Date.now(),fault:null}), send: events => client.request(`/sessions/${session.id}/events`, 'POST', { events }), finalize: lastSeq => client.request(`/sessions/${session.id}/finalize`, 'POST', { lastSeq }) });
+        preparedRuntime = current;
         await current.initialize(); if (!live.current) { current.stop(); return; }
         let savedForOffline=offline;
         if(!offline && proof?.status.canContinue && authorization.current && !current.state.ended){
@@ -209,8 +211,9 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
             await saveOfflineSession(capsule,generation,authorization.current.checkpoint(),current.events);savedForOffline=true;
           }catch(failure){
             if(failure instanceof OfflinePreparationChanged){current.stop();throw failure;}
-            await dropOfflineSession(session.id);
-            if(live.current)setStatus(t('本次未保存离线恢复资料，请保持联网。操作记录仍会保存。','Offline recovery was not prepared. Stay connected; your practice events will still be saved.'));
+            // A failed replacement cannot prove that an earlier prepared entry is unusable.
+            // Retain it and its journal; authorization changes and normal expiry are handled separately.
+            if(live.current)setStatus(t('暂时无法确认离线恢复资料，请保持联网。已保存的操作记录会保留。','Offline recovery could not be confirmed. Stay connected; saved practice events are preserved.'));
           }
         }
         if(!live.current){current.stop();return;}
@@ -234,13 +237,15 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
         }
         if (current.state.ended || mayContinue()) { if (current.events.length) void synchronize(); }
       } catch (failure) {
+        preparedRuntime?.stop();
         // Stage and error code are safe for diagnostics; never log family data,
         // server response bodies, signed URLs, or credential-bearing messages.
         if (live.current) console.error('PRACTICE_PREPARATION_FAILED', preparationStage,
           failure instanceof Error ? failure.name : 'UnknownError',
           typeof failure === 'object' && failure !== null && 'code' in failure && typeof failure.code === 'string' ? failure.code : 'UNKNOWN');
         if(unavailable(failure)){await accessFailure(failure);return;}
-        if(live.current && !isNetworkFailure(failure))await dropOfflineSession(session.id).catch(()=>undefined);
+        // A storage, asset or decoding failure is not proof of revocation. Keep the
+        // existing recovery entry and journal so a later retry or export can inspect them.
         if (live.current) { locking.current = true; setLocked(true); setPhase('pause'); setError(t('练习材料或加密记录尚未准备好。请回到家庭空间后重试。', 'Practice materials or encrypted storage are not ready. Return to your family space and retry.')); }
       }
     })();

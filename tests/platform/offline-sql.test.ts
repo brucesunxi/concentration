@@ -77,6 +77,18 @@ test('a checkpoint storage failure rolls back the journal write as part of the s
   } finally {db.close();}
 });
 
+test('a failed replacement does not erase the previously prepared native recovery', () => {
+  const {db, journal, save} = fixture();
+  try {
+    journal(); assert.equal(save(), 1);
+    const before = db.prepare(READ_OFFLINE).get();
+    db.exec("CREATE TRIGGER fail_preparation BEFORE UPDATE ON offline_resume BEGIN SELECT RAISE(ABORT, 'synthetic storage failure'); END;");
+    assert.throws(() => save(), /synthetic storage failure/);
+    assert.deepEqual(db.prepare(READ_OFFLINE).get(), before);
+    assert.equal(db.prepare('SELECT events FROM journal WHERE id=?').get('session-a')?.events, '[]');
+  } finally {db.close();}
+});
+
 test('native expiry seals old sessions and removes their prepared recovery without touching newer journals',()=>{
   const {db,journal,save}=fixture();
   try{
