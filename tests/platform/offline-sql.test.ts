@@ -6,7 +6,7 @@ import { OFFLINE_SCHEMA, SAVE_OFFLINE, INVALIDATE_OFFLINE, READ_OFFLINE, CHECKPO
 
 function fixture() {
   const db = new DatabaseSync(':memory:'); db.exec(JOURNAL_SCHEMA + OFFLINE_SCHEMA);
-  const journal = (id = 'session-a', events = '[]', family = 'family-a', child = 'child-a') => db.prepare(WRITE_JOURNAL).run(id, family, child, events, 1000, family, child, id);
+  const journal = (id = 'session-a', events = '[]', family = 'family-a', child = 'child-a') => db.prepare(WRITE_JOURNAL).run(id, family, child, events, 1000, 'hash-a', family, child, id);
   const save = (generation = 0, id = 'session-a', events = '[]', family = 'family-a', child = 'child-a') => db.prepare(SAVE_OFFLINE).run(id, family, child, generation, '{}', 10000, null, 'hash-a', generation, id, family, child, events, family, child, id).changes;
   return { db, journal, save };
 }

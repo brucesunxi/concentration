@@ -14,6 +14,7 @@ import { hashObject } from '../../../packages/content/index.ts';
 import { nativeVerifier } from '../../../packages/content/native-verifier.ts';
 import { UNSYNCED_RETENTION_MS, UNSYNCED_WARNING_MS, retentionClock } from '../../../packages/session-runtime/journal-retention.ts';
 import { nativeDatabaseDirectoryUri } from '../../../packages/session-runtime/native-database-path.ts';
+import { verifyJournalEvents } from '../../../packages/session-runtime/journal-integrity.ts';
 import type { CollectionStatus } from '../../../packages/contracts/collection-status.ts';
 
 let pending: Promise<SQLite.SQLiteDatabase> | undefined;
@@ -50,6 +51,7 @@ async function open() {
           // Old records have no original creation time. Begin their window at upgrade.
           await db.runAsync('UPDATE journal SET created_at_ms=? WHERE created_at_ms IS NULL',Date.now());
         });
+        if(!columns.some(column=>column.name==='events_hash'))await db.execAsync('ALTER TABLE journal ADD COLUMN events_hash TEXT');
         return db;
       } catch (e) { await db.closeAsync(); throw e; }
     } catch (error) {
@@ -82,15 +84,15 @@ export function journalFor(familyId: string, childId: string, sessionId: string,
   return {
     async load() {
       await pruneExpiredJournals();
-      const row = await withDatabase(db => db.getFirstAsync<{ family_id: string; child_id: string; events: string }>('SELECT family_id,child_id,events FROM journal WHERE id=?', sessionId));
+      const row = await withDatabase(db => db.getFirstAsync<{ family_id: string; child_id: string; events: string; events_hash: string | null }>('SELECT family_id,child_id,events,events_hash FROM journal WHERE id=?', sessionId));
       if (row && (row.family_id !== familyId || row.child_id !== childId)) throw new Error('Journal owner mismatch');
-      return row ? JSON.parse(row.events) as EngineEvent[] : [];
+      return row ? (await verifyJournalEvents(row.events,row.events_hash,nativeVerifier)).events : [];
     },
     async save(events) {
       const effectiveNow=await pruneExpiredJournals();
       const point=checkpoint?.(),hash=await hashObject(events,nativeVerifier);
       await withDatabase(db => db.withTransactionAsync(async () => {
-        const saved=await db.runAsync(WRITE_JOURNAL,sessionId,familyId,childId,JSON.stringify(events),effectiveNow,familyId,childId,sessionId);
+        const saved=await db.runAsync(WRITE_JOURNAL,sessionId,familyId,childId,JSON.stringify(events),effectiveNow,hash,familyId,childId,sessionId);
         if(saved.changes!==1)throw new Error('Journal owner mismatch or collection stopped');
         if(point)await db.runAsync(CHECKPOINT_OFFLINE,point.highest,point.fault,sessionId);
         await db.runAsync('UPDATE offline_resume SET journal_hash=? WHERE session_id=?',hash,sessionId);
@@ -114,12 +116,14 @@ export async function removeChildJournals(familyId: string, childId: string) {
 }
 export async function readChildJournals(familyId: string, childId: string) {
   await pruneExpiredJournals();
-  const rows = await withDatabase(db => db.getAllAsync<{ id: string; events: string }>('SELECT id,events FROM journal WHERE family_id=? AND child_id=? ORDER BY id', familyId, childId));
-  return rows.map(row => {
-    const events = JSON.parse(row.events) as EngineEvent[];
-    if (!Array.isArray(events)) throw new Error('LOCAL_EXPORT_UNREADABLE');
-    return { sessionId: row.id, events };
-  });
+  const rows = await withDatabase(db => db.getAllAsync<{ id: string; events: string; events_hash: string | null; created_at_ms: number }>('SELECT id,events,events_hash,created_at_ms FROM journal WHERE family_id=? AND child_id=? ORDER BY id', familyId, childId));
+  const records = [];
+  for (const row of rows) {
+    if (!Number.isFinite(row.created_at_ms) || !Number.isFinite(new Date(row.created_at_ms).getTime())) throw new Error('LOCAL_EXPORT_UNREADABLE');
+    const verified = await verifyJournalEvents(row.events,row.events_hash,nativeVerifier);
+    records.push({ sessionId: row.id, createdAt: new Date(row.created_at_ms).toISOString(), ...verified });
+  }
+  return records;
 }
 /** Only an active owner receives a complete family list. Other parents may
  * remove explicitly withdrawn profiles, but absence is not deletion proof. */
