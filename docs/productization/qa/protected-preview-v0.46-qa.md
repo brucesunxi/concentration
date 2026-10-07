@@ -25,3 +25,9 @@
 ## 2026-10-02 当前受保护别名复验
 
 在本地源码提交 `b309575` 后再次执行 `npm run audit:preview`；受保护别名指向 `READY` 部署 `dpl_DREC4pUeUKeUdczAUmtd31kL1qbr`。数据库就绪、虚构家庭建档、预览权益、签名图片与预录语音、已召回素材 404、合成练习结算、家长报告、家庭删除及旧身份 401 全部通过，输出与上方扩展验收相同。退出码为 0，且 `.focus-data/neon/protected-preview-audit-pending.json` 不存在。此结果只证明复验时该别名所服务的受保护环境；部署元数据未给出可核对的 Git 提交，因此不能把这次请求结果单独当作 `b309575` 前端代码已在该别名运行的证据。
+
+## 2026-10-07 当前部署复验
+
+对 `READY` 部署 `dpl_5iBbT4BDDKz4jjCYNDcfk7W6pNSA` 执行 `npm run audit:preview`，Vercel 部署来源经 API 核对为提交 `a5a71d0bf4a8f6ff6e1c12a68d24c9c13787fcea`，与运行时本地 HEAD 一致；验收期间受保护别名未切换。退出码为 0，结果含 `databaseReady`、`webShellVerified`、`familyCreated`、`childRead`、`billingPreviewRead`、`signedMediaVerified`、`recalledMediaRejected`、`practiceFinalized`、`parentReportRead`、`childExportRead`、`familyDeleted` 和 `oldSessionRevoked`，均为 `true`。Web 离线壳所核对文件合计 1,352,040 字节。完成后再次确认没有遗留 `.focus-data/neon/protected-preview-audit-pending.json`。
+
+这次检查覆盖实际 Vercel/Neon 受保护部署的合成家庭闭环和部署身份；Android 测试包仍配置本地 API，不能据此声称原生端已经连通该线上服务。真实家庭准入、并发与备份恢复也不在本次非破坏性验收范围内。
