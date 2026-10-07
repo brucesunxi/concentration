@@ -181,6 +181,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "parentReportFormalSteps": None,
               "offlineForcedRestart": False, "pendingBeforeSync": False, "syncedAfterReconnect": False,
               "backgroundInterrupted": False, "backgroundResumed": False,
+              "backgroundExclusionsInParentReport": 0,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
     try:
@@ -302,6 +303,15 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         if formal_in_report != result["formalIndependentSteps"]:
             raise AcceptanceError("Parent report did not retain the independent practice step")
         result["parentReportFormalSteps"] = formal_in_report
+        if background_resume:
+            background_exclusions = sum(
+                1 for session in report["sessions"]
+                for invalidation in (session.get("result") or {}).get("invalidations", [])
+                if invalidation.get("reason") == "background" and not invalidation.get("practice")
+            )
+            if background_exclusions != 1:
+                raise AcceptanceError("Parent report did not retain exactly one excluded formal background trial")
+            result["backgroundExclusionsInParentReport"] = background_exclusions
         status, space = api(base, f"/children/{me['children'][0]['id']}/life-goals", token=token)
         if status != 200 or space.get("goals") != [] or space.get("total") != 0:
             raise AcceptanceError("Opening the activity created a goal without the child's choice")
