@@ -7,6 +7,11 @@ on:
         description: Successful Android test packages run ID to install
         required: true
         type: string
+      full_flow:
+        description: Also run the synthetic family practice and cleanup flow
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -24,6 +29,9 @@ jobs:
       - uses: actions/setup-node@v7
         with:
           node-version: '26'
+      - name: Install local family API dependencies
+        if: inputs.full_flow
+        run: npm ci
       - name: Download and reverify APK
         id: package
         env:
@@ -51,6 +59,7 @@ jobs:
       - name: Install and restart on Android emulator
         env:
           PACKAGE_DIR: ${{ steps.package.outputs.package_dir }}
+          RUN_FAMILY_FLOW: ${{ inputs.full_flow }}
         run: bash scripts/qa/android-emulator-smoke.sh "$PACKAGE_DIR"
       - uses: actions/upload-artifact@v7
         if: always()
@@ -62,5 +71,8 @@ jobs:
             dist/mobile-native/android-smoke-input/**/emulator-first-launch.png
             dist/mobile-native/android-smoke-input/**/emulator-ui.xml
             dist/mobile-native/android-smoke-input/**/emulator.log
+            dist/mobile-native/android-smoke-input/**/family-flow-report.json
+            dist/mobile-native/android-smoke-input/**/android-practice-summary.png
+            dist/mobile-native/android-smoke-input/**/android-life-preselected.png
           if-no-files-found: warn
           retention-days: 14

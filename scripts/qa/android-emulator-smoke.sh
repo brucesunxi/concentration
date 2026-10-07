@@ -17,11 +17,16 @@ export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
 mkdir -p "$ANDROID_AVD_HOME"
 
 sdkmanager --install 'emulator' 'system-images;android-35;google_apis;x86_64'
-echo no | avdmanager create avd -n focus-smoke -k 'system-images;android-35;google_apis;x86_64' --device pixel_6 --force
-emulator -list-avds | grep -Fx focus-smoke
-emulator -avd focus-smoke -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$package_dir/emulator.log" 2>&1 &
+echo no | avdmanager create avd -n FocusIslandQA -k 'system-images;android-35;google_apis;x86_64' --device pixel_6 --force
+emulator -list-avds | grep -Fx FocusIslandQA
+emulator -avd FocusIslandQA -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$package_dir/emulator.log" 2>&1 &
 emulator_pid=$!
-trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
+api_pid=''
+cleanup() {
+  if [[ -n "$api_pid" ]]; then kill "$api_pid" 2>/dev/null || true; fi
+  kill "$emulator_pid" 2>/dev/null || true
+}
+trap cleanup EXIT
 
 timeout 240 adb wait-for-device
 booted=false
@@ -57,6 +62,20 @@ adb shell am force-stop dev.focusisland.family
 check_launch
 adb exec-out screencap -p > "$package_dir/emulator-first-launch.png"
 
+if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
+  export FOCUS_DATA_DIR="$RUNNER_TEMP/focus-family-qa-data"
+  mkdir -p "$FOCUS_DATA_DIR"
+  APP_MODE=local node apps/api/main.ts > "$package_dir/family-api.log" 2>&1 &
+  api_pid=$!
+  ready=false
+  for _ in {1..60}; do
+    if curl --noproxy '*' -fsS http://127.0.0.1:4181/api/ready > /dev/null 2>&1; then ready=true; break; fi
+    sleep 2
+  done
+  test "$ready" = true
+  python3 scripts/qa/android_practice_life.py --apk "$apk" --evidence-dir "$package_dir" --reset-synthetic-app > "$package_dir/family-flow-report.json"
+fi
+
 export PACKAGE_DIR="$package_dir"
 export EMULATOR_API="$(adb shell getprop ro.build.version.sdk | tr -d '\r')"
 export EMULATOR_ABI="$(adb shell getprop ro.product.cpu.abi | tr -d '\r')"
@@ -74,7 +93,7 @@ await writeFile(join(root, 'emulator-smoke-report.json'), JSON.stringify({
   installed: true,
   loginScreenVisible: true,
   coldRestartPassed: true,
-  authenticatedFlowVerified: false,
-  notes: ['No family account or child data was entered', 'Local API is not connected in this smoke test'],
+  authenticatedFlowVerified: process.env.RUN_FAMILY_FLOW === 'true',
+  notes: process.env.RUN_FAMILY_FLOW === 'true' ? ['Synthetic family and child data were deleted after the test'] : ['No family account or child data was entered', 'Local API is not connected in this smoke test'],
 }, null, 2) + '\n');
 NODE
