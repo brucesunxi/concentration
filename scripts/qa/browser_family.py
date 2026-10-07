@@ -377,10 +377,21 @@ def verify_family_flow(browser, base):
         parent_dialog.get_by_label("Family name").fill(FAMILY)
         parent_dialog.get_by_label("Parent password").fill(PASSWORD)
         parent_dialog.get_by_role("button", name="Open family space").click()
-        report = page.evaluate("""async () => {
-          const me = await (await fetch('/api/me')).json();
-          return (await (await fetch(`/api/children/${me.children[0].id}/report`)).json());
+        page.get_by_role("dialog", name="Return to parent space").wait_for(state="hidden")
+        audit = page.evaluate("""async () => {
+          const meResponse = await fetch('/api/me');
+          const me = await meResponse.json();
+          if (!meResponse.ok || me.role !== 'parent' || !me.children?.[0]?.id)
+            return {meStatus:meResponse.status, role:me.role, meError:me.error ?? me.code};
+          const reportResponse = await fetch(`/api/children/${me.children[0].id}/report`);
+          const report = await reportResponse.json();
+          return {meStatus:meResponse.status, role:me.role, reportStatus:reportResponse.status,
+            reportError:report.error ?? report.code, report};
         }""")
+        assert audit.get("meStatus") == 200 and audit.get("role") == "parent", f"Parent sign-in was not confirmed: {audit}"
+        assert audit.get("reportStatus") == 200, f"Parent report could not be read: {audit}"
+        report = audit["report"]
+        assert report.get("sessions"), f"Parent report has no confirmed sessions after practice: {audit}"
         background_marks = [
             mark for session in report.get("sessions", [])
             for mark in (session.get("result") or {}).get("invalidations", [])
