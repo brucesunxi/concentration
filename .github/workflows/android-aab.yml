@@ -1,4 +1,4 @@
-name: Android test AAB
+name: Android test packages
 
 on:
   workflow_dispatch:
@@ -29,13 +29,15 @@ jobs:
         run: node scripts/snapshot-mobile-source.mjs dist/mobile-native/android-aab/source-snapshot.json
       - name: Generate Android project
         run: node scripts/mobile.mjs prebuild --platform android --clean --no-install
-      - name: Build local test bundle
+      - name: Build local test packages
         working-directory: apps/family-mobile/android
-        run: bash ./gradlew :app:bundleRelease --no-daemon --max-workers=2
-      - name: Preserve bundle
+        run: bash ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --max-workers=2
+      - name: Preserve packages
         run: |
           cp apps/family-mobile/android/app/build/outputs/bundle/release/app-release.aab \
             dist/mobile-native/android-aab/FocusIslandDev-local.aab
+          cp apps/family-mobile/android/app/build/outputs/apk/release/app-release.apk \
+            dist/mobile-native/android-aab/FocusIslandDev-local.apk
       - name: Verify bundle and source
         run: |
           node scripts/verify-android-aab.mjs \
@@ -43,12 +45,23 @@ jobs:
             --snapshot dist/mobile-native/android-aab/source-snapshot.json \
             --source-ref "$GITHUB_SHA" --java-home "$JAVA_HOME" \
             --output dist/mobile-native/android-aab/aab-static-report.json
+      - name: Verify installable APK and source
+        run: |
+          ANDROID_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -x "$ANDROID_TOOLS/aapt2" && test -x "$ANDROID_TOOLS/apksigner"
+          node scripts/verify-android-local-artifact.mjs \
+            --apk dist/mobile-native/android-aab/FocusIslandDev-local.apk \
+            --snapshot dist/mobile-native/android-aab/source-snapshot.json \
+            --source-ref "$GITHUB_SHA" --android-tools "$ANDROID_TOOLS" \
+            --output dist/mobile-native/android-aab/apk-static-report.json
       - uses: actions/upload-artifact@v7
         with:
           name: focus-island-android-aab-${{ github.sha }}
           path: |
             dist/mobile-native/android-aab/FocusIslandDev-local.aab
+            dist/mobile-native/android-aab/FocusIslandDev-local.apk
             dist/mobile-native/android-aab/source-snapshot.json
             dist/mobile-native/android-aab/aab-static-report.json
+            dist/mobile-native/android-aab/apk-static-report.json
           if-no-files-found: error
           retention-days: 14

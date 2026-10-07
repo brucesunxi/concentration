@@ -7,7 +7,7 @@ import { fileURLToPath } from 'node:url';
 
 const root = await realpath(fileURLToPath(new URL('../', import.meta.url)));
 const args = new Map();
-const names = new Set(['--apk', '--snapshot', '--android-tools', '--output', '--previous-apk', '--source-archive', '--source-archive-report']);
+const names = new Set(['--apk', '--snapshot', '--android-tools', '--output', '--previous-apk', '--source-archive', '--source-archive-report', '--source-ref']);
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const run = (program, argv, binary = false) => execFileSync(program, argv, { encoding: binary ? 'buffer' : 'utf8', maxBuffer: 40 * 1024 * 1024 });
 
@@ -15,7 +15,7 @@ async function main() {
   for (let i = 2; i < process.argv.length; i += 2) {
     const name = process.argv[i], value = process.argv[i + 1];
     assert(names.has(name) && value && !value.startsWith('--') && !args.has(name), 'Invalid or duplicate argument');
-    args.set(name, resolve(value));
+    args.set(name, name === '--source-ref' ? value : resolve(value));
   }
   for (const name of ['--apk', '--snapshot', '--android-tools', '--output']) assert(args.has(name), `Missing ${name}`);
   const apk = await realpath(args.get('--apk'));
@@ -26,12 +26,15 @@ async function main() {
   assert(source.schemaVersion === 1 && Array.isArray(source.sourceFiles) && source.sourceFiles.length > 0, 'Invalid source snapshot');
   const archivedSource = args.has('--source-archive') || args.has('--source-archive-report');
   assert(args.has('--source-archive') === args.has('--source-archive-report'), 'Source archive and report must be provided together');
-  const readSourceFile = path => archivedSource
-    ? run('/usr/bin/tar', ['-xOzf', args.get('--source-archive'), path], true)
+  assert(!archivedSource || !args.has('--source-ref'), 'Choose a source archive or source commit');
+  const sourceCommit = args.has('--source-ref') ? run('git', ['-C', root, 'rev-parse', '--verify', `${args.get('--source-ref')}^{commit}`]).trim() : null;
+  assert(!sourceCommit || /^[a-f0-9]{40}$/.test(sourceCommit), 'Source reference must resolve to a commit');
+  const readSourceFile = path => sourceCommit ? run('git', ['-C', root, 'show', `${sourceCommit}:${path}`], true)
+    : archivedSource ? run('/usr/bin/tar', ['-xOzf', args.get('--source-archive'), path], true)
     : readFile(join(root, path));
   const version = JSON.parse((await readSourceFile('package.json')).toString('utf8')).version;
   assert(source.sourceVersion === version, 'Snapshot does not match archived source version');
-  const buildRoot = archivedSource ? null : await realpath(source.buildDirectory);
+  const buildRoot = archivedSource || sourceCommit ? null : await realpath(source.buildDirectory);
   if (buildRoot) assert(buildRoot !== root, 'Build source is not isolated');
   let sourceArchive;
   if (archivedSource) {
@@ -47,6 +50,10 @@ async function main() {
       const path = await realpath(join(directory, entry.path));
       assert(path.startsWith(directory + sep), 'Source escaped its directory');
       const bytes = await readFile(path);
+      assert(bytes.length === entry.bytes && digest(bytes) === entry.sha256, `Source changed after snapshot: ${entry.path}`);
+    }
+    if (sourceCommit) {
+      const bytes = await readSourceFile(entry.path);
       assert(bytes.length === entry.bytes && digest(bytes) === entry.sha256, `Source changed after snapshot: ${entry.path}`);
     }
   }
@@ -70,8 +77,10 @@ async function main() {
   assert(!badging.includes('application-debuggable') && !/android:debuggable[^\n]*=true\b/.test(manifest), 'Debuggable APK');
   assert(/android:allowBackup[^\n]*=false\b/.test(manifest), 'Backup must be disabled');
   assert(/android:usesCleartextTraffic[^\n]*=true\b/.test(manifest), 'Local networking mode is not explicit');
-  assert(badging.includes("native-code: 'arm64-v8a'"), 'Wrong native architecture');
-  assert(entries.includes('lib/arm64-v8a/libexpo-sqlite.so') && entries.includes('assets/index.android.bundle'), 'Missing native storage or app code');
+  const abis = [...new Set(entries.map(name => name.match(/^lib\/([^/]+)\/libexpo-sqlite\.so$/)?.[1]).filter(Boolean))].sort();
+  const declaredAbis = [...(badging.match(/^native-code: (.+)$/m)?.[1] ?? '').matchAll(/'([^']+)'/g)].map(match => match[1]).sort();
+  assert(abis.includes('arm64-v8a') && JSON.stringify(abis) === JSON.stringify(declaredAbis), 'Wrong native architecture');
+  assert(entries.includes('assets/index.android.bundle'), 'Missing native app code');
   assert(!entries.some(name => /(?:^|\/)(?:\.env(?:\.[^/]*)?|\.focus-data|.*\.jwk\.json|.*\.sqlite(?:-wal|-shm)?|.*\.db)(?:\/|$)/.test(name)), 'Private-data filename found in APK');
   const permissions = [...badging.matchAll(/^uses-permission: name='([^']+)'/gm)].map(match => match[1]);
   for (const name of ['RECORD_AUDIO', 'CAMERA', 'ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE']) assert(!permissions.includes(`android.permission.${name}`), `Unexpected permission: ${name}`);
@@ -102,13 +111,14 @@ async function main() {
   const bytes = await readFile(apk);
   const report = {
     schemaVersion: 1, sourceVersion: version, appVersion: expectedAppVersion, mode: 'local-development',
-    apk: { path: relative(root, apk), bytes: bytes.length, sha256: digest(bytes), applicationId: 'dev.focusisland.family', versionCode, abis: ['arm64-v8a'], signatureVerified: true, certificateSha256, permissions, allowBackup: false, usesCleartextTraffic: true, embeddedBundle: { bytes: bundle.length, sha256: digest(bundle) } },
+    apk: { path: relative(root, apk), bytes: bytes.length, sha256: digest(bytes), applicationId: 'dev.focusisland.family', versionCode, abis, signatureVerified: true, certificateSha256, permissions, allowBackup: false, usesCleartextTraffic: true, embeddedBundle: { bytes: bundle.length, sha256: digest(bundle) } },
     ...(upgradeFrom ? { upgradeFrom } : {}),
-    sourceSnapshot: { path: args.get('--snapshot'), sha256: digest(await readFile(args.get('--snapshot'))), checkedFiles: unique.size },
+    sourceSnapshot: { path: args.get('--snapshot'), sha256: digest(await readFile(args.get('--snapshot'))), checkedFiles: unique.size,
+      ...(sourceCommit ? { sourceCommit } : {}) },
     ...(sourceArchive ? { sourceArchive } : {}),
     embeddedMarkers: markers,
     deviceVerification: { installed: false, login: false, sqlCipherAtRest: false, audioPlayback: false, offlineRecovery: false },
-    limitations: ['Debug-signed, arm64 local test APK; not a store release', 'Requires a reachable local family API', 'Static checks do not prove runtime encryption, sound quality, device behavior or market approval'],
+    limitations: ['Debug-signed local test APK; not a store release', 'Requires a reachable local family API', 'Static checks do not prove runtime encryption, sound quality, device behavior or market approval'],
   };
   await writeFile(output, JSON.stringify(report, null, 2) + '\n', { flag: 'wx' });
   console.log(JSON.stringify({ sourceVersion: version, apk: report.apk.path, sha256: report.apk.sha256, bytes: report.apk.bytes, signatureVerified: true, output }));
