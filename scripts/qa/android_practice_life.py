@@ -54,9 +54,15 @@ class Device:
         return result.stdout
 
     def screen(self) -> list[dict[str, str]]:
-        self.run("shell", "uiautomator", "dump", "/sdcard/focus-acceptance-window.xml")
-        xml = self.run("exec-out", "cat", "/sdcard/focus-acceptance-window.xml")
-        return [node.attrib for node in ET.fromstring(xml).iter("node")]
+        # Android can briefly return an empty hierarchy while an Activity redraws.
+        for _ in range(5):
+            try:
+                self.run("shell", "uiautomator", "dump", "/sdcard/focus-acceptance-window.xml")
+                xml = self.run("exec-out", "cat", "/sdcard/focus-acceptance-window.xml")
+                return [node.attrib for node in ET.fromstring(xml).iter("node")]
+            except (AcceptanceError, ET.ParseError):
+                time.sleep(0.4)
+        raise AcceptanceError("Android accessibility hierarchy stayed unreadable after redraw")
 
     def swipe(self) -> None:
         self.run("shell", "input", "swipe", "540", "1530", "540", "500", "350")
