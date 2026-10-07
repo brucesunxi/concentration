@@ -41,7 +41,7 @@ const client = new MobileClient();
 function FamilyApp() {
   const [me, setMe] = useState<Me | null>(null), [session, setSession] = useState<Session | null>(null);
   const [offlineOffer,setOfflineOffer]=useState<NonNullable<Awaited<ReturnType<typeof readOfflineSession>>>|null>(null);
-  const [locale, setLocale] = useState<Locale>(() => supportedDeviceLocale(getLocales().map(item => item.languageTag))), [familyName, setFamilyName] = useState('');
+  const [locale, setLocale] = useState<Locale>(() => supportedDeviceLocale(getLocales().map(item => item.languageTag)));
   const localeRef = useRef(locale); localeRef.current = locale;
   const [busy, setBusy] = useState(true), [error, setError] = useState(''), [storageUnavailable, setStorageUnavailable] = useState(false), [view, setView] = useState<'home' | 'add' | 'report' | 'life' | 'recovery' | 'guide' | 'security' | 'billing' | 'limits' | 'members' | 'join' | 'child-data-visibility' | 'strategy' | 'help'>('home');
   const [lifeSuggestion, setLifeSuggestion] = useState<GoalInput['templateId'] | undefined>();
@@ -64,7 +64,7 @@ function FamilyApp() {
       if (next.role === 'parent') await reconcileFamilyJournals(next.family.id, next.children, next.member?.role === 'owner' && next.member.state === 'active');
       const active = next.role === 'child' ? await client.request<Session | null>('/sessions/active') : null;
       if (!mounted.current || version !== identityVersion.current) return;
-      setMe(next); setFamilyName(next.family.name); setLocale(next.family.locale); setSession(resume ? active : null);
+      setMe(next); setLocale(next.family.locale); setSession(resume ? active : null);
     } catch (e) {
       if (!mounted.current || version !== identityVersion.current) return;
       setMe(null); setSession(null);
@@ -167,8 +167,8 @@ function FamilyApp() {
     <Button quiet disabled={busy} title={t('重新连接家庭服务','Reconnect to the family service')} onPress={()=>void refresh()} />
     <Button quiet disabled={busy} title={t('退出离线入口','Leave offline access')} onPress={()=>void action(async()=>{const version=++identityVersion.current;try{await client.logout()}finally{if(mounted.current&&version===identityVersion.current){setOfflineOffer(null);setSession(null);setMe(null)}}})} />
   </Page>;
-  if(!me && view==='join')return <JoinFamily locale={locale} client={client} onBack={()=>setView('home')} onJoined={next=>{setMe(next);setFamilyName(next.family.name);setView('home');}}/>;
-  if (!me) return <Login onJoin={()=>setView('join')} locale={locale} setLocale={setLocale} name={familyName} busy={busy} error={error} storageUnavailable={storageUnavailable} onRetry={() => void restoreEntry()} onSubmit={(name, password, create, memberLogin) => void action(async () => { const version = ++identityVersion.current; const next = create ? await client.setup(name, password, locale) : await client.login(name, password, memberLogin); if (next.role === 'parent') await reconcileFamilyJournals(next.family.id, next.children, next.member?.role === 'owner' && next.member.state === 'active'); if (!mounted.current || version !== identityVersion.current) return; setMe(next); setFamilyName(next.family.name); setLocale(next.family.locale); })} />;
+  if(!me && view==='join')return <JoinFamily locale={locale} client={client} onBack={()=>setView('home')} onJoined={next=>{setMe(next);setView('home');}}/>;
+  if (!me) return <Login onJoin={()=>setView('join')} locale={locale} setLocale={setLocale} busy={busy} error={error} storageUnavailable={storageUnavailable} onRetry={() => void restoreEntry()} onSubmit={(name, password, create, memberLogin) => void action(async () => { const version = ++identityVersion.current; const next = create ? await client.setup(name, password, locale) : await client.login(name, password, memberLogin); if (next.role === 'parent') await reconcileFamilyJournals(next.family.id, next.children, next.member?.role === 'owner' && next.member.state === 'active'); if (!mounted.current || version !== identityVersion.current) return; setMe(next); setLocale(next.family.locale); })} />;
   if(practiceInvitation){
     const invitedChild=me.children.find(child=>child.id===practiceInvitation.childId);
     if(invitedChild){
@@ -242,9 +242,9 @@ function FamilyApp() {
   </Page>;
 }
 
-function Login({ locale, setLocale, name: initial, busy, error, storageUnavailable, onSubmit, onRetry, onJoin }: { locale: Locale; setLocale(l: Locale): void; name: string; busy: boolean; error: string; storageUnavailable: boolean; onSubmit(name: string, password: string, create: boolean, memberLogin:string): void; onRetry(): void; onJoin():void }) {
+function Login({ locale, setLocale, busy, error, storageUnavailable, onSubmit, onRetry, onJoin }: { locale: Locale; setLocale(l: Locale): void; busy: boolean; error: string; storageUnavailable: boolean; onSubmit(name: string, password: string, create: boolean, memberLogin:string): void; onRetry(): void; onJoin():void }) {
   const [memberLogin,setMemberLogin]=useState('owner');
-  const [name, setName] = useState(initial), [password, setPassword] = useState(''), [create, setCreate] = useState(false), [accepted, setAccepted] = useState(false); const t = translate(locale);
+  const [name, setName] = useState(''), [password, setPassword] = useState(''), [create, setCreate] = useState(false), [accepted, setAccepted] = useState(false); const t = translate(locale);
   if (storageUnavailable) return <Page title={t('本机资料暂时无法读取', 'Local records are temporarily unavailable')}><Notice>{error}</Notice><Text style={s.body}>{t('已保存的资料不会被清除。请解锁设备后重新检查。', 'Saved records are kept. Unlock the device, then check again.')}</Text><Button title={t('重新检查本机安全状态', 'Check secure storage again')} disabled={busy} onPress={onRetry} /></Page>;
   return <Page title={t('欢迎来到专注岛', 'Welcome to Focus Island')} subtitle={t('给家长和孩子的短练习与生活策略。', 'Short practices and everyday strategies for families.')}><FamilyArtwork kind="island" compact /><View style={s.row}><Choice label="简体中文" selected={locale === 'zh-CN'} onPress={() => setLocale('zh-CN')} /><Choice label="English" selected={locale === 'en'} onPress={() => setLocale('en')} /></View><Notice>{t('当前为成人开发验收版，请使用虚构家庭资料。', 'This is an adult development preview. Use fictional family details.')}</Notice><Notice>{error}</Notice><View style={s.card}><Text style={s.heading}>{create ? t('建立测试家庭', 'Create a test family') : t('家长登录', 'Parent sign-in')}</Text><Field label={t('家庭名称', 'Family name')} value={name} onChangeText={setName} autoCapitalize="none" autoCorrect={false} maxLength={48} />{!create&&<><Field label={t('家长登录名','Parent username')} value={memberLogin} onChangeText={setMemberLogin} autoCapitalize="none" autoCorrect={false} maxLength={32}/><Text style={s.muted}>{t('创建者填写 owner；受邀家长填写自己的登录名。','Creators use owner; invited parents use their username.')}</Text></>}<Field label={t('家长密码', 'Parent password')} value={password} onChangeText={setPassword} secureTextEntry autoCapitalize="none" autoCorrect={false} maxLength={128} />{create && <Text style={s.muted}>{t('新密码至少 15 个字符，可以使用容易记住的长句。', 'Use at least 15 characters. A memorable passphrase works.')}</Text>}{create && <CheckBox value={accepted} onChange={setAccepted} label={t('我会使用虚构资料进行本地测试。', 'I will use fictional details for local testing.')} />}<Button title={busy ? t('正在连接…', 'Connecting…') : create ? t('建立家庭', 'Create family') : t('进入家庭空间', 'Open family space')} disabled={busy || !name.trim() || [...password].length < (create ? 15 : 1) || (create && !accepted)} onPress={() => { const value = password; setPassword(''); onSubmit(name.trim(), value, create, memberLogin.trim()); }} /><Button quiet disabled={busy} title={create ? t('已有家庭，去登录', 'Already have a family? Sign in') : t('建立新的测试家庭', 'Create a new test family')} onPress={() => { setCreate(!create); setPassword(''); }} /></View><Button quiet title={t('接受邀请','Accept invitation')} disabled={busy} onPress={onJoin}/><Button quiet title={t('恢复已保存的孩子会话', 'Restore saved child session')} disabled={busy} onPress={onRetry} /></Page>;
 }

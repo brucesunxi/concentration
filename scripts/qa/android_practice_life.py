@@ -199,7 +199,8 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "backgroundPauseExplained": False,
               "upgradeFromApkSha256": hashlib.sha256(upgrade_from.read_bytes()).hexdigest() if upgrade_from else None,
               "upgradePreservedOfflineJournal": False,
-              "nativeSignOutVisible": False, "nativeSignOutSurvivedOfflineRestart": False,
+              "nativeSignOutVisible": False, "nativeSignOutHidesFamilyName": False,
+              "nativeSignOutSurvivedOfflineRestart": False,
               "backgroundExclusionsInParentReport": 0,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
@@ -363,6 +364,9 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             device.tap("Sign out", scroll=True, timeout=25)
             device.wait_text("Welcome to Focus Island", timeout=25)
             result["nativeSignOutVisible"] = True
+            if any(family in str(node) for node in device.screen()):
+                raise AcceptanceError("Signed-out login screen still exposed the family name")
+            result["nativeSignOutHidesFamilyName"] = True
             if evidence_dir:
                 (evidence_dir / "android-sign-out-login.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
             device.run("reverse", "--remove", "tcp:4181")
