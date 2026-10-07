@@ -469,6 +469,46 @@ def verify_first_language(browser, base):
     print("PASS language entry: Simplified Chinese, Traditional Chinese fallback, saved manual choice")
 
 
+def verify_update_recovery(browser, base):
+    # An unavailable lazy module is what an old open page encounters after its
+    # asset has fallen out of the serving deployment. Keep service workers out
+    # of this isolated browser case so the network failure is deterministic.
+    context = browser.new_context(locale="en-US", service_workers="block")
+    page = context.new_page()
+    missing = [False]
+    refreshed = []
+    lazy_pattern = "**/assets/JoinFamily-*.js"
+
+    def fail_first_lazy(route):
+        if not missing[0]:
+            missing[0] = True
+            route.abort()
+        else:
+            route.continue_()
+
+    def note_refresh(route):
+        refreshed.append(route.request.url)
+        route.continue_()
+
+    page.route(lazy_pattern, fail_first_lazy)
+    page.route(re.compile(r"/\?[^#]*focus-refresh="), note_refresh)
+    try:
+        page.goto(base, wait_until="networkidle")
+        page.get_by_role("button", name="Accept invitation").first.click()
+        page.get_by_role("heading", name="Let’s reopen your space").wait_for(timeout=10000)
+        assert missing[0], "The recovery case must actually lose the lazy module"
+        page.unroute(lazy_pattern, fail_first_lazy)
+        page.get_by_role("button", name="Reload online").click()
+        page.get_by_role("heading", name="Start with a family space").wait_for(timeout=10000)
+        assert refreshed, "Recovery must bypass an older worker's cached homepage"
+        expect(page).to_have_url(base + "/", timeout=15000)
+        page.get_by_role("button", name="Accept invitation").first.click()
+        page.get_by_role("heading", name="Accept invitation").wait_for(timeout=10000)
+        print("PASS web update recovery: missing lazy page, online refresh, clean address and current invitation form")
+    finally:
+        context.close()
+
+
 def main():
     port = free_port()
     base = f"http://127.0.0.1:{port}"
@@ -492,6 +532,7 @@ def main():
                     verify_family_flow(browser, base)
                     verify_mobile_entry(browser, base)
                     verify_first_language(browser, base)
+                    verify_update_recovery(browser, base)
                 finally:
                     browser.close()
         finally:
