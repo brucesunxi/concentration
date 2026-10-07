@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import { createHash } from 'node:crypto';
+import { createHash, X509Certificate } from 'node:crypto';
 import { execFileSync } from 'node:child_process';
 import { readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
@@ -7,9 +7,14 @@ import { fileURLToPath } from 'node:url';
 
 const root = await realpath(fileURLToPath(new URL('../', import.meta.url)));
 const args = new Map();
-const names = new Set(['--apk', '--snapshot', '--android-tools', '--output', '--previous-apk', '--source-archive', '--source-archive-report', '--source-ref']);
+const names = new Set(['--apk', '--snapshot', '--android-tools', '--output', '--previous-apk', '--source-archive', '--source-archive-report', '--source-ref', '--aab-report']);
 const digest = bytes => createHash('sha256').update(bytes).digest('hex');
 const run = (program, argv, binary = false) => execFileSync(program, argv, { encoding: binary ? 'buffer' : 'utf8', maxBuffer: 40 * 1024 * 1024 });
+function signingCertificate(output) {
+  const pem = output.match(/-----BEGIN CERTIFICATE-----[\s\S]+?-----END CERTIFICATE-----/)?.[0];
+  assert(pem, 'APK signing certificate is unavailable');
+  return new X509Certificate(pem);
+}
 
 async function main() {
   for (let i = 2; i < process.argv.length; i += 2) {
@@ -62,7 +67,7 @@ async function main() {
   const androidTools = await realpath(args.get('--android-tools'));
   const badging = run(join(androidTools, 'aapt2'), ['dump', 'badging', apk]);
   const manifest = run(join(androidTools, 'aapt2'), ['dump', 'xmltree', apk, '--file', 'AndroidManifest.xml']);
-  const signature = run(join(androidTools, 'apksigner'), ['verify', '--verbose', '--print-certs', apk]);
+  const signature = run(join(androidTools, 'apksigner'), ['verify', '--verbose', '--print-certs-pem', apk]);
   const entries = run('/usr/bin/unzip', ['-Z1', apk]).trim().split('\n');
   const bundle = run('/usr/bin/unzip', ['-p', apk, 'assets/index.android.bundle'], true);
   const expectedAppVersion = JSON.parse((await readSourceFile('apps/family-mobile/package.json')).toString('utf8')).version;
@@ -85,8 +90,15 @@ async function main() {
   const permissions = [...badging.matchAll(/^uses-permission: name='([^']+)'/gm)].map(match => match[1]);
   for (const name of ['RECORD_AUDIO', 'CAMERA', 'ACCESS_FINE_LOCATION', 'ACCESS_COARSE_LOCATION', 'READ_EXTERNAL_STORAGE', 'WRITE_EXTERNAL_STORAGE']) assert(!permissions.includes(`android.permission.${name}`), `Unexpected permission: ${name}`);
   assert(signature.includes('Verified using v2 scheme (APK Signature Scheme v2): true'), 'APK signature verification failed');
-  const certificateSha256 = signature.match(/Signer #1 certificate SHA-256 digest: ([a-f0-9]+)/)?.[1];
-  assert(certificateSha256 && signature.includes('CN=Android Debug'), 'Expected local test certificate');
+  const certificate = signingCertificate(signature);
+  const certificateSha256 = certificate.fingerprint256.replaceAll(':', '').toLowerCase();
+  assert(certificate.subject.includes('CN=Android Debug'), 'Expected local test certificate');
+  if (args.has('--aab-report')) {
+    const aabReport = JSON.parse(await readFile(args.get('--aab-report'), 'utf8'));
+    assert(aabReport.aab?.certificateSha256 === certificateSha256 &&
+      aabReport.sourceSnapshot?.sourceCommit === sourceCommit && aabReport.appVersion === expectedAppVersion,
+    'APK and AAB do not share the same source and signing certificate');
+  }
   let upgradeFrom;
   if (args.has('--previous-apk')) {
     const previousApk = await realpath(args.get('--previous-apk'));
@@ -95,8 +107,8 @@ async function main() {
     const previousVersionCode = Number(previousBadging.match(/\bversionCode='(\d+)'/)?.[1]);
     assert(previousBadging.includes("package: name='dev.focusisland.family'"), 'Previous APK package differs');
     assert(Number.isSafeInteger(previousVersionCode) && versionCode > previousVersionCode, 'Android version code must increase');
-    const previousSignature = run(join(androidTools, 'apksigner'), ['verify', '--verbose', '--print-certs', previousApk]);
-    const previousCertificateSha256 = previousSignature.match(/Signer #1 certificate SHA-256 digest: ([a-f0-9]+)/)?.[1];
+    const previousSignature = run(join(androidTools, 'apksigner'), ['verify', '--verbose', '--print-certs-pem', previousApk]);
+    const previousCertificateSha256 = signingCertificate(previousSignature).fingerprint256.replaceAll(':', '').toLowerCase();
     assert(previousCertificateSha256 === certificateSha256, 'Android signing certificate changed; in-place upgrade would fail');
     upgradeFrom = { path: relative(root, previousApk), versionCode: previousVersionCode, certificateSha256: previousCertificateSha256 };
   }

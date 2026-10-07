@@ -53,6 +53,7 @@ jobs:
             --apk dist/mobile-native/android-aab/FocusIslandDev-local.apk \
             --snapshot dist/mobile-native/android-aab/source-snapshot.json \
             --source-ref "$GITHUB_SHA" --android-tools "$ANDROID_TOOLS" \
+            --aab-report dist/mobile-native/android-aab/aab-static-report.json \
             --output dist/mobile-native/android-aab/apk-static-report.json
       - uses: actions/upload-artifact@v7
         with:
