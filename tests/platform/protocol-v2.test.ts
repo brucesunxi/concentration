@@ -37,6 +37,12 @@ test('late timers, missed assets, frame stalls, premature responses and changed 
     assert.equal(state.results.length, 0); assert.equal(state.nextIndex, 0); assert.equal(state.invalidations[0].reason, c.reason);
   }
 });
+test('an untimed search does not become invalid solely because a frame arrived late', () => {
+  const plan = make('search');
+  const started = replay(plan, [event({ type: 'present', trialId: plan.trials[0].id, presentation: { ...presentation, frameDeltaMs: 130 } }, 1, 0)]);
+  assert.equal(plan.trials[0].windowMs, 0);
+  assert.equal(started.active?.invalidReason, null);
+});
 test('formal timed stimuli must have the specified blank interval', () => {
   const plan = make(), all = completeEvents(plan);
   const index = all.findIndex(e => e.type === 'present' && e.trialId === plan.trials[5].id);

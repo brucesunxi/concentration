@@ -150,7 +150,7 @@ export function replay(plan: Plan, events: EngineEvent[], budgetMs = Infinity): 
       const trial = plan.trials[state.nextIndex];
       requireThat(event.presentation && Number.isFinite(event.presentation.frameDeltaMs) && event.presentation.frameDeltaMs > 0 && event.presentation.method === (plan.environment.platform === 'web' ? 'raf-pair' : 'native-frame'), 'Presentation evidence required');
       if (previousSubmit && trial.windowMs && !trial.practice && !previousSubmit.trial.practice && previousSubmit.trial.block === trial.block) requireThat(event.at - previousSubmit.at >= TIMING.intervalMs, 'Stimulus interval too short');
-      state.active = { trial, onset: event.at, selected: [], recalled: trial.task !== 'memory', assisted: false, responseCount: 0, firstResponseMs: null, invalidReason: !event.presentation.assetsReady ? 'asset_failure' : plan.environment.input !== 'assistive' && event.presentation.frameDeltaMs > TIMING.maxFrameGapMs ? 'render_failure' : null };
+      state.active = { trial, onset: event.at, selected: [], recalled: trial.task !== 'memory', assisted: false, responseCount: 0, firstResponseMs: null, invalidReason: !event.presentation.assetsReady ? 'asset_failure' : trial.windowMs > 0 && plan.environment.input !== 'assistive' && event.presentation.frameDeltaMs > TIMING.maxFrameGapMs ? 'render_failure' : null };
       continue;
     }
     if (event.type === 'end') {

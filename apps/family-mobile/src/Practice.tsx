@@ -272,7 +272,7 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
       frame = requestAnimationFrame(second => {
         if (cancelled || !lifecycle.isCurrent(revision) || AppState.currentState !== 'active') { if (!cancelled && lifecycle.isCurrent(revision)) setPhase('pause'); return; }
         if (!mayContinue() || offerCheckIn()) return;
-        const delta = second - first, failed = delta <= 0 || (plan.environment?.input !== 'assistive' && delta > TIMING.maxFrameGapMs);
+        const delta = second - first, failed = delta <= 0 || (trial.windowMs > 0 && plan.environment?.input !== 'assistive' && delta > TIMING.maxFrameGapMs);
         // JS-backed native animation frames approximate presentation; no physical-display claim.
         if (delta <= 0) { setStatus(t('画面还没准备好，请稍后继续。', 'The display is not ready. Please try again.')); setPhase('pause'); return; }
         const current = runtime.current; if (!current || locking.current) return;
@@ -294,7 +294,7 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
     const budgetTimer = setTimeout(() => { if (lifecycle.isActive(active)) { if (AppState.currentState === 'active') void end('time_limit'); else pause('background', backgroundPauseCopy(plan.locale, true)); } }, Math.max(0, session.budget_ms - active.priorActiveMs - elapsed));
     let frame = 0, previous = performance.now();
     const observe = (at: number) => { if (!lifecycle.isActive(active)) return; const gap = at - previous; previous = at; if (gap > TIMING.maxFrameGapMs) pause('render_failure', t('画面刚才停顿了，这一步不会算成漏答。', 'The display paused. This step will not count as a missed response.')); else frame = requestAnimationFrame(observe); };
-    if (plan.environment?.input !== 'assistive') frame = requestAnimationFrame(observe);
+    if (active.trial.windowMs > 0 && plan.environment?.input !== 'assistive') frame = requestAnimationFrame(observe);
     return () => { clearTimeout(trialTimer); clearTimeout(budgetTimer); cancelAnimationFrame(frame); };
   }, [phase]);
   useEffect(() => { if (phase !== 'gap') return; const revision = lifecycle.revision; const timer = setTimeout(() => { if (lifecycle.isCurrent(revision)) next(); }, TIMING.intervalMs); return () => clearTimeout(timer); }, [phase, state?.nextIndex]);

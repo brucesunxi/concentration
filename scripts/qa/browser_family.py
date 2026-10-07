@@ -381,7 +381,16 @@ def verify_family_flow(browser, base):
           const me = await (await fetch('/api/me')).json();
           return (await (await fetch(`/api/children/${me.children[0].id}/report`)).json());
         }""")
-        assert sum(1 for session in report.get("sessions", []) for mark in (session.get("result") or {}).get("invalidations", []) if mark.get("reason") == "background" and not mark.get("practice")) == 1, "Backgrounded formal trial must be excluded in the parent report"
+        background_marks = [
+            mark for session in report.get("sessions", [])
+            for mark in (session.get("result") or {}).get("invalidations", [])
+            if mark.get("reason") == "background" and not mark.get("practice")
+        ]
+        assert len(background_marks) == 1, (
+            "Backgrounded formal trial must be excluded exactly once in the parent report; "
+            f"found {len(background_marks)}. Trial outcomes: "
+            f"{[(session.get('result') or {}).get('invalidations', []) for session in report.get('sessions', [])]}"
+        )
         page.get_by_role("button", name="Progress").first.click()
         page.get_by_text("Screen reader · separate record").first.wait_for(timeout=15000)
         page.get_by_text("Kept separately; no accuracy or ability change calculated").first.wait_for(timeout=15000)

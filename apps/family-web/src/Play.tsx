@@ -267,7 +267,7 @@ export function Play({ session, familyId, offline=false, preview, onExit, onExpl
         if (cancelled || !lifecycle.isCurrent(revision) || document.hidden) { if (!cancelled && lifecycle.isCurrent(revision)) setPhase('pause'); return; }
         if (!mayContinue() || offerCheckIn()) return;
         const presentation = { frameDeltaMs: second - first, assetsReady: !!preparedRef.current || !!previewContent.current, method: 'raf-pair' as const };
-        const failed = modern && plan.environment?.input !== 'assistive' && presentation.frameDeltaMs > TIMING.maxFrameGapMs;
+        const failed = modern && trial.windowMs > 0 && plan.environment?.input !== 'assistive' && presentation.frameDeltaMs > TIMING.maxFrameGapMs;
         if (presentation.frameDeltaMs <= 0) { setPhase('pause'); setStatusMessage(t('画面还没准备好，请稍后继续。', 'The display is not ready. Please try again.')); return; }
         const onset = now();
         if (failed) { lifecycle.retire(); setPhase('pause'); setStatusMessage(t('刚才画面有些停顿，这一步不计入结果。准备好可以重来。', 'The display paused briefly. This step will not count. Try again when ready.')); }
@@ -284,7 +284,7 @@ export function Play({ session, familyId, offline=false, preview, onExit, onExpl
     return () => clearTimeout(timer);
   }, [phase]);
   useEffect(() => {
-    const active = lifecycle.active; if (!modern || plan.environment?.input === 'assistive' || phase !== 'active' || !active) return;
+    const active = lifecycle.active; if (!modern || plan.environment?.input === 'assistive' || phase !== 'active' || !active?.trial.windowMs) return;
     let frame = 0, prior = performance.now();
     const observe = (at: number) => {
       if (!lifecycle.isActive(active)) return;
