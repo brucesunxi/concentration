@@ -10,9 +10,15 @@ sudo chmod a+rw /dev/kvm
 sdkmanager_path="$(find "$ANDROID_HOME/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
 test -x "$sdkmanager_path"
 export PATH="$(dirname "$sdkmanager_path"):$ANDROID_HOME/platform-tools:$ANDROID_HOME/emulator:$PATH"
+export ANDROID_SDK_HOME="$RUNNER_TEMP"
+export ANDROID_USER_HOME="$ANDROID_SDK_HOME/.android"
+export ANDROID_EMULATOR_HOME="$ANDROID_USER_HOME"
+export ANDROID_AVD_HOME="$ANDROID_USER_HOME/avd"
+mkdir -p "$ANDROID_AVD_HOME"
 
 sdkmanager --install 'emulator' 'system-images;android-35;google_apis;x86_64'
 echo no | avdmanager create avd -n focus-smoke -k 'system-images;android-35;google_apis;x86_64' --device pixel_6 --force
+emulator -list-avds | grep -Fx focus-smoke
 emulator -avd focus-smoke -no-window -no-audio -no-boot-anim -no-snapshot -gpu swiftshader_indirect > "$package_dir/emulator.log" 2>&1 &
 emulator_pid=$!
 trap 'kill "$emulator_pid" 2>/dev/null || true' EXIT
