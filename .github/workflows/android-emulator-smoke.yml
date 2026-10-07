@@ -1,0 +1,65 @@
+name: Android emulator startup
+
+on:
+  workflow_dispatch:
+    inputs:
+      build_run_id:
+        description: Successful Android test packages run ID to install
+        required: true
+        type: string
+
+permissions:
+  actions: read
+  contents: read
+
+jobs:
+  smoke:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+      - name: Download and reverify APK
+        id: package
+        env:
+          GH_TOKEN: ${{ github.token }}
+          BUILD_RUN_ID: ${{ inputs.build_run_id }}
+        run: |
+          [[ "$BUILD_RUN_ID" =~ ^[0-9]+$ ]]
+          gh run download "$BUILD_RUN_ID" --dir dist/mobile-native/android-smoke-input
+          REPORT="$(find dist/mobile-native/android-smoke-input -type f -name apk-static-report.json -print -quit)"
+          test -n "$REPORT"
+          PACKAGE_DIR="${REPORT%/*}"
+          test -f "$PACKAGE_DIR/FocusIslandDev-local.apk"
+          test -f "$PACKAGE_DIR/aab-static-report.json"
+          SOURCE_REF="$(node -e 'const fs=require("node:fs");const report=JSON.parse(fs.readFileSync(process.argv[1],"utf8"));const ref=report.sourceSnapshot?.sourceCommit;if(!/^[a-f0-9]{40}$/.test(ref))process.exit(1);process.stdout.write(ref)' "$REPORT")"
+          ANDROID_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -x "$ANDROID_TOOLS/aapt2" && test -x "$ANDROID_TOOLS/apksigner"
+          node scripts/verify-android-local-artifact.mjs \
+            --apk "$PACKAGE_DIR/FocusIslandDev-local.apk" \
+            --snapshot "$PACKAGE_DIR/source-snapshot.json" \
+            --source-ref "$SOURCE_REF" --android-tools "$ANDROID_TOOLS" \
+            --aab-report "$PACKAGE_DIR/aab-static-report.json" \
+            --output "$PACKAGE_DIR/apk-smoke-recheck.json"
+          node scripts/qa/compare-android-smoke-input.mjs "$REPORT" "$PACKAGE_DIR/apk-smoke-recheck.json"
+          echo "package_dir=$PACKAGE_DIR" >> "$GITHUB_OUTPUT"
+      - name: Install and restart on Android emulator
+        env:
+          PACKAGE_DIR: ${{ steps.package.outputs.package_dir }}
+        run: bash scripts/qa/android-emulator-smoke.sh "$PACKAGE_DIR"
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: android-emulator-smoke-${{ inputs.build_run_id }}
+          path: |
+            dist/mobile-native/android-smoke-input/**/apk-smoke-recheck.json
+            dist/mobile-native/android-smoke-input/**/emulator-smoke-report.json
+            dist/mobile-native/android-smoke-input/**/emulator-first-launch.png
+            dist/mobile-native/android-smoke-input/**/emulator-ui.xml
+            dist/mobile-native/android-smoke-input/**/emulator.log
+          if-no-files-found: warn
+          retention-days: 14
