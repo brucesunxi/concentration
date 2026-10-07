@@ -62,6 +62,10 @@ adb shell am force-stop dev.focusisland.family
 check_launch
 adb exec-out screencap -p > "$package_dir/emulator-first-launch.png"
 
+if [[ "${RUN_OFFLINE_RECOVERY:-false}" == true && "${RUN_FAMILY_FLOW:-false}" != true ]]; then
+  echo 'Offline recovery requires the synthetic family flow' >&2
+  exit 1
+fi
 if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
   export FOCUS_DATA_DIR="$RUNNER_TEMP/focus-family-qa-data"
   mkdir -p "$FOCUS_DATA_DIR"
@@ -73,7 +77,9 @@ if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
     sleep 2
   done
   test "$ready" = true
-  python3 scripts/qa/android_practice_life.py --apk "$apk" --evidence-dir "$package_dir" --reset-synthetic-app > "$package_dir/family-flow-report.json"
+  acceptance_args=(--apk "$apk" --evidence-dir "$package_dir" --reset-synthetic-app)
+  if [[ "${RUN_OFFLINE_RECOVERY:-false}" == true ]]; then acceptance_args+=(--offline-recovery); fi
+  python3 scripts/qa/android_practice_life.py "${acceptance_args[@]}" > "$package_dir/family-flow-report.json"
 fi
 
 export PACKAGE_DIR="$package_dir"

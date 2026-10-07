@@ -91,6 +91,14 @@ class Device:
     def tap(self, label: str, *, scroll: bool = False, timeout: float = 12) -> None:
         self.tap_node(self.find(label, scroll=scroll, timeout=timeout))
 
+    def wait_text(self, phrase: str, *, timeout: float = 25) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if any(phrase in n.get("text", "") for n in self.screen()):
+                return
+            time.sleep(0.3)
+        raise AcceptanceError(f"Could not find text {phrase!r}")
+
     def type(self, label: str, value: str) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
             raise AcceptanceError("Test input must be simple synthetic ASCII")
@@ -162,7 +170,7 @@ def complete_search(device: Device) -> None:
         raise AcceptanceError("Search step did not complete correctly")
 
 
-def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None) -> dict:
+def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None, offline_recovery: bool = False) -> dict:
     suffix = secrets.token_hex(5)
     family, password = f"SyntheticAndroid{suffix}", f"SyntheticAndroidAcceptance{suffix}2026"
     created = False
@@ -170,6 +178,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None) ->
     result = {"platform": "Android emulator", "avd": AVD, "mode": "local-development",
               "apkSha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "formalIndependentSteps": 0,
               "parentReportFormalSteps": None,
+              "offlineForcedRestart": False, "pendingBeforeSync": False, "syncedAfterReconnect": False,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
     try:
@@ -193,6 +202,20 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None) ->
         device.tap("Save profile", scroll=True)
         device.tap("SyntheticWren · Start today’s suggested practice", scroll=True, timeout=25)
         device.tap("I want to start", scroll=True)
+        if offline_recovery:
+            device.wait_text("Recovery information for this practice is saved on this device", timeout=30)
+            device.run("reverse", "--remove", "tcp:4181")
+            device.run("shell", "am", "force-stop", PACKAGE)
+            device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+            device.find("Restore this practice", scroll=True, timeout=35)
+            visible = device.screen()
+            if any(family in str(n) or "SyntheticWren" in str(n) for n in visible):
+                raise AcceptanceError("Offline recovery exposed a family identifier")
+            if evidence_dir:
+                (evidence_dir / "android-offline-offer.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+            device.tap("Restore this practice", scroll=True)
+            device.find("I want to try", scroll=True, timeout=30)
+            result["offlineForcedRestart"] = True
         device.tap("I want to try", scroll=True, timeout=25)
         for step in range(3):
             complete_search(device)
@@ -204,12 +227,22 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None) ->
                 except AcceptanceError:
                     pass
         device.tap("Stop for today")
+        if offline_recovery:
+            device.find("Retry sync", scroll=True, timeout=25)
+            device.wait_text("Records are saved here and awaiting service confirmation", timeout=20)
+            result["pendingBeforeSync"] = True
+            if evidence_dir:
+                (evidence_dir / "android-pending-sync.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+            device.run("reverse", "tcp:4181", "tcp:4181")
+            device.tap("Retry sync")
         device.find("If you like, explore an everyday goal", scroll=True, timeout=25)
         texts = [n.get("text", "") for n in device.screen()]
         if not any("1 independent step and 0 assisted steps." in value for value in texts):
             raise AcceptanceError("Summary did not show one independent formal step")
         if not any("Your records are confirmed by the family service." in value for value in texts):
             raise AcceptanceError("Summary was not confirmed by the family service")
+        if offline_recovery:
+            result["syncedAfterReconnect"] = True
         result["formalIndependentSteps"] = 1
         if evidence_dir:
             evidence_dir.mkdir(parents=True, exist_ok=True)
@@ -275,13 +308,14 @@ def main() -> int:
     parser.add_argument("--api-base", default="http://127.0.0.1:4181")
     parser.add_argument("--evidence-dir", type=Path)
     parser.add_argument("--reset-synthetic-app", action="store_true", help="Required acknowledgement: clears this app on FocusIslandQA")
+    parser.add_argument("--offline-recovery", action="store_true", help="Remove the API port, force-stop, recover offline, then sync")
     args = parser.parse_args()
     if not args.reset_synthetic_app:
         parser.error("--reset-synthetic-app is required because the dedicated emulator app data will be cleared")
     device = Device(args.adb, args.serial)
     try:
         validate_target(device, args.api_base, args.apk)
-        result = run_flow(device, args.api_base, args.apk, args.evidence_dir)
+        result = run_flow(device, args.api_base, args.apk, args.evidence_dir, args.offline_recovery)
         print(json.dumps(result, indent=2))
         if not result["familyDeleted"] or not result["appDataCleared"]:
             raise AcceptanceError("Synthetic data cleanup did not finish")

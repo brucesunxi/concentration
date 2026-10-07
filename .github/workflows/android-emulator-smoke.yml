@@ -12,6 +12,11 @@ on:
         required: false
         default: false
         type: boolean
+      offline_recovery:
+        description: Interrupt the synthetic practice, recover offline, then sync
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -60,6 +65,7 @@ jobs:
         env:
           PACKAGE_DIR: ${{ steps.package.outputs.package_dir }}
           RUN_FAMILY_FLOW: ${{ inputs.full_flow }}
+          RUN_OFFLINE_RECOVERY: ${{ inputs.offline_recovery }}
         run: bash scripts/qa/android-emulator-smoke.sh "$PACKAGE_DIR"
       - uses: actions/upload-artifact@v7
         if: always()
@@ -74,5 +80,7 @@ jobs:
             dist/mobile-native/android-smoke-input/**/family-flow-report.json
             dist/mobile-native/android-smoke-input/**/android-practice-summary.png
             dist/mobile-native/android-smoke-input/**/android-life-preselected.png
+            dist/mobile-native/android-smoke-input/**/android-offline-offer.png
+            dist/mobile-native/android-smoke-input/**/android-pending-sync.png
           if-no-files-found: warn
           retention-days: 14
