@@ -52,6 +52,14 @@ def verify_candidate_is_served(base):
     assert received == expected, "Browser acceptance must serve the newly built candidate rather than a retained release"
 
 
+def set_document_hidden(page, hidden):
+    page.evaluate("""hidden => {
+      if (hidden) Object.defineProperty(document, 'hidden', {configurable: true, value: true});
+      else delete document.hidden;
+      document.dispatchEvent(new Event('visibilitychange'));
+    }""", hidden)
+
+
 def play_one_formal_step(page):
     page.get_by_role("button", name="Start today’s practice").click()
     invitation = page.get_by_role("dialog")
@@ -65,11 +73,22 @@ def play_one_formal_step(page):
     for label in ("Fox", "Bear", "Cat"):
         assert examples.get_by_role("img", name=label).count() == 1
     expect(examples.get_by_text("Find all of these")).to_be_visible()
+    set_document_hidden(page, True)
+    set_document_hidden(page, False)
+    expect(examples).to_be_visible()
+    expect(page.get_by_role("button", name="I want to try")).to_be_visible()
     page.get_by_role("button", name="I want to try").click()
 
     for step in range(3):
         page.get_by_role("button", name="All found").wait_for(timeout=15000)
         page.wait_for_timeout(300)  # Allow the visible input window to open.
+        if step == 2:
+            set_document_hidden(page, True)
+            page.get_by_role("heading", name="A break matters too").wait_for(timeout=10000)
+            set_document_hidden(page, False)
+            expect(page.locator(".intro-stage [role='status']")).to_contain_text("does not count as a mistake")
+            page.get_by_role("button", name="Ready to continue").click()
+            page.get_by_role("button", name="All found").wait_for(timeout=15000)
         rabbits = page.locator('button.stimulus-tile[aria-label^="Rabbit"]')
         assert rabbits.count() > 0
         for rabbit in rabbits.all():
@@ -77,6 +96,10 @@ def play_one_formal_step(page):
         page.get_by_role("button", name="All found").click()
         page.locator(".feedback-stage").wait_for(timeout=15000)
         assert page.locator(".feedback-stage h1").inner_text() == "That step is done"
+        if step == 0:
+            set_document_hidden(page, True)
+            set_document_hidden(page, False)
+            expect(page.locator(".feedback-stage")).to_be_visible()
         if step < 2:
             page.locator(".feedback-stage button.primary").click()
 
@@ -354,6 +377,11 @@ def verify_family_flow(browser, base):
         parent_dialog.get_by_label("Family name").fill(FAMILY)
         parent_dialog.get_by_label("Parent password").fill(PASSWORD)
         parent_dialog.get_by_role("button", name="Open family space").click()
+        report = page.evaluate("""async () => {
+          const me = await (await fetch('/api/me')).json();
+          return (await (await fetch(`/api/children/${me.children[0].id}/report`)).json());
+        }""")
+        assert sum(1 for session in report.get("sessions", []) for mark in (session.get("result") or {}).get("invalidations", []) if mark.get("reason") == "background" and not mark.get("practice")) == 1, "Backgrounded formal trial must be excluded in the parent report"
         page.get_by_role("button", name="Progress").first.click()
         page.get_by_text("Screen reader · separate record").first.wait_for(timeout=15000)
         page.get_by_text("Kept separately; no accuracy or ability change calculated").first.wait_for(timeout=15000)
