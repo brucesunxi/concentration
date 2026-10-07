@@ -199,6 +199,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "backgroundPauseExplained": False,
               "upgradeFromApkSha256": hashlib.sha256(upgrade_from.read_bytes()).hexdigest() if upgrade_from else None,
               "upgradePreservedOfflineJournal": False,
+              "nativeSignOutVisible": False, "nativeSignOutSurvivedOfflineRestart": False,
               "backgroundExclusionsInParentReport": 0,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
@@ -357,6 +358,22 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             raise AcceptanceError("Age-matched everyday activity catalogue is incomplete")
         result["goalCount"] = 0
         result["templateCount"] = 4
+        if offline_recovery:
+            device.tap("Back to family space", scroll=True, timeout=25)
+            device.tap("Sign out", scroll=True, timeout=25)
+            device.wait_text("Welcome to Focus Island", timeout=25)
+            result["nativeSignOutVisible"] = True
+            if evidence_dir:
+                (evidence_dir / "android-sign-out-login.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+            device.run("reverse", "--remove", "tcp:4181")
+            device.run("shell", "am", "force-stop", PACKAGE)
+            device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+            device.wait_text("Welcome to Focus Island", timeout=30)
+            if any(node.get("content-desc") == "Restore this practice" for node in device.screen()):
+                raise AcceptanceError("Signed-out offline practice reappeared after restart")
+            result["nativeSignOutSurvivedOfflineRestart"] = True
+            if evidence_dir:
+                (evidence_dir / "android-sign-out-restart.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
         return result
     except Exception:
         if evidence_dir:
