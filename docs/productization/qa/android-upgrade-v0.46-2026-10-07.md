@@ -1,5 +1,13 @@
 # Android 覆盖升级与离线练习恢复
 
+## 直升验收：0.2.8 → 0.2.10
+
+2026-10-07 的[Android 35 / x86_64 模拟器任务 37597904850](https://github.com/brucesunxi/concentration/actions/runs/37597904850)从旧包 `0.2.8` / Android 版本码 `9` 直接覆盖到当前包 `0.2.10` / 版本码 `11`，跳过中间的 `0.2.9`。旧包来源为构建任务 `37584595512`，当前包来源为 `37591984293`；两包的包名均为 `dev.focusisland.family`，签名证书 SHA-256 均为 `fac61745dc0903786fb9ede62a962b399f7348f0bb6f899b8332667591033b9c`，APK SHA-256 分别为 `fb758b3e12f086f4e6ef188b970a97d07f9bdd92cbe5fd9376ed125ee55f868d` 与 `e50a5014a6e703c933914b5628ffefcba2ed9e03678fee40a8fb3a13d3a00d88`。运行前重新核验了两包、源码快照、签名和版本递增。
+
+旧包先建立虚构家庭并准备练习；断开本地 API、强制停止后，使用 `adb install -r` 覆盖新版且不清除 App 数据。新版显示原设备已准备练习的离线恢复入口，恢复后完成两道示范题和一道正式题。结束时先显示待同步，重连后得到服务端确认；孩子摘要和家长报告均为 **1 个独立正式步骤**，生活目标数为 `0`。虚构家庭已删除，专用模拟器 App 数据已清理。[运行报告](../../../dist/mobile-native/v0.46/emulator-upgrade-37597904850/android-smoke-input/focus-island-android-aab-816c7116634473a67603edeb5a405e471c0471d3/family-flow-report.json)、[升级后恢复入口](../../../dist/mobile-native/v0.46/emulator-upgrade-37597904850/android-smoke-input/focus-island-android-aab-816c7116634473a67603edeb5a405e471c0471d3/android-upgrade-offline-offer.png)和[已确认结果](../../../dist/mobile-native/v0.46/emulator-upgrade-37597904850/android-smoke-input/focus-island-android-aab-816c7116634473a67603edeb5a405e471c0471d3/android-practice-summary.png)保存在本机 Git 忽略目录；恢复入口与完成页已目视核对。
+
+该直升路径证明这一对**测试包**在一台虚拟设备上的覆盖安装及离线记录兼容；不覆盖更早版本、真机、低存储、音频打断或商店签名的升级。
+
 ## 当前修正包：0.2.9 → 0.2.10
 
 提交 `816c7116634473a67603edeb5a405e471c0471d3` 将无单题倒计时的搜索、记忆任务从慢帧计时排除条件中移出；限时任务仍在呈现帧过慢时暂停并排除该步骤。计分引擎、网页与原生端使用相同边界。移动 App 版本为 `0.2.10`，Android 版本码 `11`；两包的内置运行代码摘要 `ea5cb046725d6c340a2f0d0755698d6aef9d39ff99f7755ad65b897b914e04dc`，不同于 `0.2.9`，因此本次确实覆盖了运行逻辑变化。[完整质量检查 37591966231](https://github.com/brucesunxi/concentration/actions/runs/37591966231)与[新包构建 37591984293](https://github.com/brucesunxi/concentration/actions/runs/37591984293)通过。本机重新计算的 SHA-256 与构建报告一致：
