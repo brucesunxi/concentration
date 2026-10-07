@@ -170,6 +170,12 @@ def complete_search(device: Device) -> None:
         raise AcceptanceError("Search step did not complete correctly")
 
 
+def background_and_return(device: Device) -> None:
+    device.run("shell", "input", "keyevent", "3")  # HOME
+    time.sleep(1)
+    device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+
+
 def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
              offline_recovery: bool = False, background_resume: bool = False) -> dict:
     suffix = secrets.token_hex(5)
@@ -181,6 +187,8 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "parentReportFormalSteps": None,
               "offlineForcedRestart": False, "pendingBeforeSync": False, "syncedAfterReconnect": False,
               "backgroundInterrupted": False, "backgroundResumed": False,
+              "introRetainedAfterBackground": False, "feedbackRetainedAfterBackground": False,
+              "backgroundPauseExplained": False,
               "backgroundExclusionsInParentReport": 0,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
@@ -205,6 +213,15 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         device.tap("Save profile", scroll=True)
         device.tap("SyntheticWren · Start today’s suggested practice", scroll=True, timeout=25)
         device.tap("I want to start", scroll=True)
+        if background_resume:
+            device.find("I want to try", scroll=True, timeout=30)
+            background_and_return(device)
+            device.find("I want to try", scroll=True, timeout=30)
+            if any(n.get("content-desc") == "I am ready" for n in device.screen()):
+                raise AcceptanceError("Backgrounding the rule intro skipped its examples")
+            result["introRetainedAfterBackground"] = True
+            if evidence_dir:
+                (evidence_dir / "android-background-intro.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
         if offline_recovery:
             device.wait_text("Recovery information for this practice is saved on this device", timeout=30)
             device.run("reverse", "--remove", "tcp:4181")
@@ -229,10 +246,10 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
                     time.sleep(0.3)
                 else:
                     raise AcceptanceError("Formal search trial did not become active before backgrounding")
-                device.run("shell", "input", "keyevent", "3")  # HOME
-                time.sleep(1)
-                device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+                background_and_return(device)
                 device.find("I am ready", timeout=30)
+                device.wait_text("does not count as a mistake", timeout=20)
+                result["backgroundPauseExplained"] = True
                 result["backgroundInterrupted"] = True
                 if evidence_dir:
                     (evidence_dir / "android-background-pause.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
@@ -247,6 +264,13 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
                     raise AcceptanceError("Formal search trial did not resume after background pause")
             complete_search(device)
             if step < 2:
+                if step == 0 and background_resume:
+                    background_and_return(device)
+                    device.wait_text("This step is complete", timeout=30)
+                    device.find("Continue", scroll=True, timeout=20)
+                    result["feedbackRetainedAfterBackground"] = True
+                    if evidence_dir:
+                        (evidence_dir / "android-background-feedback.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
                 device.tap("Continue")
                 # The wellbeing check can intervene between steps.
                 try:

@@ -89,5 +89,7 @@ jobs:
             dist/mobile-native/android-smoke-input/**/android-offline-offer.png
             dist/mobile-native/android-smoke-input/**/android-pending-sync.png
             dist/mobile-native/android-smoke-input/**/android-background-pause.png
+            dist/mobile-native/android-smoke-input/**/android-background-intro.png
+            dist/mobile-native/android-smoke-input/**/android-background-feedback.png
           if-no-files-found: warn
           retention-days: 14
