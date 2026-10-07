@@ -18,7 +18,9 @@ from playwright.sync_api import expect, sync_playwright
 ROOT = Path(__file__).resolve().parents[2]
 FAMILY = "Synthetic browser acceptance family"
 PASSWORD = "Synthetic-browser-acceptance-2026!"
+NEW_PASSWORD = "Synthetic-browser-acceptance-2026-new!"
 CHILD = "Synthetic Wren"
+RECOVERED_CHILD = "Synthetic Finch"
 
 
 def free_port():
@@ -302,7 +304,8 @@ def verify_invitation_refresh_and_race(page):
 
 
 def verify_family_flow(browser, base):
-    page = browser.new_page(viewport={"width": 1440, "height": 900}, locale="en-US", timezone_id="America/New_York")
+    context = browser.new_context(viewport={"width": 1440, "height": 900}, locale="en-US", timezone_id="America/New_York")
+    page = context.new_page()
     errors = []
     page.on("pageerror", lambda error: errors.append(str(error)))
     try:
@@ -419,7 +422,42 @@ def verify_family_flow(browser, base):
         page.get_by_role("heading", name="A small discovery today").wait_for(timeout=10000)
         assert not page.evaluate("document.cookie.includes('focus-offline-access-blocked=1')"), "Verified parent sign-in should release the offline block after journal reconciliation"
         assert page.evaluate("localStorage.getItem('focus-offline-access-blocked')") is None
-        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, separate screen reader condition, server confirmation, storage-failure sign-out, offline block and verified parent sign-in")
+        page.get_by_role("button", name="Add a child").first.click()
+        page.get_by_label("Child’s nickname").fill(RECOVERED_CHILD)
+        page.get_by_label("Age band").select_option("9-11")
+        page.get_by_label("Practice language").select_option("en")
+        page.get_by_label(re.compile("I agree to save local test records")).check()
+        page.get_by_role("button", name="Prepare their space").click()
+        page.get_by_text(RECOVERED_CHILD).first.wait_for(timeout=10000)
+        other_tab = page.context.new_page()
+        other_tab.goto(base, wait_until="networkidle")
+        other_tab.get_by_role("heading", name="A small discovery today").wait_for(timeout=10000)
+        other_tab.get_by_text(RECOVERED_CHILD).first.wait_for(timeout=10000)
+        page.get_by_role("button", name="Family space").first.click()
+        page.set_viewport_size({"width": 320, "height": 780})
+        page.get_by_role("button", name="Change parent password").click()
+        assert page.evaluate("document.body.scrollWidth <= innerWidth"), "The password form overflows a 320px viewport"
+        page.get_by_label("Current parent password").fill(PASSWORD)
+        page.get_by_label("New password", exact=True).fill(NEW_PASSWORD)
+        page.get_by_label("Repeat new password").fill("mismatched synthetic password")
+        page.get_by_label("I understand all sign-ins will end and saved records will remain.").check()
+        save_password = page.get_by_role("button", name="Update password & sign out")
+        expect(save_password).to_be_disabled()
+        page.get_by_label("Repeat new password").fill(NEW_PASSWORD)
+        expect(save_password).to_be_enabled()
+        save_password.click()
+        page.get_by_text("Your password has changed. Sign in with your new password.").wait_for(timeout=10000)
+        other_tab.get_by_label("Family name").wait_for(timeout=10000)
+        expect(other_tab.locator(".app-layout")).to_have_count(0, timeout=10000)
+        page.get_by_label("Family name").fill(FAMILY)
+        page.get_by_label("Parent password").fill(PASSWORD)
+        page.get_by_role("button", name="Open family space").click()
+        page.get_by_text("The family name or password is incorrect, or sign-in is temporarily unavailable.").wait_for(timeout=10000)
+        page.get_by_label("Parent password").fill(NEW_PASSWORD)
+        page.get_by_role("button", name="Open family space").click()
+        page.get_by_role("heading", name="A small discovery today").wait_for(timeout=10000)
+        assert page.evaluate("async () => { const me = await (await fetch('/api/me')).json(); return {family:me.family.name,children:me.children.map(child => child.alias)}; }") == {"family": FAMILY, "children": [RECOVERED_CHILD]}
+        print("PASS family flow: 320px home and profile dialog, voluntary start, formal step, separate screen reader condition, server confirmation, storage-failure sign-out, offline block, password change, cross-tab clearance and verified new sign-in")
     except Exception:
         artifact = ROOT / "dist/browser-qa/failure.png"
         artifact.parent.mkdir(parents=True, exist_ok=True)
@@ -427,7 +465,7 @@ def verify_family_flow(browser, base):
         print(f"Browser failure screenshot: {artifact}")
         raise
     finally:
-        page.close()
+        context.close()
 
 
 def verify_mobile_entry(browser, base):
