@@ -37,7 +37,16 @@ Vercel 默认记录应用处理的 API 请求，包括成功、拒绝、服务�
 6. 对 error 比例、按接口 P95/P99 耗时及 aborted 比例建立时间窗口，附请求数量；零请求或少样本不声称达到 SLO。原技术设计的延迟/RPO/RTO 候选值仍须在参考区域实测与演练。
 7. aborted 只证明响应尚未完整发出便关闭，不能据此判断是谁主动退出或孩子是否完成。家庭记录和同步状态仍以服务端结果/本机日志协议为准。
 
-在项目目录可用 CLI 检索，例如 `vercel logs --since 30m --query '<应用请求编号>' --expand`。此处 query 用于查应用日志消息；`--request-id` 是平台自己的请求编号。CLI 的项目访问需要现有管理员登录，不在命令参数中传秘密。外部日志导出或监控接入须继续审阅地域与资料流。
+在项目目录用以下命令按**应用**请求编号读取；只输出经白名单校验的应用事件，不显示平台日志里的原始请求路径、查询或消息对象。`--request-id` 在 Vercel CLI 中筛选的是**平台**请求编号，与本应用 UUID 不同，因此这里将编号交给本地筛选器。CLI 的项目访问需要现有管理员登录，不在命令参数中传秘密。外部日志导出或监控接入须继续审阅地域与资料流。
+
+```sh
+FOCUS_DEPLOYMENT='dpl_替换为要检查的部署编号'
+FOCUS_REQUEST_ID='替换为页面显示的应用请求编号'
+set -o pipefail
+vercel logs "$FOCUS_DEPLOYMENT" --since 30m --json --limit 1000 | npm run --silent ops:lookup -- --request-id "$FOCUS_REQUEST_ID" --source-limit 1000
+```
+
+`found=false` 只说明所读取的日志中没有该事件，不能证明请求未发生；先核对部署、时间窗口、访问权限和平台保留期。`sourceLimitReached=true` 表示结果可能被截断，应缩短窗口。格式不合法或同编号记录矛盾时工具拒绝输出事件。不要把平台原始 JSONL 保存到工单。
 
 ## 3. 按部署汇总技术结果
 

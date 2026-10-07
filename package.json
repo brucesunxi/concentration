@@ -38,7 +38,8 @@
     "db:prepare": "node scripts/prepare-postgres.ts",
     "db:audit:billing": "node scripts/audit-billing-neon.ts",
     "db:audit:runtime": "node scripts/audit-neon-runtime-readonly.ts",
-    "ops:summary": "node scripts/summarize-request-observations.mjs"
+    "ops:summary": "node scripts/summarize-request-observations.mjs",
+    "ops:lookup": "node scripts/find-request-observation.mjs"
   },
   "engines": {
     "node": ">=24.14.0"

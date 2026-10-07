@@ -1,6 +1,6 @@
 import { createInterface } from 'node:readline';
 import { pathToFileURL } from 'node:url';
-import { isFamilyRouteCategory } from '../apps/api/request-observation.ts';
+import { isFamilyResponseCode, isFamilyRouteCategory } from '../apps/api/request-observation.ts';
 
 const SAMPLE_FLOOR = 20;
 const P99_SAMPLE_FLOOR = 100;
@@ -8,9 +8,9 @@ const UUID = /^[0-9a-f]{8}-[0-9a-f]{4}-[1-8][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-
 const METHODS = new Set(['GET', 'HEAD', 'POST', 'PATCH', 'DELETE', 'PUT', 'OPTIONS', 'OTHER']);
 const OUTCOMES = new Set(['ok', 'rejected', 'error', 'aborted']);
 
-function eventFrom(value) {
+export function parseRequestObservation(value) {
   if (!value || value.event !== 'FAMILY_HTTP_REQUEST') return null;
-  const { schemaVersion, timestamp, requestId, source, version, method, route, transport, status, outcome, durationMs, runtimeWaitMs } = value;
+  const { schemaVersion, timestamp, requestId, source, version, method, route, transport, status, outcome, durationMs, runtimeWaitMs, code } = value;
   if (schemaVersion !== 1 || typeof timestamp !== 'string' || !/^\d{4}-\d\d-\d\dT\d\d:\d\d:\d\d\.\d{3}Z$/.test(timestamp) ||
       !Number.isFinite(Date.parse(timestamp)) || !UUID.test(requestId) || !['standalone', 'vercel'].includes(source) ||
       !(version === null || (typeof version === 'string' && /^\d{1,3}\.\d{1,3}\.\d{1,3}$/.test(version))) ||
@@ -20,8 +20,10 @@ function eventFrom(value) {
       !(status === null || (Number.isInteger(status) && status >= 100 && status <= 599)) ||
       (outcome === 'aborted' ? status !== null && status < 100 : status === null) ||
       (outcome === 'ok' && status >= 400) || (outcome === 'rejected' && (status < 400 || status >= 500)) ||
-      (outcome === 'error' && status < 500)) return false;
-  return { timestamp, requestId, source, version, method, route, transport, status, outcome, durationMs, runtimeWaitMs };
+      (outcome === 'error' && status < 500) ||
+      (outcome === 'ok' ? code !== null : outcome === 'aborted' ? code !== 'REQUEST_ABORTED' :
+        !isFamilyResponseCode(code) && code !== (outcome === 'error' ? 'REQUEST_FAILED' : 'REQUEST_REJECTED'))) return false;
+  return { timestamp, requestId, source, version, method, route, transport, status, outcome, durationMs, runtimeWaitMs, code };
 }
 
 function percentile(values, fraction, minimum = SAMPLE_FLOOR) {
@@ -64,7 +66,7 @@ export async function summarizeRequestObservations(lines, { from, to, sourceLimi
       if (typeof value === 'string') try { value = JSON.parse(value); } catch { continue; }
       if (value?.event !== 'FAMILY_HTTP_REQUEST') continue;
       integrity.candidates++;
-      const event = eventFrom(value);
+      const event = parseRequestObservation(value);
       if (!event) { integrity.invalid++; continue; }
       const at = Date.parse(event.timestamp);
       if (at < start || at > end) { integrity.outsideWindow++; continue; }

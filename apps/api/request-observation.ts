@@ -11,6 +11,9 @@ const responseCodes = new Set([
   'ENTITLEMENT_REQUIRED', 'ENTITLEMENT_UNAVAILABLE', 'DATABASE_NOT_READY', 'WEB_RELEASE_UNAVAILABLE', 'NOT_BUILT',
   'INTERNAL_ERROR', 'SERVICE_UNAVAILABLE',
 ]);
+export function isFamilyResponseCode(value: unknown): value is string {
+  return typeof value === 'string' && responseCodes.has(value);
+}
 const directRoutes = new Set([
   '/api/health', '/api/ready', '/api/me', '/api/auth/setup', '/api/auth/login', '/api/auth/join', '/api/auth/logout',
   '/api/auth/change-password', '/api/auth/logout-all', '/api/account/security', '/api/family', '/api/family/billing',
