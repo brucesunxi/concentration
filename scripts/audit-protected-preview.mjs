@@ -95,11 +95,12 @@ async function checkWebShell() {
   } catch { throw new Error('SYNTHETIC_WEB_SHELL_MANIFEST_INVALID'); }
   if (shell.schemaVersion !== 1 || !Array.isArray(shell.assets) || !Array.isArray(budget.assets) ||
       budget.passed !== true || !Number.isSafeInteger(budget.limitBytes) || !Number.isSafeInteger(budget.totalBytes) ||
-      budget.totalBytes > budget.limitBytes || shell.totalBytes !== budget.totalBytes) throw new Error('SYNTHETIC_WEB_SHELL_BUDGET_INVALID');
+      budget.totalBytes > budget.limitBytes || shell.totalBytes > 1_500_000 || shell.totalBytes < budget.totalBytes) throw new Error('SYNTHETIC_WEB_SHELL_BUDGET_INVALID');
   const files = shell.assets.filter(asset => asset.url !== '/');
   const budgetFiles = new Map(budget.assets.map(asset => [asset.path, asset]));
-  if (files.length !== budget.assets.length || budgetFiles.size !== files.length ||
+  if (files.length < budget.assets.length || budgetFiles.size !== budget.assets.length ||
       shell.assets.filter(asset => asset.url === '/').length !== 1) throw new Error('SYNTHETIC_WEB_SHELL_FILES_INVALID');
+  if (budget.assets.some(asset => !files.some(file => file.url === '/' + asset.path))) throw new Error('SYNTHETIC_WEB_SHELL_FILES_INVALID');
   for (const name of ['characters', 'objects']) {
     if (!files.some(asset => new RegExp(`^/assets/${name}-sheet-[A-Za-z0-9_-]+\\.webp$`).test(asset.url)) ||
         files.some(asset => new RegExp(`^/assets/${name}-sheet-.*\\.png$`).test(asset.url))) throw new Error(`SYNTHETIC_WEB_${name.toUpperCase()}_PREVIEW_INVALID`);
@@ -109,7 +110,7 @@ async function checkWebShell() {
     if (!asset || typeof asset.url !== 'string' || !Number.isSafeInteger(asset.bytes) || asset.bytes <= 0 ||
         !/^[a-f0-9]{64}$/.test(asset.sha256)) throw new Error('SYNTHETIC_WEB_SHELL_ENTRY_INVALID');
     const reported = budgetFiles.get(asset.url.slice(1));
-    if (!reported || reported.bytes !== asset.bytes || reported.sha256 !== asset.sha256) throw new Error('SYNTHETIC_WEB_SHELL_REPORT_MISMATCH');
+    if (reported ? reported.bytes !== asset.bytes || reported.sha256 !== asset.sha256 : !/^\/assets\/[A-Za-z0-9_.-]+\.(js|css)$/.test(asset.url)) throw new Error('SYNTHETIC_WEB_SHELL_REPORT_MISMATCH');
     const delivered = await publicBytes(asset.url);
     if (delivered.status !== 200 || delivered.bytes.length !== asset.bytes ||
         createHash('sha256').update(delivered.bytes).digest('hex') !== asset.sha256) throw new Error('SYNTHETIC_WEB_SHELL_DELIVERY_MISMATCH');

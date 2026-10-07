@@ -6,4 +6,9 @@ import './compact.css';
 import { shellReady } from './offline-shell.ts';
 
 createRoot(document.getElementById('root')!).render(<ErrorBoundary><App /></ErrorBoundary>);
-void shellReady();
+void shellReady().finally(() => {
+  const url = new URL(location.href);
+  if (!url.searchParams.has('focus-refresh')) return;
+  url.searchParams.delete('focus-refresh');
+  history.replaceState(history.state, '', url.pathname + url.search + url.hash);
+});

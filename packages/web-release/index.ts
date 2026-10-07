@@ -3,6 +3,7 @@ import { lstat, mkdir, open, readFile, rename, rm, writeFile } from 'node:fs/pro
 import { dirname, join, resolve } from 'node:path';
 import { z } from 'zod';
 import { workerSource, workerVersion } from '../offline-shell/worker.mjs';
+import { webGraphFiles } from '../offline-shell/manifest-files.mjs';
 
 const hash = (bytes: string | Buffer) => createHash('sha256').update(bytes).digest('hex');
 const digest = z.string().regex(/^[a-f0-9]{64}$/);
@@ -59,15 +60,8 @@ export async function inspectWebBuild(source: string, version: string) {
     }
   }
   if (paths.size > 512) fail('WEB_RELEASE_TOO_MANY_FILES');
-  const initial = new Set(['index.html']), visited = new Set<string>();
-  function visit(key: string) {
-    if (visited.has(key)) return; visited.add(key);
-    const entry = graph[key];
-    for (const path of [entry.file, ...entry.css ?? [], ...entry.assets ?? []]) initial.add(path);
-    for (const dependency of entry.imports ?? []) visit(dependency);
-  }
   const entryKey = Object.keys(graph).find(key => graph[key].isEntry)!;
-  visit(entryKey);
+  const { initial, offline } = webGraphFiles(graph, entryKey);
   const buffers = new Map<string, Buffer>(), files = [];
   let total = 0;
   for (const path of [...paths].sort()) {
@@ -84,10 +78,11 @@ export async function inspectWebBuild(source: string, version: string) {
     if (!file || !initial.has(file.path) || file.sha256 !== entry.sha256 || file.bytes !== entry.bytes) fail('WEB_RELEASE_BUDGET_MISMATCH');
   }
   const shell = JSON.parse(buffers.get('offline-shell.json')!.toString());
-  if (shell.schemaVersion !== 1 || shell.totalBytes !== initialBytes || !Array.isArray(shell.assets) || shell.assets.length !== initial.size + 1 || new Set(shell.assets.map((asset: { url: string }) => asset.url)).size !== initial.size + 1) fail('WEB_RELEASE_SHELL_INVALID');
+  const offlineBytes = files.filter(file => offline.has(file.path)).reduce((sum, file) => sum + file.bytes, 0);
+  if (shell.schemaVersion !== 1 || shell.totalBytes !== offlineBytes || offlineBytes > 1500000 || !Array.isArray(shell.assets) || shell.assets.length !== offline.size + 1 || new Set(shell.assets.map((asset: { url: string }) => asset.url)).size !== offline.size + 1) fail('WEB_RELEASE_SHELL_INVALID');
   for (const asset of shell.assets) {
     const file = files.find(file => file.path === (asset.url === '/' ? 'index.html' : asset.url?.slice(1)));
-    if (!file || !initial.has(file.path) || !asset.url.startsWith('/') || file.sha256 !== asset.sha256 || file.bytes !== asset.bytes) fail('WEB_RELEASE_SHELL_MISMATCH');
+    if (!file || !offline.has(file.path) || !asset.url.startsWith('/') || file.sha256 !== asset.sha256 || file.bytes !== asset.bytes) fail('WEB_RELEASE_SHELL_MISMATCH');
   }
   if (workerVersion(shell.assets) !== shell.version || buffers.get('focus-sw.js')!.toString() !== workerSource(shell)) fail('WEB_RELEASE_SHELL_MISMATCH');
   if (!buffers.get('index.html')!.toString().includes(`src="/${graph[entryKey].file}"`)) fail('WEB_RELEASE_ENTRY_MISMATCH');

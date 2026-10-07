@@ -12,9 +12,9 @@ export async function webFixture(directory: string, label: string, forcedLazyPat
   const files = new Map([['index.html', html], [mainPath, mainBody], [lazyPath, lazyBody]]);
   const initial = ['index.html', mainPath].sort().map(path => ({ path, bytes: Buffer.byteLength(files.get(path)!), sha256: digest(files.get(path)!) }));
   const totalBytes = initial.reduce((sum, file) => sum + file.bytes, 0);
-  const shellAssets = initial.map(({ path, ...file }) => ({ url: '/' + path, ...file }));
+  const shellAssets = [...initial, { path: lazyPath, bytes: Buffer.byteLength(lazyBody), sha256: digest(lazyBody) }].map(({ path, ...file }) => ({ url: '/' + path, ...file }));
   shellAssets.push({ ...shellAssets.find(file => file.url === '/index.html')!, url: '/' });
-  const shell = { schemaVersion: 1, version: workerVersion(shellAssets), assets: shellAssets, totalBytes };
+  const shell = { schemaVersion: 1, version: workerVersion(shellAssets), assets: shellAssets, totalBytes: totalBytes + Buffer.byteLength(lazyBody) };
   files.set('.vite/manifest.json', JSON.stringify({ 'index.html': { file: mainPath, isEntry: true, dynamicImports: ['lazy.ts'] }, 'lazy.ts': { file: lazyPath, isDynamicEntry: true, imports: ['index.html'] } }));
   files.set('budget.json', JSON.stringify({ totalBytes, limitBytes: 1500000, passed: true, assets: initial }));
   files.set('offline-shell.json', JSON.stringify(shell));

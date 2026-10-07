@@ -66,6 +66,17 @@ test('missing lazy files, unsafe graph paths and incomplete offline packages lea
   assert.equal((await reader('/'))!.release, first.id);
 });
 
+test('a shell that omits a later page module cannot be published', async t => {
+  const { b, store, first } = await workspace(t);
+  const shellPath = join(b.directory, 'offline-shell.json');
+  const shell = JSON.parse(await readFile(shellPath, 'utf8'));
+  shell.assets = shell.assets.filter((asset: { url: string }) => asset.url !== '/' + b.lazyPath);
+  shell.totalBytes -= Buffer.byteLength(b.lazyBody);
+  await writeFile(shellPath, JSON.stringify(shell));
+  await assert.rejects(publishWebRelease(b.directory, store, { version: 'B', expected: first.id }), /WEB_RELEASE_SHELL_INVALID/);
+  assert.equal((await readWebReleaseState(store))!.current, first.id);
+});
+
 test('a fabricated or incomplete budget success cannot activate a build', async t => {
   const { b, store, first } = await workspace(t);
   await writeFile(join(b.directory, 'budget.json'), JSON.stringify({ passed: true, totalBytes: 0, limitBytes: 1500000, assets: [] }));
