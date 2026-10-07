@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { performProfileAction, serializeChildExport } from '../../packages/session-runtime/profile-actions.ts';
+import { localRecoveryForExport, performProfileAction, serializeChildExport } from '../../packages/session-runtime/profile-actions.ts';
 import type { ProfileActionPorts } from '../../packages/session-runtime/profile-actions.ts';
 import { NetworkUnavailable } from '../../packages/session-runtime/offline-session.ts';
 const me = { role: 'parent', family: { id: 'family-a' }, member: { role: 'owner', state: 'active' }, children: [{ id: 'child-a' }] };
@@ -68,6 +68,17 @@ test('exports never share after backgrounding and do not imply that a share shee
   await assert.rejects(performProfileAction('export', 'family-a', 'child-a', stale.ports), /ACTION_INTERRUPTED/); assert.deepEqual(stale.calls, []);
   const good = setup(); const result = await performProfileAction('export', 'family-a', 'child-a', good.ports);
   assert.equal(result.delivery, 'share-sheet-closed'); assert.deepEqual(good.calls, ['GET /children/child-a/export', 'share']);
+});
+test('local recovery export distinguishes included, empty, and unreadable device records', async () => {
+  const item = { sessionId: 'session-a', events: [{ id: 'event-a' }] };
+  const included = await localRecoveryForExport('this-device-only', async () => [item]);
+  assert.equal(included.status, 'included'); assert.deepEqual(included.records, [item]);
+  assert.match(included.capturedAt, /^\d{4}-\d{2}-\d{2}T/);
+  const empty = await localRecoveryForExport('this-browser-only', async () => []);
+  assert.equal(empty.status, 'none'); assert.deepEqual(empty.records, []);
+  const unavailable = await localRecoveryForExport('this-device-only', async (): Promise<typeof item[]> => { throw new Error('corrupt encrypted journal'); });
+  assert.equal(unavailable.status, 'unavailable'); assert.deepEqual(unavailable.records, []);
+  assert.deepEqual(JSON.parse(serializeChildExport({ ...exported, localRecovery: unavailable }, 'child-a')).localRecovery, unavailable);
 });
 test('the export serializer rejects other children and nested credential fields', () => {
   assert.equal(JSON.parse(serializeChildExport(exported, 'child-a')).child.id, 'child-a');

@@ -24,7 +24,7 @@ import { practiceInvitationCopy } from '../../../packages/contracts/practice-inv
 import type { PracticeStartReview } from '../../../packages/contracts/index.ts';
 import { childDataVisibilityCopy } from '../../../packages/contracts/child-data-visibility.ts';
 import { supportedDeviceLocale } from '../../../packages/contracts/device-locale.ts';
-import { performProfileAction, serializeChildExport } from '../../../packages/session-runtime/profile-actions.ts';
+import { localRecoveryForExport, performProfileAction, serializeChildExport } from '../../../packages/session-runtime/profile-actions.ts';
 import './practice-invitation.css';
 import './child-data-visibility.css';
 
@@ -266,11 +266,10 @@ export function App() {
     await safely(async () => {
       const data = await request<{child:{id:string}}>(`/children/${childId}/export`, 'GET', undefined, {}, { timeoutMs: 180000 });
       if(data.child.id!==childId || identity!==accessVersion.current)throw new Error(t('家庭状态已改变，请重新打开档案后导出。','The family space changed. Reopen this profile before exporting.'));
-      let records:Awaited<ReturnType<ReturnType<typeof journal>['exportChild']>>|null=null;
-      try{records=await journal().exportChild(familyId,childId);}
-      catch{setError(t('本浏览器的恢复日志无法读取或核对。导出文件只包含家庭服务中的记录；请检查原设备后重试。','This browser’s recovery logs could not be read or verified. The downloaded file contains server records only; check the original device and retry.'));}
+      const localRecovery=await localRecoveryForExport('this-browser-only',()=>journal().exportChild(familyId,childId));
+      if(localRecovery.status==='unavailable')setError(t('本浏览器的恢复日志无法读取或核对。导出文件只包含家庭服务中的记录；请检查原设备后重试。','This browser’s recovery logs could not be read or verified. The downloaded file contains server records only; check the original device and retry.'));
       if(identity!==accessVersion.current)throw new Error(t('家庭状态已改变，请重新打开档案后导出。','The family space changed. Reopen this profile before exporting.'));
-      const combined={...data,localRecovery:{scope:'this-browser-only',capturedAt:new Date().toISOString(),status:records===null?'unavailable':records.length?'included':'none',records:records??[]}};
+      const combined={...data,localRecovery};
       let serialized:string;
       try{serialized=serializeChildExport(combined,childId,50_000_000);}
       catch(error){throw new Error(error instanceof Error&&error.message==='EXPORT_TOO_LARGE'

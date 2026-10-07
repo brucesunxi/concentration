@@ -5,7 +5,7 @@ import type { Child, Me } from '../../../packages/contracts/models.ts';
 import type { Locale, TaskId } from '../../../packages/task-engine/index.ts';
 import { TASKS } from '../../../packages/task-engine/index.ts';
 import { taskContent, translate } from '../../../packages/content/copy.ts';
-import { performProfileAction, requireCurrent } from '../../../packages/session-runtime/profile-actions.ts';
+import { localRecoveryForExport, performProfileAction, requireCurrent } from '../../../packages/session-runtime/profile-actions.ts';
 import type { ProfileAction } from '../../../packages/session-runtime/profile-actions.ts';
 import { MobileClient, MobileRequestError } from './client';
 import { Button, CheckBox, Choice, Field, Notice, Page, colors, s } from './ui';
@@ -81,13 +81,15 @@ export function ParentSpace({ child, family, mode, locale, client, onBack, onCha
     const action = intent, value = password; setPassword('');
     if (!action || !value || !acknowledged || (action === 'delete' && confirmation !== child.alias)) return;
     await run(async () => {
+      let localExportUnavailable = false;
       const outcome = await performProfileAction(action, family.id, child.id, {
         authenticate: async () => { const me = await client.login(family.name, value); requireCurrent(current); if (me.role === 'parent' && me.family.id === family.id) await reconcileFamilyJournals(me.family.id, me.children, me.member?.role === 'owner' && me.member.state === 'active'); return me; }, identity: () => client.request<Me>('/me'), current,
         request: (path, method) => client.request(path, method, method === 'POST' ? {} : undefined),
         cleanup: () => removeChildJournals(family.id, child.id),
         share: async data => {
-          const records = await readChildJournals(family.id, child.id); requireCurrent(current);
-          const combined = { ...(data as Record<string, unknown>), localRecovery: { scope: 'this-device-only', capturedAt: new Date().toISOString(), records } };
+          const localRecovery = await localRecoveryForExport('this-device-only', () => readChildJournals(family.id, child.id));
+          localExportUnavailable = localRecovery.status === 'unavailable'; requireCurrent(current);
+          const combined = { ...(data as Record<string, unknown>), localRecovery };
           return shareChildExport(combined, child.id, current, labels.export);
         },
       });
@@ -95,6 +97,7 @@ export function ParentSpace({ child, family, mode, locale, client, onBack, onCha
       setIntent(null);
       if (action === 'export') {
         setNotice(outcome.delivery === 'saved' ? t('文件已保存到你选择的位置。', 'The file was saved to your selected folder.') : outcome.delivery === 'cancelled' ? t('已取消保存，没有创建导出文件。', 'Saving was cancelled. No export file was created.') : t('分享窗口已关闭。是否保存成功，请在所选位置确认。', 'The share sheet has closed. Check your chosen destination to confirm the file was saved.'));
+        if (localExportUnavailable && outcome.delivery !== 'cancelled') setError(t('此设备的恢复日志无法读取或核对。导出文件只包含家庭服务中的记录；请保留原设备，稍后重试。', 'Recovery logs on this device could not be read or verified. The export contains server records only. Keep the original device and retry later.'));
       } else {
         setClosed(true); setPendingCleanup(!outcome.localCleared);
         setNotice(outcome.localCleared ? t('家庭服务已处理，本机恢复日志已清理。已导出的外部副本由你管理。', 'The family service has processed your request and local recovery records are cleared. You manage any previously exported copies.') : t('家庭服务已处理，但本机恢复日志还未清理。请重试本机清理。', 'The family service has processed your request, but local recovery records are not yet cleared. Retry local cleanup.'));

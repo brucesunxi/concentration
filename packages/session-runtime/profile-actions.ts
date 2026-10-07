@@ -15,6 +15,16 @@ export interface ProfileActionPorts {
 export function requireCurrent(current: () => boolean) {
   if (!current()) throw new Error('ACTION_INTERRUPTED');
 }
+export async function localRecoveryForExport<T>(scope: 'this-browser-only' | 'this-device-only', read: () => Promise<T[]>) {
+  const capturedAt = new Date().toISOString();
+  try {
+    const records = await read();
+    return { scope, capturedAt, status: records.length ? 'included' : 'none', records } as const;
+  } catch {
+    // Keep the server export available, but never represent unreadable local data as empty.
+    return { scope, capturedAt, status: 'unavailable', records: [] as T[] } as const;
+  }
+}
 function assertParent(identity: ParentIdentity, familyId: string) {
   if (identity.role !== 'parent' || identity.family.id !== familyId) throw new Error('PARENT_IDENTITY_CHANGED');
   if (identity.member?.role !== 'owner' || identity.member.state !== 'active') throw new Error('PARENT_SCOPE_INCOMPLETE');
