@@ -125,6 +125,8 @@ jobs:
             dist/mobile-native/android-smoke-input/**/android-background-intro.png
             dist/mobile-native/android-smoke-input/**/android-background-feedback.png
             dist/mobile-native/android-smoke-input/**/android-upgrade-offline-offer.png
+            dist/mobile-native/android-smoke-input/**/android-failure-screen.png
+            dist/mobile-native/android-smoke-input/**/android-failure-nodes.json
             dist/mobile-native/android-upgrade-input/**/apk-smoke-recheck.json
           if-no-files-found: warn
           retention-days: 14

@@ -169,7 +169,8 @@ def complete_search(device: Device) -> None:
         if idle_scrolls > 4:
             break
     if not seen:
-        raise AcceptanceError("No rabbit target was found")
+        visible = [n.get("content-desc") or n.get("text") for n in device.screen()]
+        raise AcceptanceError(f"No rabbit target was found; visible: {[value for value in visible if value][:16]}")
     device.tap("All found", scroll=True)
     device.find("Continue", timeout=12)
     if not any(n.get("text") == "This step is complete" for n in device.screen()):
@@ -357,6 +358,17 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         result["goalCount"] = 0
         result["templateCount"] = 4
         return result
+    except Exception:
+        if evidence_dir:
+            evidence_dir.mkdir(parents=True, exist_ok=True)
+            try:
+                (evidence_dir / "android-failure-screen.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+                (evidence_dir / "android-failure-nodes.json").write_text(
+                    json.dumps(device.screen(), indent=2), encoding="utf-8"
+                )
+            except (AcceptanceError, subprocess.TimeoutExpired, OSError):
+                pass
+        raise
     finally:
         if created:
             try:
