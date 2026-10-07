@@ -26,7 +26,13 @@
 
 [远程模拟器任务 37579840887](https://github.com/brucesunxi/concentration/actions/runs/37579840887)使用相同 SHA-256 的 APK 和临时本地 API。先等本机恢复资料保存完成，再断开 API 端口转发、强制关闭并重新启动 App。界面只提供已准备练习的恢复入口，没有显示虚构家庭名或孩子昵称；恢复后离线完成 2 道示范题和 1 道正式题，提前结束时显示“本机已保存、等待同步”。恢复连接并主动重试后，界面显示服务端确认，家长报告恰有 1 个独立正式步骤。最终虚构家庭已删除，专用模拟器 App 数据已清空。[离线报告](../../../dist/mobile-native/v0.46/emulator-offline-37579840887/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/family-flow-report.json)、[恢复入口](../../../dist/mobile-native/v0.46/emulator-offline-37579840887/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/android-offline-offer.png)、[待同步状态](../../../dist/mobile-native/v0.46/emulator-offline-37579840887/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/android-pending-sync.png)和[已确认状态](../../../dist/mobile-native/v0.46/emulator-offline-37579840887/android-emulator-smoke-37573726397/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/android-practice-summary.png)保存在本机 Git 忽略目录。
 
-这证明当前包在一台 Android 35 / x86_64 虚拟设备上可从已准备会话离线重启并补传；没有覆盖不同网络、真机安全存储、旧包升级、后台中断或撤回竞态。恢复时家长身份没有自动重新登录，因此已同步摘要只提供返回家庭空间，不能直接进入需重新确认身份的生活目标入口。
+这证明当前包在一台 Android 35 / x86_64 虚拟设备上可从已准备会话离线重启并补传；没有覆盖不同网络、真机安全存储、旧包升级或撤回竞态。恢复时家长身份没有自动重新登录，因此已同步摘要只提供返回家庭空间，不能直接进入需重新确认身份的生活目标入口。
+
+## 练习中途切到后台并返回
+
+[远程模拟器任务 37581571389](https://github.com/brucesunxi/concentration/actions/runs/37581571389)在相同 APK、Android 35 / x86_64 虚拟设备和临时本地 API 上，先完成两道规则示范，再于正式找目标步骤呈现后按 Home 键。重新打开 App 时显示“休息一下”和“我准备好了”，孩子可以选择继续或结束；选择继续后重新呈现目标。最终摘要显示 1 个独立正式步骤、0 个使用帮助步骤；服务端家长报告有 1 个独立正式步骤，并单独保留 1 个原因是 `background` 的正式步骤排除记录，后台中断未被计为一次正式答错。生活建议仅被预选，目标数保持 0；虚构家庭及专用模拟器 App 数据均已清理。
+
+[运行报告](../../../dist/mobile-native/v0.46/emulator-background-37581571389/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/family-flow-report.json)、[后台返回截图](../../../dist/mobile-native/v0.46/emulator-background-37581571389/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/android-background-pause.png)与[完成结果截图](../../../dist/mobile-native/v0.46/emulator-background-37581571389/focus-island-android-aab-b8230d3958e921564c8a0a675e7edde4113a0381/android-practice-summary.png)保存在本机 Git 忽略目录。此验收覆盖一台虚拟设备的 Home 键后台切换；来电/音频打断、系统回收进程、长时间后台、低存储、不同设备和旧包升级仍需分别验收。
 
 ## 上一轮 AAB 记录
 
