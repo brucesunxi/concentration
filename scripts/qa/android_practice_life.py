@@ -235,7 +235,9 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None, of
                 (evidence_dir / "android-pending-sync.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
             device.run("reverse", "tcp:4181", "tcp:4181")
             device.tap("Retry sync")
-        device.find("If you like, explore an everyday goal", scroll=True, timeout=25)
+            device.wait_text("Your records are confirmed by the family service.", timeout=30)
+        else:
+            device.find("If you like, explore an everyday goal", scroll=True, timeout=25)
         texts = [n.get("text", "") for n in device.screen()]
         if not any("1 independent step and 0 assisted steps." in value for value in texts):
             raise AcceptanceError("Summary did not show one independent formal step")
@@ -247,14 +249,15 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None, of
         if evidence_dir:
             evidence_dir.mkdir(parents=True, exist_ok=True)
             (evidence_dir / "android-practice-summary.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
-        device.tap("If you like, explore an everyday goal")
-        choice = device.find("Find two little things\nChoose two familiar things and name them with someone at home.", scroll=True, timeout=25)
-        if choice.get("checked") != "true":
-            raise AcceptanceError("Age-matched everyday activity was not preselected")
-        result["selectedTemplate"] = "Find two little things"
-        if evidence_dir:
-            device.swipe()
-            (evidence_dir / "android-life-preselected.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+        if not offline_recovery:
+            device.tap("If you like, explore an everyday goal")
+            choice = device.find("Find two little things\nChoose two familiar things and name them with someone at home.", scroll=True, timeout=25)
+            if choice.get("checked") != "true":
+                raise AcceptanceError("Age-matched everyday activity was not preselected")
+            result["selectedTemplate"] = "Find two little things"
+            if evidence_dir:
+                device.swipe()
+                (evidence_dir / "android-life-preselected.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
         status, auth = api(base, "/auth/login", method="POST", body={"name": family, "password": password, "memberLogin": "owner"})
         if status != 200 or not re.fullmatch(r"[a-f0-9]{64}", auth.get("accessToken", "")):
             raise AcceptanceError("Could not read the synthetic family's goal count")
