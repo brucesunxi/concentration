@@ -35,6 +35,8 @@
 
 包含移动工作区的 `npm audit --omit=dev` 仍报 24 项（16 高、8 中），主要沿 Expo、Metro、React Native 构建链传播，包括 `braces`、`node-forge` 和 `uuid`。审计会计入工作区打包工具，不能直接解释为 24 个已暴露在已安装 App 中的漏洞；同样也不能据此判定移动端无风险。自动修复建议将 Expo 降到 44、React Native 降到 0.72，与当前 Expo 57 / React Native 0.86 原生工程不兼容，不能直接执行。发布前须逐项核对实际运行路径、升级方案与 Android/iOS 重新构建回归；iQOO 真机全流程已完成，但不足以覆盖目标设备矩阵。
 
+复核当前锁文件和 `npm audit --omit=dev --json` 后，24 条仍为 16 高、8 中，且均可追溯到少数底层包：`braces 3.0.3` 经 `micromatch → Metro 文件扫描` 进入依赖树，`node-forge 1.4.0` 经 Expo CLI/代码签名证书工具进入，`uuid 7.0.3` 经 `xcode` 进入原生工程生成工具。前两项的[braces 公告](https://github.com/advisories/GHSA-vfj7-8cjw-p6xm)与[node-forge 公告](https://github.com/advisories/GHSA-86w9-cpqp-85rv)目前均注明**没有修复版本**；[UUID 公告](https://github.com/advisories/GHSA-w5hq-g745-h8pq)针对特定缓冲区写入 API，而当前 `xcode` 使用 `uuid.v4()`。这是锁文件路径与已知调用面的核对，尚未证明安装包和所有构建输入不存在可利用路径。保留发布前跟踪：监视上游修复、限制构建输入与权限、更新后重跑原生编译及设备验收；不得通过不兼容降级或隐去告警把安全项标成通过。
+
 ## 规则语音专项复测
 
 后续为完整练习验收增加了固定语音首次播放与重播检查。`0.2.14` 在 iQOO 的首次播放检查失败；`0.2.15`（版本码 16）去掉首次播放前的 seek 后，在同一台 iQOO 仍未观察到播放状态或系统播放事件。两次失败均使用虚构家庭、本机 PGlite，失败后删除虚构家庭并清空测试应用数据。失败不能被先前的练习主流程通过或云端模拟器通过覆盖。
