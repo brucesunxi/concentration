@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
-"""Run the practice-to-life acceptance flow on the disposable FocusIslandQA AVD.
+"""Run the practice-to-life acceptance flow on an explicitly selected QA device.
 
-This script intentionally refuses physical devices, other AVDs, and non-local APIs.
-It creates fictional data, checks that browsing an activity does not save a goal,
-then deletes the family and clears the dedicated simulator app data.
+The default target is the disposable FocusIslandQA AVD. A physical device requires
+an explicit fresh-test-install acknowledgement. Both paths use a local API and
+fictional data, delete the test family, and clear only this test app's data.
 """
 
 import argparse
@@ -45,24 +45,49 @@ class Device:
         return result.stdout
 
     def run_bytes(self, *args: str, timeout: int = 20) -> bytes:
+        screenshot = args == ("exec-out", "screencap", "-p")
+        if screenshot and not self.app_foreground():
+            raise AcceptanceError("Refusing to capture a screenshot outside the test app")
         result = subprocess.run(
             [self.adb, "-s", self.serial, *args], capture_output=True,
             timeout=timeout, check=False,
         )
         if result.returncode:
             raise AcceptanceError(f"adb {' '.join(args[:2])} failed during screenshot capture")
+        if screenshot and not self.app_foreground():
+            raise AcceptanceError("Test app left foreground during screenshot capture")
         return result.stdout
+
+    def app_foreground(self) -> bool:
+        focus = self.run("shell", "dumpsys", "window")
+        return bool(re.search(r"mCurrentFocus=.*dev\.focusisland\.family/.+MainActivity", focus))
+
+    def open_app(self) -> None:
+        # Some physical devices return from installation or data reset before
+        # the launcher has handed the foreground window back to the app.
+        for _ in range(3):
+            self.run("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
+            for _ in range(8):
+                if self.app_foreground():
+                    return
+                time.sleep(0.4)
+        raise AcceptanceError("Test app did not remain in the foreground after launch")
 
     def screen(self) -> list[dict[str, str]]:
         # Android can briefly return an empty hierarchy while an Activity redraws.
         for _ in range(5):
             try:
+                if not self.app_foreground():
+                    time.sleep(0.4)
+                    continue
                 self.run("shell", "uiautomator", "dump", "/sdcard/focus-acceptance-window.xml")
                 xml = self.run("exec-out", "cat", "/sdcard/focus-acceptance-window.xml")
-                return [node.attrib for node in ET.fromstring(xml).iter("node")]
+                nodes = [node.attrib for node in ET.fromstring(xml).iter("node")]
+                if self.app_foreground() and any(node.get("package") == PACKAGE for node in nodes):
+                    return nodes
             except (AcceptanceError, ET.ParseError):
                 time.sleep(0.4)
-        raise AcceptanceError("Android accessibility hierarchy stayed unreadable after redraw")
+        raise AcceptanceError("Test app left foreground or its accessibility hierarchy stayed unreadable")
 
     def swipe(self) -> None:
         self.run("shell", "input", "swipe", "540", "1530", "540", "500", "350")
@@ -131,18 +156,23 @@ def api(base: str, path: str, *, method: str = "GET", body=None, token: str | No
         return error.code, json.load(error)
 
 
-def validate_target(device: Device, base: str, apk: Path) -> None:
+def validate_target(device: Device, base: str, apk: Path, physical: bool = False) -> None:
     parsed = urllib.parse.urlsplit(base)
     if parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or parsed.port != 4181 or parsed.path:
         raise AcceptanceError("Only the local development API at http://127.0.0.1:4181 is allowed")
     if not apk.is_file():
         raise AcceptanceError("Release APK does not exist")
-    if not device.serial.startswith("emulator-"):
-        raise AcceptanceError("Only an Android emulator is allowed")
-    if device.run("emu", "avd", "name").strip().splitlines()[0] != AVD:
-        raise AcceptanceError(f"Only the dedicated {AVD} AVD is allowed")
-    if device.run("shell", "getprop", "ro.build.characteristics").strip() not in {"emulator", "default,emulator"}:
-        raise AcceptanceError("Device does not identify as an emulator")
+    characteristics = device.run("shell", "getprop", "ro.build.characteristics").strip()
+    if physical:
+        if device.serial.startswith("emulator-") or "emulator" in characteristics:
+            raise AcceptanceError("Physical test mode requires a real Android device")
+    else:
+        if not device.serial.startswith("emulator-"):
+            raise AcceptanceError("Only an Android emulator is allowed by default")
+        if device.run("emu", "avd", "name").strip().splitlines()[0] != AVD:
+            raise AcceptanceError(f"Only the dedicated {AVD} AVD is allowed")
+        if characteristics not in {"emulator", "default,emulator"}:
+            raise AcceptanceError("Device does not identify as an emulator")
     status, ready = api(base, "/ready")
     if status != 200 or ready.get("status") != "ok" or ready.get("mode") != "local-development":
         raise AcceptanceError("The local development family service is not ready")
@@ -180,17 +210,20 @@ def complete_search(device: Device) -> None:
 def background_and_return(device: Device) -> None:
     device.run("shell", "input", "keyevent", "3")  # HOME
     time.sleep(1)
-    device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+    device.open_app()
 
 
 def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
              offline_recovery: bool = False, background_resume: bool = False,
-             upgrade_from: Path | None = None) -> dict:
+             upgrade_from: Path | None = None, physical: bool = False) -> dict:
     suffix = secrets.token_hex(5)
     family, password = f"SyntheticAndroid{suffix}", f"SyntheticAndroidAcceptance{suffix}2026"
     created = False
     token: str | None = None
-    result = {"platform": "Android emulator", "avd": AVD, "mode": "local-development",
+    result = {"platform": "Android physical" if physical else "Android emulator",
+              "deviceModel": device.run("shell", "getprop", "ro.product.model").strip(),
+              "androidVersion": device.run("shell", "getprop", "ro.build.version.release").strip(),
+              "avd": None if physical else AVD, "mode": "local-development",
               "apkSha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "formalIndependentSteps": 0,
               "parentReportFormalSteps": None,
               "offlineForcedRestart": False, "pendingBeforeSync": False, "syncedAfterReconnect": False,
@@ -208,7 +241,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         device.run("reverse", "tcp:4181", "tcp:4181")
         device.run("install", "-r", str(upgrade_from or apk), timeout=90)
         device.run("shell", "pm", "clear", PACKAGE)
-        device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+        device.open_app()
         device.tap("English", timeout=25)
         device.tap("Create a new test family", scroll=True)
         device.type("Family name", family)
@@ -240,7 +273,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             device.run("shell", "am", "force-stop", PACKAGE)
             if upgrade_from:
                 device.run("install", "-r", str(apk), timeout=90)
-            device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+            device.open_app()
             device.find("Restore this practice", scroll=True, timeout=35)
             visible = device.screen()
             if any(family in str(n) or "SyntheticWren" in str(n) for n in visible):
@@ -371,7 +404,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
                 (evidence_dir / "android-sign-out-login.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
             device.run("reverse", "--remove", "tcp:4181")
             device.run("shell", "am", "force-stop", PACKAGE)
-            device.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity")
+            device.open_app()
             device.wait_text("Welcome to Focus Island", timeout=30)
             if any(node.get("content-desc") == "Restore this practice" for node in device.screen()):
                 raise AcceptanceError("Signed-out offline practice reappeared after restart")
@@ -380,7 +413,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
                 (evidence_dir / "android-sign-out-restart.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
         return result
     except Exception:
-        if evidence_dir:
+        if evidence_dir and device.app_foreground():
             evidence_dir.mkdir(parents=True, exist_ok=True)
             try:
                 (evidence_dir / "android-failure-screen.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
@@ -416,22 +449,26 @@ def main() -> int:
     parser.add_argument("--serial", default="emulator-5554")
     parser.add_argument("--api-base", default="http://127.0.0.1:4181")
     parser.add_argument("--evidence-dir", type=Path)
-    parser.add_argument("--reset-synthetic-app", action="store_true", help="Required acknowledgement: clears this app on FocusIslandQA")
+    parser.add_argument("--reset-synthetic-app", action="store_true", help="Required acknowledgement: clears only this test app's data")
+    parser.add_argument("--physical-fresh-test-install", action="store_true", help="Use the selected physical device only after confirming this test app was absent before this QA installation")
     parser.add_argument("--offline-recovery", action="store_true", help="Remove the API port, force-stop, recover offline, then sync")
     parser.add_argument("--background-resume", action="store_true", help="Background an active formal trial, then resume it")
     parser.add_argument("--upgrade-from", type=Path, help="Older APK to install first, then replace offline with --apk")
     args = parser.parse_args()
     if not args.reset_synthetic_app:
-        parser.error("--reset-synthetic-app is required because the dedicated emulator app data will be cleared")
+        parser.error("--reset-synthetic-app is required because the test app data will be cleared")
+    if args.physical_fresh_test_install and args.serial.startswith("emulator-"):
+        parser.error("--physical-fresh-test-install requires a physical device serial")
     if args.upgrade_from and not args.offline_recovery:
         parser.error("--upgrade-from requires --offline-recovery")
     if args.upgrade_from and not args.upgrade_from.is_file():
         parser.error("--upgrade-from APK does not exist")
     device = Device(args.adb, args.serial)
     try:
-        validate_target(device, args.api_base, args.apk)
+        validate_target(device, args.api_base, args.apk, args.physical_fresh_test_install)
         result = run_flow(device, args.api_base, args.apk, args.evidence_dir,
-                          args.offline_recovery, args.background_resume, args.upgrade_from)
+                          args.offline_recovery, args.background_resume, args.upgrade_from,
+                          args.physical_fresh_test_install)
         print(json.dumps(result, indent=2))
         if not result["familyDeleted"] or not result["appDataCleared"]:
             raise AcceptanceError("Synthetic data cleanup did not finish")
