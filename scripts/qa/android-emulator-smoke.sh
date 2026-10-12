@@ -117,6 +117,10 @@ if [[ -n "${UPGRADE_FROM_PACKAGE_DIR:-}" && ( "${RUN_FAMILY_FLOW:-false}" != tru
   echo 'Upgrade requires the synthetic family flow and offline recovery' >&2
   exit 1
 fi
+if [[ "${SKIP_UPGRADE_AUDIO:-false}" == true && ( -z "${UPGRADE_FROM_PACKAGE_DIR:-}" || "${RUN_AUDIO_BACKGROUND:-false}" == true || "${RUN_AUDIO_LOCKSCREEN:-false}" == true ) ]]; then
+  echo 'Skipping narration requires an upgrade and cannot combine with audio interruption checks' >&2
+  exit 1
+fi
 if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
   # Reproduce the physical iQOO's vibrate-mode condition during narration QA.
   adb shell cmd audio set-ringer-mode VIBRATE
@@ -137,6 +141,7 @@ if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
   if [[ "${RUN_AUDIO_BACKGROUND:-false}" == true ]]; then acceptance_args+=(--audio-background); fi
   if [[ "${RUN_AUDIO_LOCKSCREEN:-false}" == true ]]; then acceptance_args+=(--audio-lockscreen); fi
   if [[ -n "${UPGRADE_FROM_PACKAGE_DIR:-}" ]]; then acceptance_args+=(--upgrade-from "$startup_apk"); fi
+  if [[ "${SKIP_UPGRADE_AUDIO:-false}" == true ]]; then acceptance_args+=(--skip-audio-check); fi
   python3 scripts/qa/android_practice_life.py "${acceptance_args[@]}" > "$package_dir/family-flow-report.json"
 fi
 

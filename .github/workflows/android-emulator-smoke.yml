@@ -36,6 +36,11 @@ on:
         description: Optional older Android test packages run ID; requires full_flow and offline_recovery
         required: false
         type: string
+      skip_upgrade_audio:
+        description: Skip known older-build narration only during an upgrade flow
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   actions: read
@@ -116,6 +121,7 @@ jobs:
           RUN_BACKGROUND_RESUME: ${{ inputs.background_resume }}
           RUN_AUDIO_BACKGROUND: ${{ inputs.audio_background }}
           RUN_AUDIO_LOCKSCREEN: ${{ inputs.audio_lockscreen }}
+          SKIP_UPGRADE_AUDIO: ${{ inputs.skip_upgrade_audio }}
           UPGRADE_FROM_PACKAGE_DIR: ${{ steps.previous_package.outputs.package_dir }}
         run: bash scripts/qa/android-emulator-smoke.sh "$PACKAGE_DIR"
       - uses: actions/upload-artifact@v7
