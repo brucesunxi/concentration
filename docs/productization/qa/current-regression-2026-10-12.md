@@ -10,6 +10,12 @@
 | `npm run test:browser` | Web 构建、预算、离线壳和 6 组浏览器流程通过 | 家庭练习、读屏独立条件、离线阻断、跨标签清理、密码变更与更新恢复。测试用项目锁定的 Playwright 1.47.0 和已有 Chromium；浏览器脚本不是每个目标浏览器与设备的兼容性矩阵。构建 Web 入口预算约 1.21 MB，低于 1.5 MB 门槛；离线壳约 1.35 MB。 |
 | `npm run content:audit`、`npm run voice:audit`、`npm run visuals:check` | 工程检查通过 | 32 个内容包签名与素材摘要有效；16 个源码语音文件的工程质检通过，8 个视觉输出摘要、尺寸和体积符合配置。未替代真人听审、图片辨识或适龄判断。 |
 
+## 部署与数据库只读复核
+
+Vercel 生产别名 `concentration-two.vercel.app` 当前指向状态为 `Ready` 的部署；该只读部署摘要没有提供可核对的 Git SHA。Production 环境中列有加密的 `DATABASE_URL` 和 `FOCUS_SESSION_SIGNING_JWK`，但当前 CLI 会话的 `vercel env run -e production` 没有注入这两个值。因此无法从当前权限确认线上数据库实际主机，也没有以线上变量发起数据库连接；变量列表和部署就绪均不能代替运行时配置验收。
+
+本机保存的受限 `focus_family_runtime` 连接配置先在内存中核对为唯一获准的 Neon endpoint 与 `neondb`，再运行 `npm run db:audit:runtime`。只读事务的审计通过：TLS 对端验证、schema 32、运行角色权限与家庭隔离均为真，事务回滚。该结果仅证明这份本机受限连接配置对应的库状态，不证明 Vercel 加密变量指向相同的库，也不覆盖备份恢复或容量演练。没有读取或输出数据库密码。
+
 ## 仍阻止生产开放的事实
 
 - 内容盘点 `npm run content:readiness` 显示 32/32 组合有固定语音，但只有 24/32 朗读完整规则；8 个停止反应组合只有策略录音，去重后需制作并审阅 4 条完整规则。32/32 内容包仍待真人专业审核，源码层面可正式发布组合为 0。现有[发布验证](../CONTENT-STUDIO.md)和相应测试会拒绝拿策略录音冒充规则录音。
