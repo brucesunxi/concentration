@@ -48,10 +48,18 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
   const copy = content?.pack.copy;
   const stopAudio = () => { try { audio.pause(); } catch { /* Player may already be disposed on unmount. */ } };
   const audioUnavailable = t('声音暂时不能播放。你仍可看文字并继续练习。', 'Audio could not play. You can read the instruction and continue.');
-  async function playNarration() {
-    if (!audioReady || !live.current) return;
+  function playNarration() {
+    if (!audioReady || !audioStatus.isLoaded || !live.current) return;
     setAudioError('');
-    try { await audio.seekTo(0); audio.play(); }
+    try {
+      // Android may leave a short clip unbuffered after awaiting a seek.
+      // Start playback immediately on the first tap; on replay, set the
+      // play request while the player seeks back to the beginning.
+      if (audioStatus.currentTime > 0 || audioStatus.didJustFinish) {
+        void audio.seekTo(0).catch(() => { if (live.current) setAudioError(audioUnavailable); });
+      }
+      audio.play();
+    }
     catch { if (live.current) setAudioError(audioUnavailable); }
   }
   function expireAuthorization(code = 'SESSION_AUTHORIZATION_EXPIRED') {
@@ -314,7 +322,7 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
     {phase === 'check-in' && windowCopy && <View style={s.card}><Text accessibilityRole="header" style={s.heading}>{windowCopy.title}</Text><Text style={s.body}>{windowCopy.body}</Text><Button title={windowCopy.stop} disabled={busy || locked} onPress={() => void end('child_stopped')} /><Button quiet title={windowCopy.proceed} disabled={busy || locked} onPress={continueAfterCheckIn} /></View>}
     {phase === 'loading' && <ActivityIndicator color={colors.accent} />}
     {phase === 'settling' && <View style={[s.center, { minHeight: 220 }]}><Text accessibilityLiveRegion="polite" style={s.muted}>{t('这一步结束了，稍等一下。', 'This step is finished. One moment.')}</Text></View>}
-    {phase === 'intro' && session.continuation_grant && <Text style={s.muted}>{offlineReady ? t('这份练习的恢复资料已保存在此设备，有效期内可恢复。家长停止采集的通知，要联网后才能收到。', 'Recovery information for this practice is saved on this device and is valid within its continuation window. A parent’s request to stop collection is received when you reconnect.') : t('本次练习可以暂时断网继续；重新打开仍需联网确认。', 'This practice can briefly continue without a connection; reopening needs an online check.')}</Text>}{phase === 'intro' && copy && <View style={s.card}><Text style={s.heading}>{copy.skill}</Text><Text style={s.body}>{copy.rule}</Text>{content && <RuleExamples task={plan.task} locale={plan.locale} teen={teen} assets={content.assets} />}<View style={p.strategy}><Text style={s.body}>{copy.strategy}</Text></View>{content?.pack.audio && audioReady && <Button quiet title={audioStatus.playing ? t('停止播放', 'Stop audio') : content.pack.audio?.copyKey === 'strategy' ? t('听一听小策略', 'Listen to a tip') : t('听一听规则', 'Listen to the rule')} onPress={() => { if (audioStatus.playing) stopAudio(); else void playNarration(); }} />}{content?.pack.audio && <Notice>{audioError || (audioStatus.error ? audioUnavailable : '')}</Notice>}<Notice>{status}</Notice><Button title={t('我想试一试', 'I want to try')} disabled={busy} onPress={next} /><Button quiet title={t('今天先不做', 'Not today')} disabled={busy} onPress={() => void end('child_stopped')} /></View>}
+    {phase === 'intro' && session.continuation_grant && <Text style={s.muted}>{offlineReady ? t('这份练习的恢复资料已保存在此设备，有效期内可恢复。家长停止采集的通知，要联网后才能收到。', 'Recovery information for this practice is saved on this device and is valid within its continuation window. A parent’s request to stop collection is received when you reconnect.') : t('本次练习可以暂时断网继续；重新打开仍需联网确认。', 'This practice can briefly continue without a connection; reopening needs an online check.')}</Text>}{phase === 'intro' && copy && <View style={s.card}><Text style={s.heading}>{copy.skill}</Text><Text style={s.body}>{copy.rule}</Text>{content && <RuleExamples task={plan.task} locale={plan.locale} teen={teen} assets={content.assets} />}<View style={p.strategy}><Text style={s.body}>{copy.strategy}</Text></View>{content?.pack.audio && audioReady && <Button quiet title={audioStatus.playing ? t('停止播放', 'Stop audio') : content.pack.audio?.copyKey === 'strategy' ? t('听一听小策略', 'Listen to a tip') : t('听一听规则', 'Listen to the rule')} disabled={!audioStatus.isLoaded && !audioStatus.playing} onPress={() => { if (audioStatus.playing) stopAudio(); else playNarration(); }} />}{content?.pack.audio && <Notice>{audioError || (audioStatus.error ? audioUnavailable : '')}</Notice>}<Notice>{status}</Notice><Button title={t('我想试一试', 'I want to try')} disabled={busy} onPress={next} /><Button quiet title={t('今天先不做', 'Not today')} disabled={busy} onPress={() => void end('child_stopped')} /></View>}
     {(phase === 'arming' || phase === 'active') && trial && content && <View style={s.card}><Text style={s.label}>{trial.practice ? t('先熟悉规则', 'Try the rule first') : t('正式练习', 'Your practice')}</Text><Text style={s.body}>{copy?.rule}</Text><View style={{ opacity: visible ? 1 : 0 }} accessibilityElementsHidden={!visible} importantForAccessibility={visible ? 'auto' : 'no-hide-descendants'}>
       {trial.task === 'search' && <View style={p.grid}>{trial.items.map((item, index) => <Pressable key={index} accessibilityRole="button" accessibilityLabel={`${itemLabel(item, plan.locale, teen)} ${index + 1}`} accessibilityState={{ selected: state?.active?.selected.includes(index) ?? false, disabled: phase !== 'active' }} disabled={phase !== 'active'} onPress={() => choose(index)} style={[p.tile, state?.active?.selected.includes(index) && p.selected]}><Stimulus item={item} locale={plan.locale} teen={teen} assets={content.assets} size={58} onError={imageFailed} /></Pressable>)}</View>}
       {['stop', 'sustain'].includes(trial.task) && <View style={s.center}><Stimulus item={trial.items[0]} locale={plan.locale} teen={teen} assets={content.assets} size={144} onError={imageFailed} /></View>}

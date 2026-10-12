@@ -141,6 +141,19 @@ class Device:
             time.sleep(0.3)
         raise AcceptanceError(f"Could not find any expected text: {phrases!r}")
 
+    def app_audio_started_since(self, before: str, after: str) -> bool:
+        package = self.run("shell", "dumpsys", "package", PACKAGE)
+        uid = re.search(r"\buserId=(\d+)\b", package)
+        if not uid:
+            raise AcceptanceError("Could not identify the test app audio UID")
+        players = set(re.findall(rf"new player piid:(\d+) uid/pid:{uid.group(1)}/", after))
+        prior = set(before.splitlines())
+        return any(
+            (match := re.search(r"player piid:(\d+) state:started", line))
+            and match.group(1) in players and line not in prior
+            for line in after.splitlines()
+        )
+
     def type(self, label: str, value: str) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
             raise AcceptanceError("Test input must be simple synthetic ASCII")
@@ -298,8 +311,26 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         device.tap("I want to start", scroll=True)
         stage = "verify fixed audio playback"
         listen = device.find_any(("Listen to the rule", "Listen to a tip"), scroll=True, timeout=30)
+        audio_before = device.run("shell", "dumpsys", "audio")
         device.tap_node(listen)
-        device.find("Stop audio", timeout=8)
+        started = False
+        deadline = time.monotonic() + 7
+        while time.monotonic() < deadline:
+            audio_after = device.run("shell", "dumpsys", "audio")
+            if device.app_audio_started_since(audio_before, audio_after):
+                started = True
+                break
+            time.sleep(0.25)
+        if not started:
+            # The native system log is not available on every emulator image.
+            # Its visible playback control is a secondary check.
+            try:
+                device.find("Stop audio", timeout=2)
+                started = True
+            except AcceptanceError:
+                pass
+        if not started:
+            raise AcceptanceError("No app audio playback event or playing control after tapping narration")
         if any("Audio could not play" in n.get("text", "") for n in device.screen()):
             raise AcceptanceError("Fixed audio reported a playback error")
         result["fixedAudioPlaybackStarted"] = True
