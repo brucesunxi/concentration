@@ -346,8 +346,12 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
     try:
         device.run("reverse", "tcp:4181", "tcp:4181")
         install_args = ("install", "--no-streaming", "-r") if physical else ("install", "-r")
+        # A physical phone may require a normal on-device source confirmation.
+        # Keep the wait bounded while allowing the operator time to inspect it.
+        install_timeout = 180 if physical else 90
         if not preinstalled_exact:
-            device.run(*install_args, str(upgrade_from or apk), timeout=90)
+            print("Installing initial QA APK; waiting for any on-device confirmation", file=sys.stderr, flush=True)
+            device.run(*install_args, str(upgrade_from or apk), timeout=install_timeout)
         device.run("shell", "pm", "clear", PACKAGE)
         device.open_app()
         stage = "select English"
@@ -469,7 +473,8 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             device.run("reverse", "--remove", "tcp:4181")
             device.run("shell", "am", "force-stop", PACKAGE)
             if upgrade_from:
-                device.run(*install_args, str(apk), timeout=90)
+                print("Upgrading the offline QA installation; waiting for any on-device confirmation", file=sys.stderr, flush=True)
+                device.run(*install_args, str(apk), timeout=install_timeout)
             device.open_app()
             device.find("Restore this practice", scroll=True, timeout=35)
             visible = device.screen()
@@ -667,14 +672,14 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--apk", type=Path, required=True, help="Release APK to install on the dedicated simulator")
+    parser.add_argument("--apk", type=Path, required=True, help="Release APK to install on the selected QA device")
     parser.add_argument("--adb", default="adb")
     parser.add_argument("--serial", default="emulator-5554")
     parser.add_argument("--api-base", default="http://127.0.0.1:4181")
     parser.add_argument("--evidence-dir", type=Path)
     parser.add_argument("--reset-synthetic-app", action="store_true", help="Required acknowledgement: clears only this test app's data")
     parser.add_argument("--physical-fresh-test-install", action="store_true", help="Use the selected physical device only after confirming this test app was absent before this QA installation")
-    parser.add_argument("--preinstalled-exact-apk", action="store_true", help="Use a physical test APK already installed on this device after matching its SHA-256")
+    parser.add_argument("--preinstalled-exact-apk", action="store_true", help="Use the physical initial APK already installed after matching its SHA-256 (the older APK for an upgrade)")
     parser.add_argument("--offline-recovery", action="store_true", help="Remove the API port, force-stop, recover offline, then sync")
     parser.add_argument("--background-resume", action="store_true", help="Background an active formal trial, then resume it")
     parser.add_argument("--audio-background", action="store_true", help="Background the app during narration, then verify stop and restart")
@@ -687,8 +692,8 @@ def main() -> int:
         parser.error("--reset-synthetic-app is required because the test app data will be cleared")
     if args.physical_fresh_test_install and args.serial.startswith("emulator-"):
         parser.error("--physical-fresh-test-install requires a physical device serial")
-    if args.preinstalled_exact_apk and (not args.physical_fresh_test_install or args.upgrade_from):
-        parser.error("--preinstalled-exact-apk requires a physical fresh test install and no upgrade")
+    if args.preinstalled_exact_apk and not args.physical_fresh_test_install:
+        parser.error("--preinstalled-exact-apk requires a physical fresh test install")
     if args.upgrade_from and not args.offline_recovery:
         parser.error("--upgrade-from requires --offline-recovery")
     if args.skip_audio_check and (not args.upgrade_from or args.audio_background or args.audio_lockscreen):
@@ -697,7 +702,7 @@ def main() -> int:
         parser.error("--upgrade-from APK does not exist")
     device = Device(args.adb, args.serial)
     try:
-        validate_target(device, args.api_base, args.apk, args.physical_fresh_test_install,
+        validate_target(device, args.api_base, args.upgrade_from or args.apk, args.physical_fresh_test_install,
                         args.preinstalled_exact_apk)
         if args.expect_ringer_mode and device.ringer_mode() != args.expect_ringer_mode:
             raise AcceptanceError(f"Expected {args.expect_ringer_mode} ringer mode before narration QA")
