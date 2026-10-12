@@ -114,6 +114,7 @@ jobs:
             dist/mobile-native/android-smoke-input/**/apk-smoke-recheck.json
             dist/mobile-native/android-smoke-input/**/emulator-smoke-report.json
             dist/mobile-native/android-smoke-input/**/emulator-first-launch.png
+            dist/mobile-native/android-smoke-input/**/emulator-failure-screen.png
             dist/mobile-native/android-smoke-input/**/emulator-ui.xml
             dist/mobile-native/android-smoke-input/**/emulator.log
             dist/mobile-native/android-smoke-input/**/family-flow-report.json

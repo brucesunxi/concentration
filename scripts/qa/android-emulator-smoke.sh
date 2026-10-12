@@ -39,19 +39,51 @@ for _ in {1..60}; do
 done
 test "$booted" = true
 adb shell input keyevent 82
+# Android reports boot_completed before the launcher has always settled on
+# hosted runners. Give the home process time before installing the test APK.
+sleep 12
 adb install -r "$startup_apk"
 adb shell dumpsys package dev.focusisland.family | grep -F "versionName=$expected_app_version"
 
 check_launch() {
-  adb shell am start -W -n dev.focusisland.family/.MainActivity
+  adb shell am start -n dev.focusisland.family/.MainActivity
   local seen=false
-  for _ in {1..18}; do
+  local launcher_waits=0
+  local wait_coordinates wait_x wait_y
+  for _ in {1..24}; do
     adb shell uiautomator dump /sdcard/focus-window.xml >/dev/null 2>&1 || true
     adb exec-out cat /sdcard/focus-window.xml > "$package_dir/emulator-ui.xml" 2>/dev/null || true
     if grep -Eq 'FOCUS ISLAND|Welcome to Focus Island|欢迎来到专注岛' "$package_dir/emulator-ui.xml"; then seen=true; break; fi
+    if grep -Fq "Pixel Launcher isn't responding" "$package_dir/emulator-ui.xml" && (( launcher_waits < 2 )); then
+      wait_coordinates="$(python3 - "$package_dir/emulator-ui.xml" <<'PY'
+import re
+import sys
+import xml.etree.ElementTree as ET
+
+for node in ET.parse(sys.argv[1]).getroot().iter('node'):
+    if node.get('text') == 'Wait':
+        bounds = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.get('bounds', ''))
+        if bounds:
+            left, top, right, bottom = map(int, bounds.groups())
+            print((left + right) // 2, (top + bottom) // 2)
+            break
+PY
+)"
+      if [[ "$wait_coordinates" =~ ^[0-9]+\ [0-9]+$ ]]; then
+        read -r wait_x wait_y <<< "$wait_coordinates"
+        adb shell input tap "$wait_x" "$wait_y"
+        launcher_waits=$((launcher_waits + 1))
+        sleep 8
+        adb shell am start -n dev.focusisland.family/.MainActivity
+      fi
+    fi
     sleep 5
   done
-  test "$seen" = true
+  if [[ "$seen" != true ]]; then
+    adb exec-out screencap -p > "$package_dir/emulator-failure-screen.png" || true
+    echo 'Test app did not reach its welcome screen after launch' >&2
+    return 1
+  fi
   adb shell pidof dev.focusisland.family >/dev/null
   if adb logcat -d -b crash | grep -F 'Process: dev.focusisland.family'; then
     echo 'Focus Island crashed during startup' >&2
