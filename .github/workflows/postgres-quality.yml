@@ -1,0 +1,39 @@
+name: PostgreSQL runtime quality
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths: ['apps/api/**', 'packages/**', 'tests/postgres/**', 'scripts/qa/run-local-postgres.mjs', '.github/workflows/postgres-quality.yml', 'package*.json', 'tsconfig.json']
+  pull_request:
+    paths: ['apps/api/**', 'packages/**', 'tests/postgres/**', 'scripts/qa/run-local-postgres.mjs', '.github/workflows/postgres-quality.yml', 'package*.json', 'tsconfig.json']
+
+permissions:
+  contents: read
+
+jobs:
+  postgres:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: npm
+      - run: npm ci
+      - name: Install native PostgreSQL tools
+        run: |
+          sudo apt-get update -qq
+          sudo apt-get install -y --no-install-recommends postgresql-16
+      - name: Exercise fresh isolated PostgreSQL cluster
+        run: npm run test:postgres
+      - uses: actions/upload-artifact@v7
+        if: always()
+        with:
+          name: postgres-runtime-evidence
+          path: dist/postgres-qa/report.json
+          if-no-files-found: warn
+          retention-days: 14

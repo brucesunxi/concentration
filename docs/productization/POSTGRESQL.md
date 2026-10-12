@@ -30,4 +30,12 @@
 
 旧版本验收记录中提到的测试容器属于历史执行证据，不是当前的部署依赖。
 
+## 一次性原生 PostgreSQL 工程回归
+
+`PostgreSQL runtime quality` 工作流在独立 Ubuntu CI runner 上安装 PostgreSQL 16 工具，通过 [`initdb`](https://www.postgresql.org/docs/16/app-initdb.html) 在本任务临时目录中新建集群，再由 [`pg_ctl`](https://www.postgresql.org/docs/16/app-pg-ctl.html) 启动、核对状态和停止。只绑定回环地址，使用随机空闲端口和固定的 `focus_qa` 虚构数据库；不接受现有数据库 URL。连接前核对目标主机/库名，并在任何迁移或角色写入前核对服务端实际数据目录与本轮新目录完全一致。`trust` 认证仅用于这个单任务临时 runner，不能照搬到共享或生产主机。
+
+入口 `npm run test:postgres` 仅允许临时 Linux CI runner 执行；不会在 Mac 上安装服务、创建 Docker 文件或连接 Neon。测试结束先确认该临时服务停止，再清理其新目录；只上传不含连接串、签名私钥和家庭身份的 JSON 证据。覆盖当前 schema、受限角色、连接池作用域与排队、回滚、借用连接被终止、并发幂等写入和删除后的旧上传。执行结果应查看对应 workflow，新增代码或绿色的普通单元测试不能代替该任务实际通过。
+
+该测试验证标准 PostgreSQL 单机上的应用行为，尚不覆盖 Neon 池化代理、跨区延迟、托管切换、备份恢复或生产容量。当前用户没有授权创建 Neon 测试分支；不得为补这些缺口自动新建项目、分支或数据库。
+
 2026-10-07：家长档案导出的全部分页现在使用同一个 `REPEATABLE READ` 事务读取，身份检查和各栏目不能跨不同快照；见[一致读取验收](qa/child-export-snapshot-2026-10-07.md)。真实 Neon 的并发与大档案演练仍须在独立测试分支完成。
