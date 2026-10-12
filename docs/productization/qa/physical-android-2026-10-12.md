@@ -39,4 +39,6 @@
 
 后续为完整练习验收增加了固定语音首次播放与重播检查。`0.2.14` 在 iQOO 的首次播放检查失败；`0.2.15`（版本码 16）去掉首次播放前的 seek 后，在同一台 iQOO 仍未观察到播放状态或系统播放事件。两次失败均使用虚构家庭、本机 PGlite，失败后删除虚构家庭并清空测试应用数据。失败不能被先前的练习主流程通过或云端模拟器通过覆盖。
 
-进一步查明 iQOO 的铃声模式为 `VIBRATE`，而应用原本将 `playsInSilentMode` 设为 `false`。Expo 文档说明 Android 在静音或振动模式下会抑制此种播放；把媒体音量从 0 临时调高到 7 仍未触发播放。下一版将 Android 上由用户主动点击的规则语音设为可在振动模式播放，并复测首次播放、重播及完整练习。测试后已将 iQOO 的媒体音量恢复为 0，熄屏恢复为 30 秒，插电常亮恢复关闭；临时复制到手机下载目录的测试 APK 已移除。此修复尚未经过真机验收，不能列为已解决。
+进一步查明 iQOO 的铃声模式为 `VIBRATE`，而应用原本将 `playsInSilentMode` 设为 `false`。Expo 文档说明 Android 在静音或振动模式下会抑制此种播放；把媒体音量从 0 临时调高到 7 仍未触发播放。`0.2.16` 将 Android 上由用户主动点击的规则语音设为可在振动模式播放。测试后已将 iQOO 的媒体音量恢复为 0，熄屏恢复为 30 秒，插电常亮恢复关闭；临时复制到手机下载目录的测试 APK 已移除。
+
+提交 `f40da02` 的 [Family quality 38202173362](https://github.com/brucesunxi/concentration/actions/runs/38202173362)、[Android 包构建 38202197008](https://github.com/brucesunxi/concentration/actions/runs/38202197008)和 [Android 15 模拟器完整流程 38202833128](https://github.com/brucesunxi/concentration/actions/runs/38202833128)均通过。APK 为 `0.2.16` / 版本码 17，SHA-256 为 `992b5dde1a585bb7e9a2484412c07d3a85cd7e063712a306a0ee5e12a5d397cf`，与源码快照和构建报告一致。模拟器报告记录首次播放、重播、断网强退恢复、重连自动同步、后台返回、家长报告及虚构资料清理全部通过；正式独立步骤与家长报告各计 1 次。报告只保存在本机 Git 忽略目录 `dist/mobile-native/v0.46/android-smoke-f40da02/`。仍需在原本振动模式的 iQOO 上复测，才可判定该设备的问题得到修复；播放状态也不能替代真人听审。
