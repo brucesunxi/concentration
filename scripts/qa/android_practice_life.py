@@ -227,6 +227,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "apkSha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "formalIndependentSteps": 0,
               "parentReportFormalSteps": None,
               "offlineForcedRestart": False, "pendingBeforeSync": False, "syncedAfterReconnect": False,
+              "syncTrigger": None,
               "backgroundInterrupted": False, "backgroundResumed": False,
               "introRetainedAfterBackground": False, "feedbackRetainedAfterBackground": False,
               "backgroundPauseExplained": False,
@@ -334,7 +335,22 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             if evidence_dir:
                 (evidence_dir / "android-pending-sync.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
             device.run("reverse", "tcp:4181", "tcp:4181")
-            device.tap("Retry sync")
+            # Reconnecting can trigger a background sync before the user can tap.
+            # Both automatic confirmation and an explicit retry are valid.
+            deadline = time.monotonic() + 30
+            while time.monotonic() < deadline:
+                nodes = device.screen()
+                if any("Your records are confirmed by the family service." in n.get("text", "") for n in nodes):
+                    result["syncTrigger"] = "automatic"
+                    break
+                retry = next((n for n in nodes if n.get("content-desc") == "Retry sync" and n.get("enabled") != "false"), None)
+                if retry:
+                    device.tap_node(retry)
+                    result["syncTrigger"] = "manual-retry"
+                    break
+                time.sleep(0.3)
+            else:
+                raise AcceptanceError("Reconnect exposed neither confirmed records nor a retry action")
             device.wait_text("Your records are confirmed by the family service.", timeout=30)
         else:
             device.find("If you like, explore an everyday goal", scroll=True, timeout=25)
