@@ -278,6 +278,7 @@ def background_and_return(device: Device) -> None:
 
 def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
              offline_recovery: bool = False, background_resume: bool = False,
+             audio_background: bool = False, audio_lockscreen: bool = False,
              upgrade_from: Path | None = None, physical: bool = False,
              preinstalled_exact: bool = False) -> dict:
     suffix = secrets.token_hex(5)
@@ -294,6 +295,8 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "offlineForcedRestart": False, "pendingBeforeSync": False, "syncedAfterReconnect": False,
               "syncTrigger": None,
               "backgroundInterrupted": False, "backgroundResumed": False,
+              "audioStoppedOnBackground": False, "audioRestartedAfterBackground": False,
+              "audioStoppedOnLockscreen": False, "audioRestartedAfterLockscreen": False,
               "introRetainedAfterBackground": False, "feedbackRetainedAfterBackground": False,
               "backgroundPauseExplained": False,
               "fixedAudioPlaybackStarted": False, "fixedAudioReplayStarted": False,
@@ -346,6 +349,63 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         if any("Audio could not play" in n.get("text", "") for n in device.screen()):
             raise AcceptanceError("Fixed audio reported a playback error")
         result["fixedAudioPlaybackStarted"] = True
+        if audio_background:
+            stage = "verify audio stops on background and restarts"
+            # The rule clip is only a few seconds long. Let the verified first
+            # play finish, then issue a fresh play and background immediately;
+            # extra accessibility snapshots here can outlast the whole clip.
+            time.sleep(6)
+            repeat = device.find_any(("Listen to the rule", "Listen to a tip"), timeout=18)
+            audio_before = device.run("shell", "dumpsys", "audio")
+            audio_uid = device.app_audio_uid()
+            device.tap_node(repeat)
+            time.sleep(0.5)
+            device.run("shell", "input", "keyevent", "3")  # HOME while the clip is playing
+            time.sleep(1)
+            if device.app_foreground():
+                raise AcceptanceError("HOME did not background the test app during audio")
+            if not audio_uid or not device.app_audio_started_since(audio_before, device.run("shell", "dumpsys", "audio"), audio_uid):
+                raise AcceptanceError("No system playback event was recorded before backgrounding")
+            device.open_app()
+            restart = device.find_any(("Listen to the rule", "Listen to a tip"), timeout=18)
+            if any(node.get("content-desc") == "Stop audio" for node in device.screen()):
+                raise AcceptanceError("Audio still appears to play after backgrounding")
+            result["audioStoppedOnBackground"] = True
+            audio_before = device.run("shell", "dumpsys", "audio")
+            device.tap_node(restart)
+            device.wait_audio_start(audio_before)
+            if any("Audio could not play" in node.get("text", "") for node in device.screen()):
+                raise AcceptanceError("Audio reported a playback error after backgrounding")
+            result["audioRestartedAfterBackground"] = True
+        if audio_lockscreen:
+            stage = "verify audio stops on lockscreen and restarts"
+            time.sleep(6)
+            repeat = device.find_any(("Listen to the rule", "Listen to a tip"), timeout=18)
+            audio_before = device.run("shell", "dumpsys", "audio")
+            audio_uid = device.app_audio_uid()
+            device.tap_node(repeat)
+            time.sleep(0.5)
+            device.run("shell", "input", "keyevent", "223")  # KEYCODE_SLEEP
+            time.sleep(1)
+            if device.app_foreground():
+                raise AcceptanceError("The screen did not lock during audio")
+            if not audio_uid or not device.app_audio_started_since(audio_before, device.run("shell", "dumpsys", "audio"), audio_uid):
+                raise AcceptanceError("No system playback event was recorded before screen lock")
+            device.run("shell", "input", "keyevent", "224")  # KEYCODE_WAKEUP
+            device.run("shell", "input", "swipe", "530", "1900", "530", "500", "400")
+            if "isKeyguardShowing=true" in device.run("shell", "dumpsys", "window"):
+                raise AcceptanceError("Device remained locked; unlock manually before further QA")
+            device.open_app()
+            restart = device.find_any(("Listen to the rule", "Listen to a tip"), timeout=18)
+            if any(node.get("content-desc") == "Stop audio" for node in device.screen()):
+                raise AcceptanceError("Audio still appears to play after screen lock")
+            result["audioStoppedOnLockscreen"] = True
+            audio_before = device.run("shell", "dumpsys", "audio")
+            device.tap_node(restart)
+            device.wait_audio_start(audio_before)
+            if any("Audio could not play" in node.get("text", "") for node in device.screen()):
+                raise AcceptanceError("Audio reported a playback error after screen lock")
+            result["audioRestartedAfterLockscreen"] = True
         if evidence_dir:
             (evidence_dir / "android-audio-playing.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
         stage = "verify fixed audio replay"
@@ -584,6 +644,8 @@ def main() -> int:
     parser.add_argument("--preinstalled-exact-apk", action="store_true", help="Use a physical test APK already installed on this device after matching its SHA-256")
     parser.add_argument("--offline-recovery", action="store_true", help="Remove the API port, force-stop, recover offline, then sync")
     parser.add_argument("--background-resume", action="store_true", help="Background an active formal trial, then resume it")
+    parser.add_argument("--audio-background", action="store_true", help="Background the app during narration, then verify stop and restart")
+    parser.add_argument("--audio-lockscreen", action="store_true", help="Lock the screen during narration, then verify stop and restart after unlocking")
     parser.add_argument("--expect-ringer-mode", choices=("NORMAL", "SILENT", "VIBRATE"), help="Require this device ringer mode before testing narration")
     parser.add_argument("--upgrade-from", type=Path, help="Older APK to install first, then replace offline with --apk")
     args = parser.parse_args()
@@ -604,7 +666,7 @@ def main() -> int:
         if args.expect_ringer_mode and device.ringer_mode() != args.expect_ringer_mode:
             raise AcceptanceError(f"Expected {args.expect_ringer_mode} ringer mode before narration QA")
         result = run_flow(device, args.api_base, args.apk, args.evidence_dir,
-                          args.offline_recovery, args.background_resume, args.upgrade_from,
+                          args.offline_recovery, args.background_resume, args.audio_background, args.audio_lockscreen, args.upgrade_from,
                           args.physical_fresh_test_install, args.preinstalled_exact_apk)
         print(json.dumps(result, indent=2))
         if not result["familyDeleted"] or not result["appDataCleared"]:

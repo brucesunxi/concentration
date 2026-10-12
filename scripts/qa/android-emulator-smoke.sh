@@ -105,6 +105,14 @@ if [[ "${RUN_BACKGROUND_RESUME:-false}" == true && "${RUN_FAMILY_FLOW:-false}" !
   echo 'Background resume requires the synthetic family flow' >&2
   exit 1
 fi
+if [[ "${RUN_AUDIO_BACKGROUND:-false}" == true && "${RUN_FAMILY_FLOW:-false}" != true ]]; then
+  echo 'Audio background requires the synthetic family flow' >&2
+  exit 1
+fi
+if [[ "${RUN_AUDIO_LOCKSCREEN:-false}" == true && "${RUN_FAMILY_FLOW:-false}" != true ]]; then
+  echo 'Audio lockscreen requires the synthetic family flow' >&2
+  exit 1
+fi
 if [[ -n "${UPGRADE_FROM_PACKAGE_DIR:-}" && ( "${RUN_FAMILY_FLOW:-false}" != true || "${RUN_OFFLINE_RECOVERY:-false}" != true ) ]]; then
   echo 'Upgrade requires the synthetic family flow and offline recovery' >&2
   exit 1
@@ -126,6 +134,8 @@ if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
   acceptance_args=(--apk "$apk" --evidence-dir "$package_dir" --reset-synthetic-app --expect-ringer-mode VIBRATE)
   if [[ "${RUN_OFFLINE_RECOVERY:-false}" == true ]]; then acceptance_args+=(--offline-recovery); fi
   if [[ "${RUN_BACKGROUND_RESUME:-false}" == true ]]; then acceptance_args+=(--background-resume); fi
+  if [[ "${RUN_AUDIO_BACKGROUND:-false}" == true ]]; then acceptance_args+=(--audio-background); fi
+  if [[ "${RUN_AUDIO_LOCKSCREEN:-false}" == true ]]; then acceptance_args+=(--audio-lockscreen); fi
   if [[ -n "${UPGRADE_FROM_PACKAGE_DIR:-}" ]]; then acceptance_args+=(--upgrade-from "$startup_apk"); fi
   python3 scripts/qa/android_practice_life.py "${acceptance_args[@]}" > "$package_dir/family-flow-report.json"
 fi

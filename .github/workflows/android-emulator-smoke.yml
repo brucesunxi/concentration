@@ -22,6 +22,16 @@ on:
         required: false
         default: false
         type: boolean
+      audio_background:
+        description: Background the app during fixed narration, then verify it stops and restarts
+        required: false
+        default: false
+        type: boolean
+      audio_lockscreen:
+        description: Lock the screen during narration, then verify it stops and restarts after unlocking
+        required: false
+        default: false
+        type: boolean
       upgrade_from_run_id:
         description: Optional older Android test packages run ID; requires full_flow and offline_recovery
         required: false
@@ -104,6 +114,8 @@ jobs:
           RUN_FAMILY_FLOW: ${{ inputs.full_flow }}
           RUN_OFFLINE_RECOVERY: ${{ inputs.offline_recovery }}
           RUN_BACKGROUND_RESUME: ${{ inputs.background_resume }}
+          RUN_AUDIO_BACKGROUND: ${{ inputs.audio_background }}
+          RUN_AUDIO_LOCKSCREEN: ${{ inputs.audio_lockscreen }}
           UPGRADE_FROM_PACKAGE_DIR: ${{ steps.previous_package.outputs.package_dir }}
         run: bash scripts/qa/android-emulator-smoke.sh "$PACKAGE_DIR"
       - uses: actions/upload-artifact@v7
