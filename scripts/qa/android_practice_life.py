@@ -104,11 +104,14 @@ class Device:
         time.sleep(0.18)
 
     def find(self, label: str, *, scroll: bool = False, timeout: float = 12) -> dict[str, str]:
+        return self.find_any((label,), scroll=scroll, timeout=timeout)
+
+    def find_any(self, labels: tuple[str, ...], *, scroll: bool = False, timeout: float = 12) -> dict[str, str]:
         deadline = time.monotonic() + timeout
         swipes = 0
         while time.monotonic() < deadline:
             nodes = self.screen()
-            found = next((n for n in nodes if n.get("content-desc") == label and n.get("enabled") != "false"), None)
+            found = next((n for n in nodes if n.get("content-desc") in labels and n.get("enabled") != "false"), None)
             if found:
                 return found
             if scroll and swipes < 5:
@@ -116,8 +119,8 @@ class Device:
                 swipes += 1
             else:
                 time.sleep(0.3)
-        labels = [n.get("content-desc", "") for n in nodes if n.get("content-desc")]
-        raise AcceptanceError(f"Could not find {label!r}; visible labels: {labels[:16]}")
+        visible_labels = [n.get("content-desc", "") for n in nodes if n.get("content-desc")]
+        raise AcceptanceError(f"Could not find any of {labels!r}; visible labels: {visible_labels[:16]}")
 
     def tap(self, label: str, *, scroll: bool = False, timeout: float = 12) -> None:
         self.tap_node(self.find(label, scroll=scroll, timeout=timeout))
@@ -253,6 +256,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "backgroundInterrupted": False, "backgroundResumed": False,
               "introRetainedAfterBackground": False, "feedbackRetainedAfterBackground": False,
               "backgroundPauseExplained": False,
+              "fixedAudioPlaybackStarted": False,
               "upgradeFromApkSha256": hashlib.sha256(upgrade_from.read_bytes()).hexdigest() if upgrade_from else None,
               "upgradePreservedOfflineJournal": False,
               "nativeSignOutVisible": False, "nativeSignOutHidesFamilyName": False,
@@ -292,6 +296,17 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         stage = "start practice and read rule"
         device.tap("SyntheticWren · Start today’s suggested practice", scroll=True, timeout=25)
         device.tap("I want to start", scroll=True)
+        stage = "verify fixed audio playback"
+        listen = device.find_any(("Listen to the rule", "Listen to a tip"), scroll=True, timeout=30)
+        device.tap_node(listen)
+        device.find("Stop audio", timeout=8)
+        if any("Audio could not play" in n.get("text", "") for n in device.screen()):
+            raise AcceptanceError("Fixed audio reported a playback error")
+        result["fixedAudioPlaybackStarted"] = True
+        if evidence_dir:
+            (evidence_dir / "android-audio-playing.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+        # Leave the short instruction clip time to finish before advancing.
+        time.sleep(6)
         if background_resume:
             device.find("I want to try", scroll=True, timeout=30)
             background_and_return(device)
