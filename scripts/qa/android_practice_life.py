@@ -62,6 +62,13 @@ class Device:
         focus = self.run("shell", "dumpsys", "window")
         return bool(re.search(r"mCurrentFocus=.*dev\.focusisland\.family/.+MainActivity", focus))
 
+    def ringer_mode(self) -> str:
+        audio = self.run("shell", "dumpsys", "audio")
+        mode = re.search(r"- mode \(internal\) = (NORMAL|SILENT|VIBRATE)\b", audio)
+        if not mode:
+            raise AcceptanceError("Could not identify the device ringer mode")
+        return mode.group(1)
+
     def open_app(self) -> None:
         # Some physical devices return from installation or data reset before
         # the launcher has handed the foreground window back to the app.
@@ -280,6 +287,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
     result = {"platform": "Android physical" if physical else "Android emulator",
               "deviceModel": device.run("shell", "getprop", "ro.product.model").strip(),
               "androidVersion": device.run("shell", "getprop", "ro.build.version.release").strip(),
+              "ringerMode": device.ringer_mode(),
               "avd": None if physical else AVD, "mode": "local-development",
               "apkSha256": hashlib.sha256(apk.read_bytes()).hexdigest(), "formalIndependentSteps": 0,
               "parentReportFormalSteps": None,
@@ -574,6 +582,7 @@ def main() -> int:
     parser.add_argument("--preinstalled-exact-apk", action="store_true", help="Use a physical test APK already installed on this device after matching its SHA-256")
     parser.add_argument("--offline-recovery", action="store_true", help="Remove the API port, force-stop, recover offline, then sync")
     parser.add_argument("--background-resume", action="store_true", help="Background an active formal trial, then resume it")
+    parser.add_argument("--expect-ringer-mode", choices=("NORMAL", "SILENT", "VIBRATE"), help="Require this device ringer mode before testing narration")
     parser.add_argument("--upgrade-from", type=Path, help="Older APK to install first, then replace offline with --apk")
     args = parser.parse_args()
     if not args.reset_synthetic_app:
@@ -590,6 +599,8 @@ def main() -> int:
     try:
         validate_target(device, args.api_base, args.apk, args.physical_fresh_test_install,
                         args.preinstalled_exact_apk)
+        if args.expect_ringer_mode and device.ringer_mode() != args.expect_ringer_mode:
+            raise AcceptanceError(f"Expected {args.expect_ringer_mode} ringer mode before narration QA")
         result = run_flow(device, args.api_base, args.apk, args.evidence_dir,
                           args.offline_recovery, args.background_resume, args.upgrade_from,
                           args.physical_fresh_test_install, args.preinstalled_exact_apk)

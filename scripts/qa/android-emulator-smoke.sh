@@ -110,6 +110,9 @@ if [[ -n "${UPGRADE_FROM_PACKAGE_DIR:-}" && ( "${RUN_FAMILY_FLOW:-false}" != tru
   exit 1
 fi
 if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
+  # Reproduce the physical iQOO's vibrate-mode condition during narration QA.
+  adb shell cmd audio set-ringer-mode VIBRATE
+  adb shell dumpsys audio | grep -F -- '- mode (internal) = VIBRATE'
   export FOCUS_DATA_DIR="$RUNNER_TEMP/focus-family-qa-data"
   mkdir -p "$FOCUS_DATA_DIR"
   APP_MODE=local node apps/api/main.ts > "$package_dir/family-api.log" 2>&1 &
@@ -120,7 +123,7 @@ if [[ "${RUN_FAMILY_FLOW:-false}" == true ]]; then
     sleep 2
   done
   test "$ready" = true
-  acceptance_args=(--apk "$apk" --evidence-dir "$package_dir" --reset-synthetic-app)
+  acceptance_args=(--apk "$apk" --evidence-dir "$package_dir" --reset-synthetic-app --expect-ringer-mode VIBRATE)
   if [[ "${RUN_OFFLINE_RECOVERY:-false}" == true ]]; then acceptance_args+=(--offline-recovery); fi
   if [[ "${RUN_BACKGROUND_RESUME:-false}" == true ]]; then acceptance_args+=(--background-resume); fi
   if [[ -n "${UPGRADE_FROM_PACKAGE_DIR:-}" ]]; then acceptance_args+=(--upgrade-from "$startup_apk"); fi
