@@ -18,3 +18,9 @@
 ## 生产准入结论
 
 当前**不能宣称已达生产发布条件**。本机内容盘点显示 32 个内容包均待真人专业审核，0 个符合正式发布；8 个组合缺完整规则口播。用空数据库连接配置实际启动 `APP_MODE=production` 时，服务按设计拒绝启动，提示监护同意、正式身份、地区审阅和运行验收尚未完成。目标设备矩阵、真实商店签名/购买、备份恢复和运营响应等发布门槛也未签署。本轮工程回归只能证明开发预览行为，不证明儿童训练效果或全球市场可用性。
+
+## 依赖安全复查（同日补充）
+
+根项目的图片处理器从 `sharp 0.35.4` 更新到 `0.35.5`，连同其平台二进制和 libvips 版本一并更新；锁文件中的间接依赖 `source-map-js` 从 `1.2.1` 更新到 `1.2.2`。这分别对应 [sharp 公告](https://github.com/advisories/GHSA-wq5f-xc86-pv6w)和 [source-map-js 公告](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)。更新后 `npm audit --omit=dev --workspaces=false` 为 0 项；本机图片/音频导入 8/8、独立 Studio HTTP 发布与撤回 1/1、视觉素材核验与口播候选核验通过。Studio HTTP 测试使用临时本地 PGlite，不连接 Neon。
+
+包含移动工作区的 `npm audit --omit=dev` 仍报 24 项（16 高、8 中），主要沿 Expo、Metro、React Native 构建链传播，包括 `braces`、`node-forge` 和 `uuid`。审计会计入工作区打包工具，不能直接解释为 24 个已暴露在已安装 App 中的漏洞；同样也不能据此判定移动端无风险。自动修复建议将 Expo 降到 44、React Native 降到 0.72，与当前 Expo 57 / React Native 0.86 原生工程不兼容，不能直接执行。发布前须逐项核对实际运行路径、升级方案与 Android/iOS 重新构建回归；现有真机全流程仍未完成。
