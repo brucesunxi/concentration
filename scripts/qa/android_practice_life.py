@@ -280,7 +280,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
              offline_recovery: bool = False, background_resume: bool = False,
              audio_background: bool = False, audio_lockscreen: bool = False,
              upgrade_from: Path | None = None, physical: bool = False,
-             preinstalled_exact: bool = False) -> dict:
+             preinstalled_exact: bool = False, skip_audio_check: bool = False) -> dict:
     suffix = secrets.token_hex(5)
     family, password = f"SyntheticAndroid{suffix}", f"SyntheticAndroidAcceptance{suffix}2026"
     created = False
@@ -300,6 +300,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "introRetainedAfterBackground": False, "feedbackRetainedAfterBackground": False,
               "backgroundPauseExplained": False,
               "fixedAudioPlaybackStarted": False, "fixedAudioReplayStarted": False,
+              "audioCheckSkipped": skip_audio_check,
               "upgradeFromApkSha256": hashlib.sha256(upgrade_from.read_bytes()).hexdigest() if upgrade_from else None,
               "upgradePreservedOfflineJournal": False,
               "nativeSignOutVisible": False, "nativeSignOutHidesFamilyName": False,
@@ -342,13 +343,14 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         device.tap("SyntheticWren · Start today’s suggested practice", scroll=True, timeout=25)
         device.tap("I want to start", scroll=True)
         stage = "verify fixed audio playback"
-        listen = device.find_any(("Listen to the rule", "Listen to a tip"), scroll=True, timeout=30)
-        audio_before = device.run("shell", "dumpsys", "audio")
-        device.tap_node(listen)
-        device.wait_audio_start(audio_before)
-        if any("Audio could not play" in n.get("text", "") for n in device.screen()):
-            raise AcceptanceError("Fixed audio reported a playback error")
-        result["fixedAudioPlaybackStarted"] = True
+        if not skip_audio_check:
+            listen = device.find_any(("Listen to the rule", "Listen to a tip"), scroll=True, timeout=30)
+            audio_before = device.run("shell", "dumpsys", "audio")
+            device.tap_node(listen)
+            device.wait_audio_start(audio_before)
+            if any("Audio could not play" in n.get("text", "") for n in device.screen()):
+                raise AcceptanceError("Fixed audio reported a playback error")
+            result["fixedAudioPlaybackStarted"] = True
         if audio_background:
             stage = "verify audio stops on background and restarts"
             # The rule clip is only a few seconds long. Let the verified first
@@ -406,21 +408,22 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             if any("Audio could not play" in node.get("text", "") for node in device.screen()):
                 raise AcceptanceError("Audio reported a playback error after screen lock")
             result["audioRestartedAfterLockscreen"] = True
-        if evidence_dir:
-            (evidence_dir / "android-audio-playing.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
-        stage = "verify fixed audio replay"
-        # The checked English instruction is about five seconds long. Let it
-        # finish so the next tap exercises replay rather than pause.
-        time.sleep(6)
-        replay = device.find_any(("Listen to the rule", "Listen to a tip"), timeout=18)
-        audio_before = device.run("shell", "dumpsys", "audio")
-        device.tap_node(replay)
-        device.wait_audio_start(audio_before)
-        if any("Audio could not play" in n.get("text", "") for n in device.screen()):
-            raise AcceptanceError("Fixed audio reported a replay error")
-        result["fixedAudioReplayStarted"] = True
-        # Leave the short instruction clip time to finish before advancing.
-        time.sleep(6)
+        if not skip_audio_check:
+            if evidence_dir:
+                (evidence_dir / "android-audio-playing.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+            stage = "verify fixed audio replay"
+            # The checked English instruction is about five seconds long. Let it
+            # finish so the next tap exercises replay rather than pause.
+            time.sleep(6)
+            replay = device.find_any(("Listen to the rule", "Listen to a tip"), timeout=18)
+            audio_before = device.run("shell", "dumpsys", "audio")
+            device.tap_node(replay)
+            device.wait_audio_start(audio_before)
+            if any("Audio could not play" in n.get("text", "") for n in device.screen()):
+                raise AcceptanceError("Fixed audio reported a replay error")
+            result["fixedAudioReplayStarted"] = True
+            # Leave the short instruction clip time to finish before advancing.
+            time.sleep(6)
         if background_resume:
             device.find("I want to try", scroll=True, timeout=30)
             background_and_return(device)
@@ -646,6 +649,7 @@ def main() -> int:
     parser.add_argument("--background-resume", action="store_true", help="Background an active formal trial, then resume it")
     parser.add_argument("--audio-background", action="store_true", help="Background the app during narration, then verify stop and restart")
     parser.add_argument("--audio-lockscreen", action="store_true", help="Lock the screen during narration, then verify stop and restart after unlocking")
+    parser.add_argument("--skip-audio-check", action="store_true", help="For an upgrade-only flow, skip known older-build narration behavior")
     parser.add_argument("--expect-ringer-mode", choices=("NORMAL", "SILENT", "VIBRATE"), help="Require this device ringer mode before testing narration")
     parser.add_argument("--upgrade-from", type=Path, help="Older APK to install first, then replace offline with --apk")
     args = parser.parse_args()
@@ -657,6 +661,8 @@ def main() -> int:
         parser.error("--preinstalled-exact-apk requires a physical fresh test install and no upgrade")
     if args.upgrade_from and not args.offline_recovery:
         parser.error("--upgrade-from requires --offline-recovery")
+    if args.skip_audio_check and (not args.upgrade_from or args.audio_background or args.audio_lockscreen):
+        parser.error("--skip-audio-check requires --upgrade-from and cannot combine with audio interruption checks")
     if args.upgrade_from and not args.upgrade_from.is_file():
         parser.error("--upgrade-from APK does not exist")
     device = Device(args.adb, args.serial)
@@ -667,7 +673,7 @@ def main() -> int:
             raise AcceptanceError(f"Expected {args.expect_ringer_mode} ringer mode before narration QA")
         result = run_flow(device, args.api_base, args.apk, args.evidence_dir,
                           args.offline_recovery, args.background_resume, args.audio_background, args.audio_lockscreen, args.upgrade_from,
-                          args.physical_fresh_test_install, args.preinstalled_exact_apk)
+                          args.physical_fresh_test_install, args.preinstalled_exact_apk, args.skip_audio_check)
         print(json.dumps(result, indent=2))
         if not result["familyDeleted"] or not result["appDataCleared"]:
             raise AcceptanceError("Synthetic data cleanup did not finish")
