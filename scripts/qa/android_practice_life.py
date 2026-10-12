@@ -158,13 +158,45 @@ class Device:
         return uid.group(1) if uid else None
 
     def app_audio_started_since(self, before: str, after: str, uid: str) -> bool:
-        players = set(re.findall(rf"new player piid:(\d+) uid/pid:{uid}/", after))
+        return any(state == "started" for _, state in self.app_audio_states_since(before, after, uid))
+
+    def app_audio_states_since(self, before: str, after: str, uid: str) -> list[tuple[str, str]]:
+        # Player creation may have left the bounded event log by the second
+        # snapshot. Keep its UID association from either snapshot. Android
+        # versions use both "state:" and "event:" for playback transitions.
+        combined = before + "\n" + after
+        players = set(re.findall(rf"new player piid:(\d+) uid/pid:{re.escape(uid)}/", combined))
+        players.update(re.findall(rf"\bpiid:(\d+)[^\n]*\bu/pid:{re.escape(uid)}/", combined))
         prior = set(before.splitlines())
-        return any(
-            (match := re.search(r"player piid:(\d+) state:started", line))
-            and match.group(1) in players and line not in prior
-            for line in after.splitlines()
-        )
+        observed = []
+        for line in after.splitlines():
+            if line in prior:
+                continue
+            match = re.search(r"player piid:(\d+) (?:state|event):(started|paused|stopped|released|idle)\b", line)
+            if match and match.group(1) in players:
+                observed.append((match.group(1), match.group(2)))
+            else:
+                released = re.search(r"releasing player piid:(\d+)\b", line)
+                if released and released.group(1) in players:
+                    observed.append((released.group(1), "released"))
+        return observed
+
+    def verify_audio_interrupted(self, before: str, uid: str | None, evidence_dir: Path | None, name: str) -> None:
+        after = self.run("shell", "dumpsys", "audio")
+        observed = self.app_audio_states_since(before, after, uid) if uid else []
+        if evidence_dir:
+            (evidence_dir / f"android-audio-{name}-events.json").write_text(json.dumps(observed), encoding="utf-8")
+            # A dedicated synthetic emulator has no other user's audio/device
+            # metadata. On a physical phone retain only the app's parsed states.
+            if self.serial.startswith("emulator-"):
+                (evidence_dir / f"android-audio-{name}-before.txt").write_text(before, encoding="utf-8")
+                (evidence_dir / f"android-audio-{name}-after.txt").write_text(after, encoding="utf-8")
+        started = {player for player, state in observed if state == "started"}
+        if not started:
+            raise AcceptanceError(f"No system playback event was recorded before {name}")
+        latest = dict(observed)
+        if any(latest[player] not in {"paused", "stopped", "released", "idle"} for player in started):
+            raise AcceptanceError(f"System playback did not stop after {name}")
 
     def wait_audio_start(self, before: str, *, timeout: float = 7) -> None:
         uid = self.app_audio_uid()
@@ -366,8 +398,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             time.sleep(1)
             if device.app_foreground():
                 raise AcceptanceError("HOME did not background the test app during audio")
-            if not audio_uid or not device.app_audio_started_since(audio_before, device.run("shell", "dumpsys", "audio"), audio_uid):
-                raise AcceptanceError("No system playback event was recorded before backgrounding")
+            device.verify_audio_interrupted(audio_before, audio_uid, evidence_dir, "background")
             device.open_app()
             restart = device.find_any(("Listen to the rule", "Listen to a tip"), timeout=18)
             if any(node.get("content-desc") == "Stop audio" for node in device.screen()):
@@ -391,8 +422,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             time.sleep(1)
             if device.app_foreground():
                 raise AcceptanceError("The screen did not lock during audio")
-            if not audio_uid or not device.app_audio_started_since(audio_before, device.run("shell", "dumpsys", "audio"), audio_uid):
-                raise AcceptanceError("No system playback event was recorded before screen lock")
+            device.verify_audio_interrupted(audio_before, audio_uid, evidence_dir, "lockscreen")
             device.run("shell", "input", "keyevent", "224")  # KEYCODE_WAKEUP
             device.run("shell", "input", "swipe", "530", "1900", "530", "500", "400")
             if "isKeyguardShowing=true" in device.run("shell", "dumpsys", "window"):

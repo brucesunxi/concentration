@@ -144,6 +144,9 @@ jobs:
             dist/mobile-native/android-smoke-input/**/android-background-intro.png
             dist/mobile-native/android-smoke-input/**/android-background-feedback.png
             dist/mobile-native/android-smoke-input/**/android-audio-playing.png
+            dist/mobile-native/android-smoke-input/**/android-audio-*-events.json
+            dist/mobile-native/android-smoke-input/**/android-audio-*-before.txt
+            dist/mobile-native/android-smoke-input/**/android-audio-*-after.txt
             dist/mobile-native/android-smoke-input/**/android-upgrade-offline-offer.png
             dist/mobile-native/android-smoke-input/**/android-sign-out-login.png
             dist/mobile-native/android-smoke-input/**/android-sign-out-restart.png
