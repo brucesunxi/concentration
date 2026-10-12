@@ -46,3 +46,7 @@
 提交 `f40da02` 的 [Family quality 38202173362](https://github.com/brucesunxi/concentration/actions/runs/38202173362)、[Android 包构建 38202197008](https://github.com/brucesunxi/concentration/actions/runs/38202197008)和 [Android 15 模拟器完整流程 38202833128](https://github.com/brucesunxi/concentration/actions/runs/38202833128)均通过。APK 为 `0.2.16` / 版本码 17，SHA-256 为 `992b5dde1a585bb7e9a2484412c07d3a85cd7e063712a306a0ee5e12a5d397cf`，与源码快照和构建报告一致。模拟器报告记录首次播放、重播、断网强退恢复、重连自动同步、后台返回、家长报告及虚构资料清理全部通过；正式独立步骤与家长报告各计 1 次。报告只保存在本机 Git 忽略目录 `dist/mobile-native/v0.46/android-smoke-f40da02/`。仍需在原本振动模式的 iQOO 上复测，才可判定该设备的问题得到修复；播放状态也不能替代真人听审。
 
 为了验证原始触发条件，后续验收脚本在模拟器运行完整流程前明确切到振动模式，并在报告中记录、校验铃声状态。[振动模式专项任务 38203513745](https://github.com/brucesunxi/concentration/actions/runs/38203513745)对同一 APK 通过：报告显示 `ringerMode=VIBRATE`、首次播放和重播均为真，正式独立步骤与家长报告各计 1 次，断网恢复、重连同步、后台返回和测试资料清理均通过。证据只保存在本机 Git 忽略目录 `dist/mobile-native/v0.46/android-smoke-vibrate-f40da02/`。模拟器使用无音频输出配置，因此该结果验证播放器状态，不能证明扬声器实际发声或声音自然度。
+
+随后在 iQOO V1936A / Android 11 上安装同一 `0.2.16` APK；设备已安装 APK 的 SHA-256 与构建产物一致。手机保持 `VIBRATE`，媒体音量临时设为 7/15，使用本机独立临时 PGlite 和虚构家庭复测。验收报告显示固定规则语音首次播放与重播均启动；正式独立步骤和家长报告各计 1 次，断网强退恢复、待同步与重连手动补传、规则页及练习中的后台返回、退出后断网重启均通过。虚构家庭已删除，测试应用数据已清空。截图只在本机 Git 忽略目录 `dist/mobile-native/v0.46/physical-iqoo-audio-v0216-2026-10-12/`。手机媒体音量恢复为 0/15、熄屏 30 秒、插电常亮关闭；传入手机下载目录的临时 APK 已不存在。
+
+首次真机运行在确认语音播放启动后，验收脚本因截图目录尚未创建而中断；脚本已改为流程开始时创建证据目录，重新运行的完整流程退出码为 0。这项结果证明播放器在该设备的振动模式下能启动并完成交互，尚不等于真人确认扬声器实际听感，也不覆盖其他机型或儿童使用效果。

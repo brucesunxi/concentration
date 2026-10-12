@@ -304,6 +304,8 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "backgroundExclusionsInParentReport": 0,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
+    if evidence_dir:
+        evidence_dir.mkdir(parents=True, exist_ok=True)
     stage = "install and open"
     try:
         device.run("reverse", "tcp:4181", "tcp:4181")
