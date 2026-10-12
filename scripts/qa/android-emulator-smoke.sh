@@ -49,19 +49,25 @@ check_launch() {
   adb shell am start -n dev.focusisland.family/.MainActivity
   local seen=false
   local launcher_waits=0
-  local wait_coordinates wait_x wait_y
+  local launcher_closes=0
+  local launcher_action launcher_coordinates launcher_x launcher_y
   for _ in {1..24}; do
     adb shell uiautomator dump /sdcard/focus-window.xml >/dev/null 2>&1 || true
     adb exec-out cat /sdcard/focus-window.xml > "$package_dir/emulator-ui.xml" 2>/dev/null || true
     if grep -Eq 'FOCUS ISLAND|Welcome to Focus Island|欢迎来到专注岛' "$package_dir/emulator-ui.xml"; then seen=true; break; fi
-    if grep -Fq "Pixel Launcher isn't responding" "$package_dir/emulator-ui.xml" && (( launcher_waits < 2 )); then
-      wait_coordinates="$(python3 - "$package_dir/emulator-ui.xml" <<'PY'
+    if grep -Fq "Pixel Launcher isn't responding" "$package_dir/emulator-ui.xml" && (( launcher_waits < 2 || launcher_closes < 1 )); then
+      # Only the disposable emulator's launcher may be dismissed. Two waits
+      # retain the original recovery path; a recurring launcher ANR then gets
+      # one close. An ANR from the tested app is never handled as infrastructure.
+      launcher_action=Wait
+      if (( launcher_waits >= 2 )); then launcher_action='Close app'; fi
+      launcher_coordinates="$(python3 - "$package_dir/emulator-ui.xml" "$launcher_action" <<'PY'
 import re
 import sys
 import xml.etree.ElementTree as ET
 
 for node in ET.parse(sys.argv[1]).getroot().iter('node'):
-    if node.get('text') == 'Wait':
+    if node.get('package') == 'android' and node.get('text') == sys.argv[2]:
         bounds = re.fullmatch(r'\[(\d+),(\d+)\]\[(\d+),(\d+)\]', node.get('bounds', ''))
         if bounds:
             left, top, right, bottom = map(int, bounds.groups())
@@ -69,10 +75,17 @@ for node in ET.parse(sys.argv[1]).getroot().iter('node'):
             break
 PY
 )"
-      if [[ "$wait_coordinates" =~ ^[0-9]+\ [0-9]+$ ]]; then
-        read -r wait_x wait_y <<< "$wait_coordinates"
-        adb shell input tap "$wait_x" "$wait_y"
-        launcher_waits=$((launcher_waits + 1))
+      if [[ "$launcher_coordinates" =~ ^[0-9]+\ [0-9]+$ ]]; then
+        echo "Disposable Pixel Launcher ANR: $launcher_action"
+        if [[ "$launcher_action" == 'Close app' ]]; then
+          cp "$package_dir/emulator-ui.xml" "$package_dir/emulator-launcher-anr.xml"
+          adb exec-out screencap -p > "$package_dir/emulator-launcher-anr.png" || true
+          launcher_closes=$((launcher_closes + 1))
+        else
+          launcher_waits=$((launcher_waits + 1))
+        fi
+        read -r launcher_x launcher_y <<< "$launcher_coordinates"
+        adb shell input tap "$launcher_x" "$launcher_y"
         sleep 8
         adb shell am start -n dev.focusisland.family/.MainActivity
       fi
