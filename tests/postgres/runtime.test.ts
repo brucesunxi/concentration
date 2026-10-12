@@ -63,7 +63,7 @@ after(async () => {
   }
 });
 async function family() {
-  const credentials = { name: 'SyntheticPG-' + randomUUID(), password: 'Synthetic-PG-passphrase-2026!' };
+  const credentials = { name: 'PG-' + randomUUID(), password: 'Synthetic-PG-passphrase-2026!' };
   const auth = await api.setup({ ...credentials, timezone: 'UTC', locale: 'en', acknowledgedLocalUse: true });
   const p = (await api.authenticate(auth.value))!;
   const c = await api.addChild(p, { alias: 'Synthetic explorer', ageBand: '6-8', locale: 'en', localConfirmation: true });
