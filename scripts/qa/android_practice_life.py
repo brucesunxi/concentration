@@ -66,11 +66,11 @@ class Device:
         # Some physical devices return from installation or data reset before
         # the launcher has handed the foreground window back to the app.
         for _ in range(3):
-            self.run("shell", "am", "start", "-W", "-n", f"{PACKAGE}/.MainActivity")
-            for _ in range(8):
+            self.run("shell", "am", "start", "-n", f"{PACKAGE}/.MainActivity", timeout=45)
+            for _ in range(60):
                 if self.app_foreground():
                     return
-                time.sleep(0.4)
+                time.sleep(0.5)
         raise AcceptanceError("Test app did not remain in the foreground after launch")
 
     def screen(self) -> list[dict[str, str]]:
@@ -130,12 +130,24 @@ class Device:
             time.sleep(0.3)
         raise AcceptanceError(f"Could not find text {phrase!r}")
 
+    def wait_any_text(self, phrases: tuple[str, ...], *, timeout: float = 25) -> None:
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            if any(any(phrase in n.get("text", "") for phrase in phrases) for n in self.screen()):
+                return
+            time.sleep(0.3)
+        raise AcceptanceError(f"Could not find any expected text: {phrases!r}")
+
     def type(self, label: str, value: str) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
             raise AcceptanceError("Test input must be simple synthetic ASCII")
         self.tap(label, scroll=True)
         self.run("shell", "input", "text", value)
-        self.run("shell", "input", "keyevent", "4")
+        # Some physical keyboards dismiss themselves after adb text entry.
+        # Only send BACK while an input method is actually shown; otherwise
+        # BACK can navigate away from the form or leave the app entirely.
+        if re.search(r"\bmInputShown=true\b", self.run("shell", "dumpsys", "input_method")):
+            self.run("shell", "input", "keyevent", "4")
 
 
 def api(base: str, path: str, *, method: str = "GET", body=None, token: str | None = None):
@@ -156,7 +168,8 @@ def api(base: str, path: str, *, method: str = "GET", body=None, token: str | No
         return error.code, json.load(error)
 
 
-def validate_target(device: Device, base: str, apk: Path, physical: bool = False) -> None:
+def validate_target(device: Device, base: str, apk: Path, physical: bool = False,
+                    preinstalled_exact: bool = False) -> None:
     parsed = urllib.parse.urlsplit(base)
     if parsed.scheme != "http" or parsed.hostname != "127.0.0.1" or parsed.port != 4181 or parsed.path:
         raise AcceptanceError("Only the local development API at http://127.0.0.1:4181 is allowed")
@@ -166,6 +179,14 @@ def validate_target(device: Device, base: str, apk: Path, physical: bool = False
     if physical:
         if device.serial.startswith("emulator-") or "emulator" in characteristics:
             raise AcceptanceError("Physical test mode requires a real Android device")
+        if preinstalled_exact:
+            paths = device.run("shell", "pm", "path", PACKAGE).strip().splitlines()
+            if len(paths) != 1 or not paths[0].startswith("package:/data/app/"):
+                raise AcceptanceError("Expected one installed test APK")
+            installed = paths[0].removeprefix("package:")
+            digest = device.run("shell", "sha256sum", installed).split()[0]
+            if digest != hashlib.sha256(apk.read_bytes()).hexdigest():
+                raise AcceptanceError("Installed test APK does not match the selected build")
     else:
         if not device.serial.startswith("emulator-"):
             raise AcceptanceError("Only an Android emulator is allowed by default")
@@ -215,7 +236,8 @@ def background_and_return(device: Device) -> None:
 
 def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
              offline_recovery: bool = False, background_resume: bool = False,
-             upgrade_from: Path | None = None, physical: bool = False) -> dict:
+             upgrade_from: Path | None = None, physical: bool = False,
+             preinstalled_exact: bool = False) -> dict:
     suffix = secrets.token_hex(5)
     family, password = f"SyntheticAndroid{suffix}", f"SyntheticAndroidAcceptance{suffix}2026"
     created = False
@@ -238,18 +260,28 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "backgroundExclusionsInParentReport": 0,
               "selectedTemplate": None, "goalCount": None, "templateCount": None,
               "familyDeleted": False, "appDataCleared": False}
+    stage = "install and open"
     try:
         device.run("reverse", "tcp:4181", "tcp:4181")
-        device.run("install", "-r", str(upgrade_from or apk), timeout=90)
+        install_args = ("install", "--no-streaming", "-r") if physical else ("install", "-r")
+        if not preinstalled_exact:
+            device.run(*install_args, str(upgrade_from or apk), timeout=90)
         device.run("shell", "pm", "clear", PACKAGE)
         device.open_app()
+        stage = "select English"
         device.tap("English", timeout=25)
+        stage = "open create-family form"
         device.tap("Create a new test family", scroll=True)
+        stage = "fill family name"
         device.type("Family name", family)
+        stage = "fill parent password"
         device.type("Parent password", password)
+        stage = "confirm fictional details"
         device.tap("I will use fictional details for local testing.", scroll=True)
         created = True
+        stage = "create family"
         device.tap("Create family", scroll=True)
+        stage = "add test profile"
         device.find("Add a test profile", scroll=True, timeout=25)
         device.tap("Add a test profile", scroll=True)
         device.type("Test nickname", "SyntheticWren")
@@ -257,6 +289,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         device.tap("English")
         device.tap("This is a fictional profile for adult development testing.", scroll=True)
         device.tap("Save profile", scroll=True)
+        stage = "start practice and read rule"
         device.tap("SyntheticWren · Start today’s suggested practice", scroll=True, timeout=25)
         device.tap("I want to start", scroll=True)
         if background_resume:
@@ -269,11 +302,12 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             if evidence_dir:
                 (evidence_dir / "android-background-intro.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
         if offline_recovery:
+            stage = "recover offline practice"
             device.wait_text("Recovery information for this practice is saved on this device", timeout=30)
             device.run("reverse", "--remove", "tcp:4181")
             device.run("shell", "am", "force-stop", PACKAGE)
             if upgrade_from:
-                device.run("install", "-r", str(apk), timeout=90)
+                device.run(*install_args, str(apk), timeout=90)
             device.open_app()
             device.find("Restore this practice", scroll=True, timeout=35)
             visible = device.screen()
@@ -287,6 +321,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             result["offlineForcedRestart"] = True
             result["upgradePreservedOfflineJournal"] = bool(upgrade_from)
         device.tap("I want to try", scroll=True, timeout=25)
+        stage = "complete practice"
         for step in range(3):
             if step == 2 and background_resume:
                 deadline = time.monotonic() + 25
@@ -329,6 +364,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
                     pass
         device.tap("Stop for today")
         if offline_recovery:
+            stage = "reconnect and synchronize"
             device.find("Retry sync", scroll=True, timeout=25)
             device.wait_text("Records are saved here and awaiting service confirmation", timeout=20)
             result["pendingBeforeSync"] = True
@@ -338,6 +374,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             # Reconnecting can trigger a background sync before the user can tap.
             # Both automatic confirmation and an explicit retry are valid.
             deadline = time.monotonic() + 30
+            retry_visible_since: float | None = None
             while time.monotonic() < deadline:
                 nodes = device.screen()
                 if any("Your records are confirmed by the family service." in n.get("text", "") for n in nodes):
@@ -345,9 +382,17 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
                     break
                 retry = next((n for n in nodes if n.get("content-desc") == "Retry sync" and n.get("enabled") != "false"), None)
                 if retry:
-                    device.tap_node(retry)
-                    result["syncTrigger"] = "manual-retry"
-                    break
+                    if retry_visible_since is None:
+                        retry_visible_since = time.monotonic()
+                    # Leave time for automatic sync. Otherwise its button may
+                    # disappear between the hierarchy read and the tap, causing
+                    # a tap on the "Back to family space" button below it.
+                    if time.monotonic() - retry_visible_since >= 8:
+                        device.tap_node(retry)
+                        result["syncTrigger"] = "manual-retry"
+                        break
+                else:
+                    retry_visible_since = None
                 time.sleep(0.3)
             else:
                 raise AcceptanceError("Reconnect exposed neither confirmed records nor a retry action")
@@ -411,7 +456,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         if offline_recovery:
             device.tap("Back to family space", scroll=True, timeout=25)
             device.tap("Sign out", scroll=True, timeout=25)
-            device.wait_text("Welcome to Focus Island", timeout=25)
+            device.wait_any_text(("Welcome to Focus Island", "欢迎来到专注岛"), timeout=25)
             result["nativeSignOutVisible"] = True
             if any(family in str(node) for node in device.screen()):
                 raise AcceptanceError("Signed-out login screen still exposed the family name")
@@ -421,14 +466,14 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
             device.run("reverse", "--remove", "tcp:4181")
             device.run("shell", "am", "force-stop", PACKAGE)
             device.open_app()
-            device.wait_text("Welcome to Focus Island", timeout=30)
+            device.wait_any_text(("Welcome to Focus Island", "欢迎来到专注岛"), timeout=30)
             if any(node.get("content-desc") == "Restore this practice" for node in device.screen()):
                 raise AcceptanceError("Signed-out offline practice reappeared after restart")
             result["nativeSignOutSurvivedOfflineRestart"] = True
             if evidence_dir:
                 (evidence_dir / "android-sign-out-restart.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
         return result
-    except Exception:
+    except Exception as error:
         if evidence_dir and device.app_foreground():
             evidence_dir.mkdir(parents=True, exist_ok=True)
             try:
@@ -438,7 +483,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
                 )
             except (AcceptanceError, subprocess.TimeoutExpired, OSError):
                 pass
-        raise
+        raise AcceptanceError(f"{stage}: {error}") from error
     finally:
         if created:
             try:
@@ -467,6 +512,7 @@ def main() -> int:
     parser.add_argument("--evidence-dir", type=Path)
     parser.add_argument("--reset-synthetic-app", action="store_true", help="Required acknowledgement: clears only this test app's data")
     parser.add_argument("--physical-fresh-test-install", action="store_true", help="Use the selected physical device only after confirming this test app was absent before this QA installation")
+    parser.add_argument("--preinstalled-exact-apk", action="store_true", help="Use a physical test APK already installed on this device after matching its SHA-256")
     parser.add_argument("--offline-recovery", action="store_true", help="Remove the API port, force-stop, recover offline, then sync")
     parser.add_argument("--background-resume", action="store_true", help="Background an active formal trial, then resume it")
     parser.add_argument("--upgrade-from", type=Path, help="Older APK to install first, then replace offline with --apk")
@@ -475,16 +521,19 @@ def main() -> int:
         parser.error("--reset-synthetic-app is required because the test app data will be cleared")
     if args.physical_fresh_test_install and args.serial.startswith("emulator-"):
         parser.error("--physical-fresh-test-install requires a physical device serial")
+    if args.preinstalled_exact_apk and (not args.physical_fresh_test_install or args.upgrade_from):
+        parser.error("--preinstalled-exact-apk requires a physical fresh test install and no upgrade")
     if args.upgrade_from and not args.offline_recovery:
         parser.error("--upgrade-from requires --offline-recovery")
     if args.upgrade_from and not args.upgrade_from.is_file():
         parser.error("--upgrade-from APK does not exist")
     device = Device(args.adb, args.serial)
     try:
-        validate_target(device, args.api_base, args.apk, args.physical_fresh_test_install)
+        validate_target(device, args.api_base, args.apk, args.physical_fresh_test_install,
+                        args.preinstalled_exact_apk)
         result = run_flow(device, args.api_base, args.apk, args.evidence_dir,
                           args.offline_recovery, args.background_resume, args.upgrade_from,
-                          args.physical_fresh_test_install)
+                          args.physical_fresh_test_install, args.preinstalled_exact_apk)
         print(json.dumps(result, indent=2))
         if not result["familyDeleted"] or not result["appDataCleared"]:
             raise AcceptanceError("Synthetic data cleanup did not finish")
