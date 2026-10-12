@@ -141,18 +141,37 @@ class Device:
             time.sleep(0.3)
         raise AcceptanceError(f"Could not find any expected text: {phrases!r}")
 
-    def app_audio_started_since(self, before: str, after: str) -> bool:
+    def app_audio_uid(self) -> str | None:
         package = self.run("shell", "dumpsys", "package", PACKAGE)
         uid = re.search(r"\buserId=(\d+)\b", package)
-        if not uid:
-            raise AcceptanceError("Could not identify the test app audio UID")
-        players = set(re.findall(rf"new player piid:(\d+) uid/pid:{uid.group(1)}/", after))
+        if uid:
+            return uid.group(1)
+        package_list = self.run("shell", "pm", "list", "packages", "-U", PACKAGE)
+        uid = re.search(rf"\bpackage:{re.escape(PACKAGE)}\s+uid:(\d+)\b", package_list)
+        return uid.group(1) if uid else None
+
+    def app_audio_started_since(self, before: str, after: str, uid: str) -> bool:
+        players = set(re.findall(rf"new player piid:(\d+) uid/pid:{uid}/", after))
         prior = set(before.splitlines())
         return any(
             (match := re.search(r"player piid:(\d+) state:started", line))
             and match.group(1) in players and line not in prior
             for line in after.splitlines()
         )
+
+    def wait_audio_start(self, before: str, *, timeout: float = 7) -> None:
+        uid = self.app_audio_uid()
+        deadline = time.monotonic() + timeout
+        while time.monotonic() < deadline:
+            # Observe the native player status first: a short clip may finish
+            # before dumpsys has returned a system event on a slower phone.
+            if any(node.get("content-desc") == "Stop audio" for node in self.screen()):
+                return
+            if uid and self.app_audio_started_since(before, self.run("shell", "dumpsys", "audio"), uid):
+                return
+            time.sleep(0.25)
+        visible = [node.get("content-desc") or node.get("text") for node in self.screen()]
+        raise AcceptanceError(f"No app audio playback event or playing control after tapping narration; visible: {[item for item in visible if item][:18]}")
 
     def type(self, label: str, value: str) -> None:
         if not re.fullmatch(r"[A-Za-z0-9_-]+", value):
@@ -269,7 +288,7 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
               "backgroundInterrupted": False, "backgroundResumed": False,
               "introRetainedAfterBackground": False, "feedbackRetainedAfterBackground": False,
               "backgroundPauseExplained": False,
-              "fixedAudioPlaybackStarted": False,
+              "fixedAudioPlaybackStarted": False, "fixedAudioReplayStarted": False,
               "upgradeFromApkSha256": hashlib.sha256(upgrade_from.read_bytes()).hexdigest() if upgrade_from else None,
               "upgradePreservedOfflineJournal": False,
               "nativeSignOutVisible": False, "nativeSignOutHidesFamilyName": False,
@@ -313,29 +332,23 @@ def run_flow(device: Device, base: str, apk: Path, evidence_dir: Path | None,
         listen = device.find_any(("Listen to the rule", "Listen to a tip"), scroll=True, timeout=30)
         audio_before = device.run("shell", "dumpsys", "audio")
         device.tap_node(listen)
-        started = False
-        deadline = time.monotonic() + 7
-        while time.monotonic() < deadline:
-            audio_after = device.run("shell", "dumpsys", "audio")
-            if device.app_audio_started_since(audio_before, audio_after):
-                started = True
-                break
-            time.sleep(0.25)
-        if not started:
-            # The native system log is not available on every emulator image.
-            # Its visible playback control is a secondary check.
-            try:
-                device.find("Stop audio", timeout=2)
-                started = True
-            except AcceptanceError:
-                pass
-        if not started:
-            raise AcceptanceError("No app audio playback event or playing control after tapping narration")
+        device.wait_audio_start(audio_before)
         if any("Audio could not play" in n.get("text", "") for n in device.screen()):
             raise AcceptanceError("Fixed audio reported a playback error")
         result["fixedAudioPlaybackStarted"] = True
         if evidence_dir:
             (evidence_dir / "android-audio-playing.png").write_bytes(device.run_bytes("exec-out", "screencap", "-p"))
+        stage = "verify fixed audio replay"
+        # The checked English instruction is about five seconds long. Let it
+        # finish so the next tap exercises replay rather than pause.
+        time.sleep(6)
+        replay = device.find_any(("Listen to the rule", "Listen to a tip"), timeout=18)
+        audio_before = device.run("shell", "dumpsys", "audio")
+        device.tap_node(replay)
+        device.wait_audio_start(audio_before)
+        if any("Audio could not play" in n.get("text", "") for n in device.screen()):
+            raise AcceptanceError("Fixed audio reported a replay error")
+        result["fixedAudioReplayStarted"] = True
         # Leave the short instruction clip time to finish before advancing.
         time.sleep(6)
         if background_resume:

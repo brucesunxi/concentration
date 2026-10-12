@@ -34,3 +34,9 @@
 根项目的图片处理器从 `sharp 0.35.4` 更新到 `0.35.5`，连同其平台二进制和 libvips 版本一并更新；锁文件中的间接依赖 `source-map-js` 从 `1.2.1` 更新到 `1.2.2`。这分别对应 [sharp 公告](https://github.com/advisories/GHSA-wq5f-xc86-pv6w)和 [source-map-js 公告](https://github.com/advisories/GHSA-68fv-2mgg-jv7q)。更新后 `npm audit --omit=dev --workspaces=false` 为 0 项；本机图片/音频导入 8/8、独立 Studio HTTP 发布与撤回 1/1、视觉素材核验与口播候选核验通过。Studio HTTP 测试使用临时本地 PGlite，不连接 Neon。
 
 包含移动工作区的 `npm audit --omit=dev` 仍报 24 项（16 高、8 中），主要沿 Expo、Metro、React Native 构建链传播，包括 `braces`、`node-forge` 和 `uuid`。审计会计入工作区打包工具，不能直接解释为 24 个已暴露在已安装 App 中的漏洞；同样也不能据此判定移动端无风险。自动修复建议将 Expo 降到 44、React Native 降到 0.72，与当前 Expo 57 / React Native 0.86 原生工程不兼容，不能直接执行。发布前须逐项核对实际运行路径、升级方案与 Android/iOS 重新构建回归；iQOO 真机全流程已完成，但不足以覆盖目标设备矩阵。
+
+## 规则语音专项复测
+
+后续为完整练习验收增加了固定语音首次播放与重播检查。`0.2.14` 在 iQOO 的首次播放检查失败；`0.2.15`（版本码 16）去掉首次播放前的 seek 后，在同一台 iQOO 仍未观察到播放状态或系统播放事件。两次失败均使用虚构家庭、本机 PGlite，失败后删除虚构家庭并清空测试应用数据。失败不能被先前的练习主流程通过或云端模拟器通过覆盖。
+
+进一步查明 iQOO 的铃声模式为 `VIBRATE`，而应用原本将 `playsInSilentMode` 设为 `false`。Expo 文档说明 Android 在静音或振动模式下会抑制此种播放；把媒体音量从 0 临时调高到 7 仍未触发播放。下一版将 Android 上由用户主动点击的规则语音设为可在振动模式播放，并复测首次播放、重播及完整练习。测试后已将 iQOO 的媒体音量恢复为 0，熄屏恢复为 30 秒，插电常亮恢复关闭；临时复制到手机下载目录的测试 APK 已移除。此修复尚未经过真机验收，不能列为已解决。

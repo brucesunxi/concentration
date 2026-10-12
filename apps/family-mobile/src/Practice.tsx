@@ -185,7 +185,9 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
   }, [session.id]);
   useEffect(() => {
     live.current = true; const abort = new AbortController(); let unsubscribe: (() => void) | undefined;
-    void setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false, playsInSilentMode: false, interruptionMode: 'doNotMix' }).catch(() => undefined);
+    // Android suppresses even user-requested media while the ringer is in
+    // vibrate/silent mode when this is false. Keep iOS silent-switch behavior.
+    void setAudioModeAsync({ allowsRecording: false, shouldPlayInBackground: false, playsInSilentMode: Platform.OS === 'android', interruptionMode: 'doNotMix' }).catch(() => undefined);
     void (async () => {
       let preparationStage = 'local-storage';
       let preparedRuntime: SessionRuntime | null = null;
