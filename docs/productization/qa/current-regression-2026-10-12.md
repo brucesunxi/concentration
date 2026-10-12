@@ -32,6 +32,10 @@ Vercel 生产别名 `concentration-two.vercel.app` 当前指向状态为 `Ready`
 
 [重跑 38224979035](https://github.com/brucesunxi/concentration/actions/runs/38224979035)在进入家庭流程前，被模拟器系统的 `Pixel Launcher isn't responding` 弹窗阻断；失败截图显示专注岛欢迎页位于弹窗下方。两次选择等待仍未消除弹窗。本次没有执行语音中断，结果不计作通过；证据在 Git 忽略目录 `dist/mobile-native/v0.46/emulator-audio-interrupt-38224979035/`。脚本随后为这个专用模拟器增加一次有上限的关闭 Launcher 操作，并保留关闭前证据；不处理被测应用自己的无响应弹窗。
 
+[随后任务 38225971448](https://github.com/brucesunxi/concentration/actions/runs/38225971448)对同一 `0.2.16` APK 在 Android 15 / x86_64、振动模式下通过完整流程，没有跳过音频检查。系统证据分别记录后台中断的播放器 `111` 与锁屏中断的播放器 `127` 从 `started` 转为 `paused`；返回后重新播放检查均通过。首次播放、重播、断网强退恢复、重连自动补传、正式步骤与家长报告各 1 次、退出后离线重启与虚构资料清理均通过。原始系统日志、应用事件和报告保存在 Git 忽略目录 `dist/mobile-native/v0.46/emulator-audio-interrupt-38225971448/`。本次没有出现 Launcher 无响应，因而尚未实际执行新增的关闭分支。该专用模拟器使用 `-no-audio`，只能证明系统播放器状态与流程，不能代替扬声器听审、真实来电、蓝牙或 iQOO 的更严格系统暂停复测。
+
+脚本提交 `5dc1813` 的 [Family quality 38225937889](https://github.com/brucesunxi/concentration/actions/runs/38225937889)也通过。本次用户重新解锁 iQOO 后，只重新核验已安装 `0.2.16` 的摘要与前台启动，未重新安装或执行真机升级；临时延长的熄屏时间已恢复为 30 秒。
+
 ## 仍阻止生产开放的事实
 
 - 内容盘点 `npm run content:readiness` 显示 32/32 组合有固定语音，但只有 24/32 朗读完整规则；8 个停止反应组合只有策略录音，去重后需制作并审阅 4 条完整规则。32/32 内容包仍待真人专业审核，源码层面可正式发布组合为 0。现有[发布验证](../CONTENT-STUDIO.md)和相应测试会拒绝拿策略录音冒充规则录音。
