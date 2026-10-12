@@ -1,6 +1,16 @@
 # Android 覆盖升级与离线练习恢复
 
-## 最新验收：0.2.10 → 0.2.11
+## 最新验收：0.2.12 → 0.2.13
+
+2026-10-07。[Android 35 / x86_64 模拟器任务 37609203327](https://github.com/brucesunxi/concentration/actions/runs/37609203327)从 `0.2.12` / 版本码 `13` 覆盖安装到 `0.2.13` / 版本码 `14`；新版来自[构建任务 37607820345](https://github.com/brucesunxi/concentration/actions/runs/37607820345)，源码提交为 `757cb571b3de4d0a86dd8712a25fad6227ca67bf`。两包签名证书一致；新版 APK SHA-256 为 `61ea2352bbd8c5b1e34c41b2b51efe8ad360c8b47a0efbbc26f2c10fe11ae450`，重新核验了两包的源码快照、包体和签名。
+
+旧包在虚构家庭中准备练习后断开本地服务、强退并覆盖安装。新版离线恢复原记录、完成两道示范题及一道正式题，先显示待同步，重连后由服务端确认；孩子摘要与家长报告均为 **1 个独立正式步骤**。退出后登录页不再预填虚构家庭名称，断开服务强退重开后没有重新出现旧恢复入口。虚构家庭及专用模拟器数据已清理。[设备报告](../../../dist/mobile-native/v0.46/emulator-sign-out-37609203327/android-smoke-input/focus-island-android-aab-757cb571b3de4d0a86dd8712a25fad6227ca67bf/family-flow-report.json)、[退出页](../../../dist/mobile-native/v0.46/emulator-sign-out-37609203327/android-smoke-input/focus-island-android-aab-757cb571b3de4d0a86dd8712a25fad6227ca67bf/android-sign-out-login.png)和[断网重开页](../../../dist/mobile-native/v0.46/emulator-sign-out-37609203327/android-smoke-input/focus-island-android-aab-757cb571b3de4d0a86dd8712a25fad6227ca67bf/android-sign-out-restart.png)保存在本机。模拟器正常退出不能证明真机安全存储失败时服务端令牌已撤销，低存储、音频打断和商店签名仍须另行验收。
+
+## 前批验收：0.2.11 → 0.2.12
+
+[Android 35 模拟器任务 37606211738](https://github.com/brucesunxi/concentration/actions/runs/37606211738)从 `0.2.11` / 版本码 `12` 覆盖到 `0.2.12` / 版本码 `13`，离线旧日志保留、正式独立步骤与家长报告均为 `1`，补传和测试资料清理通过。[运行报告](../../../dist/mobile-native/v0.46/emulator-upgrade-37606211738/android-smoke-input/focus-island-android-aab-a75c9d02aab67cfabfd9e5d5daffaa31e013c13b/family-flow-report.json)保存在本机。随后[扩展任务 37606568783](https://github.com/brucesunxi/concentration/actions/runs/37606568783)对同一包增加正常退出与断网强退重开检查，确认旧恢复入口不再出现，同时发现登录页仍显示虚构家庭名称；这项隐私问题由 `0.2.13` 修正并在上节复验。
+
+## 前批验收：0.2.10 → 0.2.11
 
 2026-10-07。[Android 35 / x86_64 模拟器任务 37602326272](https://github.com/brucesunxi/concentration/actions/runs/37602326272)从 `0.2.10` / 版本码 `11` 的测试 APK 覆盖安装到 `0.2.11` / 版本码 `12`，新包由[构建任务 37599952352](https://github.com/brucesunxi/concentration/actions/runs/37599952352)从提交 `74cae7b9f908521fc56c110384b06af5c65aa6cd` 生成。两包的包名、签名证书一致；运行前重新核验了两包的源码快照、摘要与签名。新版 APK 的 SHA-256 为 `78bb02da7f544f7ea163799ef4c60b7d801f538188a7226d4942e9aa6125a284`。
 

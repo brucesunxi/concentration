@@ -2,7 +2,17 @@
 
 2026-10-07。由于本机可用空间约 20 GiB，使用仓库的 [Android test packages 工作流](../../../.github/workflows/android-aab.yml)从同一 Git 提交远程构建可安装 APK 和 AAB，再下载交付包；未在本机生成大型 Android 工程，也未删除旧构建文件。工作流记录 App 源码逐文件摘要，编译、验证签名及包体，并上传产物与报告。没有 Docker 步骤。
 
-## 当前交付：0.2.12
+## 当前交付：0.2.13
+
+[构建任务 37607820345](https://github.com/brucesunxi/concentration/actions/runs/37607820345)从提交 `757cb571b3de4d0a86dd8712a25fad6227ca67bf` 生成 App `0.2.13`、Android 版本码 `14` 的 APK/AAB。源码快照、包体和签名核验均通过；本机下载后重新计算的 SHA-256 与静态报告一致，签名证书指纹沿用上一版。
+
+- [可安装测试 APK](../../../dist/mobile-native/v0.46/github-packages-757cb57/FocusIslandDev-local.apk)：103,662,030 字节；SHA-256 `61ea2352bbd8c5b1e34c41b2b51efe8ad360c8b47a0efbbc26f2c10fe11ae450`。
+- [测试 AAB](../../../dist/mobile-native/v0.46/github-packages-757cb57/FocusIslandDev-local.aab)：77,199,802 字节；SHA-256 `5980488acd50eaf037f9d23cbf3c43c4be9afd81c7a834c296f69e5d1aa85b98`。
+- [源码快照](../../../dist/mobile-native/v0.46/github-packages-757cb57/source-snapshot.json)、[APK 静态报告](../../../dist/mobile-native/v0.46/github-packages-757cb57/apk-static-report.json)与[AAB 静态报告](../../../dist/mobile-native/v0.46/github-packages-757cb57/aab-static-report.json)保存在本机 Git 忽略目录；GitHub 附件保留 14 天。
+
+该包仍使用本地服务配置与调试签名，不是商店发行包。设备上退出后的家庭名称保护、离线覆盖升级与重连补传已在[模拟器验收](android-upgrade-v0.46-2026-10-07.md)中核对；静态报告本身不能代替设备结果。
+
+## 前批交付：0.2.12
 
 [构建任务 37604802401](https://github.com/brucesunxi/concentration/actions/runs/37604802401)从提交 `a75c9d02aab67cfabfd9e5d5daffaa31e013c13b` 生成 App `0.2.12`、Android 版本码 `13` 的 APK/AAB，源码快照与签名核验通过。本机重新计算的两包 SHA-256 与静态报告一致，签名证书指纹与 `0.2.11` 相同。
 
