@@ -45,6 +45,7 @@ const forbiddenFile = name => /(?:^|\/)(?:\.env(?:\.[^/]*)?|\.focus-data|.*\.jwk
 async function inventory(directory, prefix = '') {
   const files = [];
   for (const name of (await readdir(join(directory, prefix))).sort()) {
+    if (name === '.DS_Store' || name.startsWith('._')) continue;
     const entry = join(prefix, name), file = join(directory, entry), stat = await lstat(file);
     assert(!stat.isSymbolicLink(), `Unexpected link in app: ${entry}`);
     assert(!forbiddenFile(entry), `Private-data filename found in app: ${entry}`);

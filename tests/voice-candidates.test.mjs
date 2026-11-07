@@ -40,5 +40,5 @@ test('unreviewed stop-rule recordings match every age and language, current inst
     await measureNarrationQuality(path, durationMs);
   }
   assert.deepEqual(covered, expected);
-  assert.deepEqual((await readdir(folder)).filter(name => name.endsWith('.mp3')).sort(), [...files].sort());
+  assert.deepEqual((await readdir(folder)).filter(name => name.endsWith('.mp3') && !name.startsWith('._')).sort(), [...files].sort());
 });

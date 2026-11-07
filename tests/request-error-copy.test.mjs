@@ -6,7 +6,7 @@ import {requestErrorCopy} from '../packages/contracts/request-error-copy.ts';
 test('every literal family API error has a specific English explanation',()=>{
   const directory=new URL('../apps/api/',import.meta.url);
   const codes=new Set();
-  for(const filename of readdirSync(directory).filter(name=>name.endsWith('.ts'))){
+  for(const filename of readdirSync(directory).filter(name=>name.endsWith('.ts')&&!name.startsWith('._'))){
     const source=readFileSync(new URL(filename,directory),'utf8');
     for(const match of source.matchAll(/\b(?:fail|familyFail|serviceFail)\(\s*\d+\s*,\s*['"]([A-Z][A-Z0-9_]+)['"]/g))codes.add(match[1]);
   }

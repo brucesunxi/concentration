@@ -168,3 +168,15 @@ test('member client discards one-time invitation codes on leaving and ignores de
   const ready=new FamilyMembersClient('synthetic','owner',async<T>(_path:string,method?:string)=>(method?{id:'new',code:'a'.repeat(64),expiresAt:new Date(at+60000).toISOString()}:list) as T,()=>{});
   await ready.load();await ready.command('invite',{childIds:['test-child'],key:'synthetic'});assert.equal(ready.state.code?.value,'a'.repeat(64));ready.dispose();assert.equal(ready.state.code,null);
 });
+
+test('member client rejects incomplete invite commands without writing',async()=>{
+  let writes=0;
+  const client=new FamilyMembersClient('synthetic','owner',async<T>(_path:string,method?:string)=>{if(!method)return list as T;writes++;return {id:'new',code:'b'.repeat(64),expiresAt:new Date(at+60000).toISOString()} as T;},()=>{});
+  await client.load();
+  await client.command('invite',{childIds:[],key:'synthetic-empty'});
+  assert.equal(writes,0);assert.equal(client.state.error,'INVALID_REQUEST');
+  await client.command('invite',{childIds:['test-child']});
+  assert.equal(writes,0);assert.equal(client.state.error,'INVALID_REQUEST');
+  await client.command('invite',{childIds:['test-child'],key:'synthetic-ok'});
+  assert.equal(writes,1);assert.equal(client.state.code?.value,'b'.repeat(64));
+});

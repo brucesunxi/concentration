@@ -40,8 +40,15 @@ v0.24 新增 [家长指导与生活任务的审核发布](docs/productization/FA
 
 需要 Node.js 24.14 或更高版本。
 
+首次安装、`node_modules` 缺失，或依赖清单 / 锁文件发生变化后，先安装依赖：
+
 ```sh
 npm ci
+```
+
+依赖已安装且与当前锁文件一致时，日常开发直接启动：
+
+```sh
 npm run dev
 ```
 
@@ -52,6 +59,21 @@ npm run dev
 - 浏览器前端由 Vite 更新，家庭服务由 Node 监测源码变化。
 
 家长建立本地家庭名称和密码后，可以为最多三个孩子选择昵称、年龄段、练习语言。进入练习会锁定家长权限；再次查看记录或资料需要家长密码。创建者登录名为 `owner`；受邀家长使用自己的登录名及密码，批准后仅访问指定孩子。
+
+### 开发前检查与清理记录
+
+2026-10-14 清理了 28 个缓存和重复文件，共 352,466 字节（约 350 KB）。本次保留了 `node_modules`，这次清理本身不要求重新安装依赖、重建网页或重新制作音频；下次开发按上面的启动步骤即可。
+
+| 已清理内容 | 后续处理 |
+|---|---|
+| 20 个 `.DS_Store` | macOS 可能重新生成，无须手动恢复 |
+| `scripts/qa/__pycache__/` 中的 3 个 `.pyc` | 运行相应 Python 工具时自动生成 |
+| `dist/content-rule-candidates/` 中的 4 份 MP3 副本 | 与 `assets/content-rule-candidates/` 中保留的文件逐字节相同；工作台直接使用保留的素材，普通开发无须生成副本 |
+| `packages/visuals/blueberry-correction-prompt.txt` | 提示词已保留在 `packages/visuals/source.json` 的 `objects-sheet.prompts[1]`，无须恢复 |
+
+需要重新制作候选语音时，再按内容制作流程执行；`voice:content -- --missing-rules` 会请求 Azure 服务，不是开发启动的准备步骤。已有候选素材在 `assets/content-rule-candidates/`。
+
+以后清理前先核对引用和保留用途：`.focus-data/` 是本地持久化数据；`dist/web-releases/` 包含当前网页与旧页面仍会引用的资源；`dist/mobile-native/` 包含测试安装包、升级基线和源码快照；`docs/productization/qa/` 包含验收证据。这些目录不能当作普通缓存整目录删除。原生工程、签名材料和历史兼容素材也应保留。
 
 ### 开发验收用的虚构家庭
 

@@ -16,6 +16,7 @@ import type { PreparedContent,PlayableContent } from './preflight.ts';
 import { appendObservations } from '../../../packages/session-runtime/observations.ts';
 import { TrialLifecycle } from '../../../packages/session-runtime/trial-lifecycle.ts';
 import { phaseAfterTrial } from '../../../packages/session-runtime/index.ts';
+import { isPositiveFrameDelta, shouldRetryPresentationArm } from '../../../packages/session-runtime/presentation-ready.ts';
 import { prepareAuthorization } from '../../../packages/session-runtime/prepare-authorization.ts';
 import type { AuthorizationProof, SessionStatus } from '../../../packages/session-runtime/prepare-authorization.ts';
 import { makeOfflineCapsule, verifyOfflineSession, OfflinePreparationChanged } from '../../../packages/session-runtime/offline-session.ts';
@@ -179,6 +180,7 @@ export function Play({ session, familyId, offline=false, preview, onExit, onExpl
       }
       const next = phaseAfterTrial(plan, window.trial, window.priorInvalidations, after);
       if (next === 'pause') setStatusMessage(t('先歇一下，再一起看清规则。也可以今天就到这里。', 'Let’s pause and look at the rule together. You can also stop for today.'));
+      if (next === 'rest' || next === 'gap' || next === 'feedback') setStatusMessage('');
       return next;
     });
   }
@@ -261,20 +263,34 @@ export function Play({ session, familyId, offline=false, preview, onExit, onExpl
 
   useEffect(() => {
     if (phase !== 'arming' || !trial) return;
-    let frame = 0, cancelled = false; const revision = lifecycle.revision;
-    frame = requestAnimationFrame(first => {
-      frame = requestAnimationFrame(second => {
-        if (cancelled || !lifecycle.isCurrent(revision) || document.hidden) { if (!cancelled && lifecycle.isCurrent(revision)) setPhase('pause'); return; }
-        if (!mayContinue() || offerCheckIn()) return;
-        const presentation = { frameDeltaMs: second - first, assetsReady: !!preparedRef.current || !!previewContent.current, method: 'raf-pair' as const };
-        const failed = modern && trial.windowMs > 0 && plan.environment?.input !== 'assistive' && presentation.frameDeltaMs > TIMING.maxFrameGapMs;
-        if (presentation.frameDeltaMs <= 0) { setPhase('pause'); setStatusMessage(t('画面还没准备好，请稍后继续。', 'The display is not ready. Please try again.')); return; }
-        const onset = now();
-        if (failed) { lifecycle.retire(); setPhase('pause'); setStatusMessage(t('刚才画面有些停顿，这一步不计入结果。准备好可以重来。', 'The display paused briefly. This step will not count. Try again when ready.')); }
-        else { lifecycle.begin(trial, onset, replay(plan, eventsRef.current, session.budget_ms)); setPhase('active'); }
-        void record([{ type: 'present', trialId: trial.id, ...(modern ? { presentation } : {}) }, ...(failed ? [{ type: 'interrupt' as const, reason: 'render_failure' as const }] : [])], undefined, onset);
+    let frame = 0, cancelled = false, attempt = 0; const revision = lifecycle.revision;
+    const arm = () => {
+      frame = requestAnimationFrame(first => {
+        frame = requestAnimationFrame(second => {
+          if (cancelled || !lifecycle.isCurrent(revision) || document.hidden) { if (!cancelled && lifecycle.isCurrent(revision)) setPhase('pause'); return; }
+          if (!mayContinue() || offerCheckIn()) return;
+          const assetsReady = !modern || !!preparedRef.current || !!previewContent.current;
+          const frameDeltaMs = second - first;
+          if (shouldRetryPresentationArm({ attempt, frameDeltaMs, assetsReady })) {
+            attempt += 1;
+            frame = requestAnimationFrame(arm);
+            return;
+          }
+          if (!assetsReady || !isPositiveFrameDelta(frameDeltaMs)) {
+            setPhase('pause');
+            setStatusMessage(t('画面还没准备好，请稍后继续。', 'The display is not ready. Please try again.'));
+            return;
+          }
+          const presentation = { frameDeltaMs, assetsReady, method: 'raf-pair' as const };
+          const failed = modern && trial.windowMs > 0 && plan.environment?.input !== 'assistive' && presentation.frameDeltaMs > TIMING.maxFrameGapMs;
+          const onset = now();
+          if (failed) { lifecycle.retire(); setPhase('pause'); setStatusMessage(t('刚才画面有些停顿，这一步不计入结果。准备好可以重来。', 'The display paused briefly. This step will not count. Try again when ready.')); }
+          else { lifecycle.begin(trial, onset, replay(plan, eventsRef.current, session.budget_ms)); setPhase('active'); }
+          void record([{ type: 'present', trialId: trial.id, ...(modern ? { presentation } : {}) }, ...(failed ? [{ type: 'interrupt' as const, reason: 'render_failure' as const }] : [])], undefined, onset);
+        });
       });
-    });
+    };
+    arm();
     return () => { cancelled = true; cancelAnimationFrame(frame); };
   }, [phase, trial?.id]);
   useEffect(() => {

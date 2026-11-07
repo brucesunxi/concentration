@@ -29,6 +29,7 @@ try {
 }
 await mkdir(mediaDir, { recursive: true });
 for (const name of await readdir(resolve(root, 'src/audio'))) {
+  if (name === '.DS_Store' || name.startsWith('._')) continue;
   if (name.endsWith('.mp3')) await copyFile(resolve(root, 'src/audio', name), resolve(mediaDir, name));
 }
 await auditDirectory(output);

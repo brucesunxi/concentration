@@ -25,6 +25,7 @@ import { Page, Button, Notice, s, colors } from './ui';
 import { makeOfflineCapsule, verifyOfflineSession, OfflinePreparationChanged } from '../../../packages/session-runtime/offline-session.ts';
 
 import { PracticeCheckIn, practiceWindowCopy } from '../../../packages/session-runtime/practice-window.ts';
+import { isPositiveFrameDelta, shouldRetryPresentationArm } from '../../../packages/session-runtime/presentation-ready.ts';
 import { backgroundPauseCopy, shouldPauseForBackground } from '../../../packages/session-runtime/background-pause-copy.ts';
 import type { PracticePhase } from '../../../packages/session-runtime/practice-window.ts';
 type Phase = PracticePhase;
@@ -150,6 +151,7 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
     void act([{ type: 'submit' }], after => {
       const next = phaseAfterTrial(plan, window.trial, window.priorInvalidations, after);
       if (next === 'pause') setStatus(after.invalidations.length > window.priorInvalidations ? t('显示、计时或操作有变化。这一步没有计为错误，准备好后可以重来。', 'Display, timing or input changed. This step was excluded. Try again when ready.') : t('先歇一下，再一起看清规则。今天停在这里也可以。', 'Let’s pause and review the rule. You can also stop for today.'));
+      if (next === 'rest' || next === 'gap' || next === 'feedback') setStatus('');
       return next;
     });
   }
@@ -282,23 +284,33 @@ export function Practice({ session, familyId, client, offline = false, onExit, o
   }, [session.id]);
   useEffect(() => {
     if (phase !== 'arming' || !trial || !content) return;
-    let frame = 0, cancelled = false; const revision = lifecycle.revision;
-    frame = requestAnimationFrame(first => {
-      frame = requestAnimationFrame(second => {
-        if (cancelled || !lifecycle.isCurrent(revision) || AppState.currentState !== 'active') { if (!cancelled && lifecycle.isCurrent(revision)) setPhase('pause'); return; }
-        if (!mayContinue() || offerCheckIn()) return;
-        const delta = second - first, failed = delta <= 0 || (trial.windowMs > 0 && plan.environment?.input !== 'assistive' && delta > TIMING.maxFrameGapMs);
-        // JS-backed native animation frames approximate presentation; no physical-display claim.
-        if (delta <= 0) { setStatus(t('画面还没准备好，请稍后继续。', 'The display is not ready. Please try again.')); setPhase('pause'); return; }
-        const current = runtime.current; if (!current || locking.current) return;
-        const onset = current.now();
-        if (failed) { lifecycle.retire(); setVisible(false); setPhase('pause'); setStatus(t('画面刚才停顿了，这一步不会算成漏答。', 'The display paused. This step will not count as a missed response.')); }
-        else { lifecycle.begin(trial, onset, current.state); setVisible(true); setPhase('active'); }
-        // Opening the response window does not await storage. Inputs are queued
-        // after presentation with their observed times; only saved events are published.
-        void act([{ type: 'present', trialId: trial.id, presentation: { assetsReady: true, frameDeltaMs: delta, method: 'native-frame' } }, ...(failed ? [{ type: 'interrupt' as const, reason: 'render_failure' as const }] : [])], undefined, onset);
+    let frame = 0, cancelled = false, attempt = 0; const revision = lifecycle.revision;
+    const arm = () => {
+      frame = requestAnimationFrame(first => {
+        frame = requestAnimationFrame(second => {
+          if (cancelled || !lifecycle.isCurrent(revision) || AppState.currentState !== 'active') { if (!cancelled && lifecycle.isCurrent(revision)) setPhase('pause'); return; }
+          if (!mayContinue() || offerCheckIn()) return;
+          const delta = second - first;
+          const assetsReady = true;
+          if (shouldRetryPresentationArm({ attempt, frameDeltaMs: delta, assetsReady })) {
+            attempt += 1;
+            frame = requestAnimationFrame(arm);
+            return;
+          }
+          // JS-backed native animation frames approximate presentation; no physical-display claim.
+          if (!isPositiveFrameDelta(delta)) { setStatus(t('画面还没准备好，请稍后继续。', 'The display is not ready. Please try again.')); setPhase('pause'); return; }
+          const failed = trial.windowMs > 0 && plan.environment?.input !== 'assistive' && delta > TIMING.maxFrameGapMs;
+          const current = runtime.current; if (!current || locking.current) return;
+          const onset = current.now();
+          if (failed) { lifecycle.retire(); setVisible(false); setPhase('pause'); setStatus(t('画面刚才停顿了，这一步不会算成漏答。', 'The display paused. This step will not count as a missed response.')); }
+          else { lifecycle.begin(trial, onset, current.state); setVisible(true); setPhase('active'); }
+          // Opening the response window does not await storage. Inputs are queued
+          // after presentation with their observed times; only saved events are published.
+          void act([{ type: 'present', trialId: trial.id, presentation: { assetsReady: true, frameDeltaMs: delta, method: 'native-frame' } }, ...(failed ? [{ type: 'interrupt' as const, reason: 'render_failure' as const }] : [])], undefined, onset);
+        });
       });
-    });
+    };
+    arm();
     return () => { cancelled = true; cancelAnimationFrame(frame); };
   }, [phase, trial?.id, content]);
   useEffect(() => {

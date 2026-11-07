@@ -33,7 +33,7 @@ async function record(relative) {
   const path = join(target, relative), stat = await lstat(path);
   if (stat.isSymbolicLink()) throw new Error(`Unexpected source symlink: ${relative}`);
   if (stat.isDirectory()) {
-    for (const name of (await readdir(path)).sort()) await record(join(relative, name));
+    for (const name of (await readdir(path)).sort()) { if (name === '.DS_Store' || name.startsWith('._')) continue; await record(join(relative, name)); }
   } else {
     const bytes = await readFile(path);
     sourceFiles.push({ path: relative, bytes: bytes.length, sha256: createHash('sha256').update(bytes).digest('hex') });

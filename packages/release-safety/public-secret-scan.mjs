@@ -53,6 +53,7 @@ export async function auditDirectory(directory, environment = process.env) {
   let count = 0;
   async function walk(path) {
     for (const entry of await readdir(path, { withFileTypes: true })) {
+      if (entry.name === '.DS_Store' || entry.name.startsWith('._')) continue;
       const child = join(path, entry.name);
       if (entry.isDirectory()) await walk(child);
       else { await auditFile(root, child, environment); count++; }

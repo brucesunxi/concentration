@@ -16,7 +16,8 @@ export class FamilyMembersClient {
     try{
       let code:MembersState['code']=null;
       if(kind==='invite'){
-        const r=await this.request<{id:string;code:string;expiresAt:string}>('/family/invitations','POST',{childIds:input.childIds,acknowledged:true},{'Idempotency-Key':input.key!});
+        if(!input.childIds?.length||!input.key){this.update({error:'INVALID_REQUEST'});return;}
+        const r=await this.request<{id:string;code:string;expiresAt:string}>('/family/invitations','POST',{childIds:input.childIds,acknowledged:true},{'Idempotency-Key':input.key});
         if(!/^[a-f0-9]{64}$/.test(r.code)||!Number.isFinite(Date.parse(r.expiresAt)))throw {code:'RESULT_UNCONFIRMED'};
         code={value:r.code,expiresAt:r.expiresAt};
       }else{
