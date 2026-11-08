@@ -20,11 +20,17 @@ import { databaseEntitlementReader } from './billing-access.ts';
 import { requestQuery } from './request-query.ts';
 import { observeFamilyRequest, familyRequestLoggingEnabled } from './request-observation.ts';
 import { deliverChildExportFile } from './export-file.ts';
-import { assertPlayInternalServiceSeparation, familyPreviewStatus } from '../../packages/mobile-release/play-internal-android.ts';
+import { assertPlayInternalServiceSeparation, familyPreviewStatus, playInternalPreviewPath } from '../../packages/mobile-release/play-internal-android.ts';
 
 export async function createFamilyServer(options: { serverless?: boolean } = {}) {
 if (process.env.APP_MODE === 'production') throw new Error('Production release remains gated: verified guardian consent, OIDC, regional review, and operational validation are not yet complete.');
-assertPlayInternalServiceSeparation({ enabled: process.env.FOCUS_PLAY_INTERNAL_API, hosts: [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL] });
+const playInternalHosts = assertPlayInternalServiceSeparation({
+  enabled: process.env.FOCUS_PLAY_INTERNAL_API,
+  vercel: process.env.VERCEL === '1',
+  environment: process.env.VERCEL_ENV,
+  servingHosts: [process.env.VERCEL_URL, process.env.VERCEL_BRANCH_URL, process.env.FOCUS_PLAY_INTERNAL_PREVIEW_HOST],
+  productionHost: process.env.VERCEL_PROJECT_PRODUCTION_URL,
+});
 if (options.serverless && (!process.env.DATABASE_URL || !process.env.FOCUS_SESSION_SIGNING_JWK || process.env.VERCEL !== '1')) throw new Error('VERCEL_RUNTIME_CONFIG_REQUIRED');
 const root = resolve(import.meta.dirname, '../..');
 const sourceVersion = (JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as { version: string }).version;
@@ -39,7 +45,7 @@ const authRateSecret = process.env.FOCUS_SESSION_SIGNING_JWK || await readFile(r
 const api = service(db, Date.now, content, authority, localReleaseScope, undefined, databaseEntitlementReader());
 const port = Number(process.env.API_PORT || 4181);
 const allowedOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`, 'http://127.0.0.1:4180', 'http://localhost:4180']);
-const vercelHosts = options.serverless ? [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL].filter((host): host is string => !!host) : [];
+const vercelHosts = options.serverless ? (playInternalHosts.length ? playInternalHosts : [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL].filter((host): host is string => !!host)) : [];
 for (const host of vercelHosts) allowedOrigins.add(`https://${host}`);
 const allowedHosts = options.serverless ? vercelHosts : ['127.0.0.1', 'localhost'];
 async function body(req: http.IncomingMessage) {
@@ -63,6 +69,7 @@ const server = http.createServer(async (req, res) => {
     const url = new URL(req.url || '/', `http://127.0.0.1:${port}`), method = req.method || 'GET';
     const hostname = (req.headers.host || '').split(':')[0];
     if (!allowedHosts.includes(hostname)) throw new ApiError(403, 'HOST_REJECTED', '不允许此主机。');
+    if (process.env.FOCUS_PLAY_INTERNAL_API === '1' && playInternalPreviewPath(url.pathname) === 'deny') { json({ code: 'PLAY_INTERNAL_API_ONLY' }, 404); return; }
     if (!url.pathname.startsWith('/api/')) {
       if (method !== 'GET' && method !== 'HEAD') throw new ApiError(405, 'METHOD_NOT_ALLOWED', '不支持此操作。');
       if (url.pathname.startsWith('/content-assets/')) {
@@ -204,7 +211,7 @@ const server = http.createServer(async (req, res) => {
   }
 });
 server.requestTimeout = 15000; server.headersTimeout = 10000;
-const studioPort=options.serverless ? 0 : Number(process.env.STUDIO_PORT??(postgres?0:port+3));
+const studioPort=options.serverless || process.env.FOCUS_PLAY_INTERNAL_API === '1' ? 0 : Number(process.env.STUDIO_PORT??(postgres?0:port+3));
 if(postgres && studioPort && !process.env.FOCUS_STUDIO_DATABASE_URL) throw new Error('DATABASE_STUDIO_ROLE_REQUIRED');
 const studioDb = postgres && studioPort ? await openDatabase('memory://', process.env.FOCUS_STUDIO_DATABASE_URL) : db;
 if(postgres && studioPort) await verifyRuntimeRole(studioDb,'studio');
@@ -216,4 +223,4 @@ async function shutdown() { if(stopping)return;stopping=true;await Promise.all([
 if (!options.serverless) { process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown); }
 return { server, shutdown };
 }
-if (import.meta.main) await createFamilyServer();
+if (import.meta.main) await createFamilyServer({ serverless: process.env.VERCEL === '1' });

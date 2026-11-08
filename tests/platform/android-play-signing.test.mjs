@@ -1,6 +1,6 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
-import { mkdtemp, readFile, rm, stat } from 'node:fs/promises';
+import { mkdtemp, mkdir, readFile, rm, stat, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
@@ -82,6 +82,32 @@ test('Play internal command checks fail closed without printing a sentinel secre
     assert.equal(created.stdout.includes(payload.toString('base64')), false);
     assert.deepEqual(await readFile(output), payload);
     assert.equal((await stat(output)).mode & 0o077, 0);
+    const localCheck = spawnSync(process.execPath, ['scripts/build-play-internal-android.mjs', '--check'], {
+      cwd: root, encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH, FOCUS_ANDROID_DISTRIBUTION: 'play-internal',
+        EXPO_PUBLIC_FOCUS_API_ORIGIN: 'https://family.example.test',
+        FOCUS_UPLOAD_STORE_FILE: output, FOCUS_PLAY_UPLOAD_KEY_ALIAS: 'focus-island-upload',
+        FOCUS_PLAY_UPLOAD_STORE_PASSWORD: password, FOCUS_PLAY_UPLOAD_KEY_PASSWORD: password,
+      },
+    });
+    assert.equal(localCheck.status, 0, localCheck.stderr);
+    const localReport = JSON.parse(localCheck.stdout.trim());
+    assert.equal(localReport.uploadable, false);
+    assert.equal(localReport.stage, 'inputs');
+    assert.equal(localCheck.stdout.includes(password), false);
+    const protectedBuild = spawnSync(process.execPath, ['scripts/build-play-internal-android.mjs', '--check'], {
+      cwd: root, encoding: 'utf8',
+      env: {
+        PATH: process.env.PATH, FOCUS_ANDROID_DISTRIBUTION: 'play-internal',
+        EXPO_PUBLIC_FOCUS_API_ORIGIN: 'https://concentration-two.vercel.app',
+        FOCUS_UPLOAD_STORE_FILE: output, FOCUS_PLAY_UPLOAD_KEY_ALIAS: 'focus-island-upload',
+        FOCUS_PLAY_UPLOAD_STORE_PASSWORD: password, FOCUS_PLAY_UPLOAD_KEY_PASSWORD: password,
+      },
+    });
+    assert.equal(protectedBuild.status, 1);
+    assert.match(protectedBuild.stderr, /PLAY_INTERNAL_PROTECTED_PREVIEW_FORBIDDEN/);
+    assert.equal(protectedBuild.stderr.includes(password), false);
     const insidePath = join(root, 'upload.p12');
     const inside = spawnSync(process.execPath, ['scripts/materialize-play-upload-keystore.mjs', '--output', insidePath], {
       cwd: root, encoding: 'utf8', env: { PATH: process.env.PATH, FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64: payload.toString('base64') },

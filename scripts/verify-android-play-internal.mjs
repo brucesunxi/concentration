@@ -69,6 +69,7 @@ async function main() {
     'packages/mobile-release/play-internal-android.ts', 'packages/mobile-release/android-play-signing.mjs',
     'packages/session-runtime/mobile-preview-copy.ts', 'scripts/configure-android-play-internal.mjs',
     'scripts/verify-android-play-internal.mjs', 'scripts/check-play-internal-api.mjs',
+    'scripts/build-play-internal-android.mjs',
   ]) assert(paths.has(required), `Incomplete source snapshot: ${required}`);
   const appVersion = JSON.parse((await readSourceFile('apps/family-mobile/package.json')).toString('utf8')).version;
   const sourceVersion = JSON.parse((await readSourceFile('package.json')).toString('utf8')).version;

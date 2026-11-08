@@ -13,12 +13,16 @@ import {
   assertPlayInternalHealthReport,
   assertPlayInternalManifest,
   assertPlayInternalServiceSeparation,
+  playInternalLocalBuildInputs,
+  playInternalPreviewHosts,
   assertPlayInternalSigner,
   assertSecretsNotPackaged,
   assessPlayInternalHealth,
   familyPreviewStatus,
   playInternalApiOrigin,
   playInternalCertificateSha256,
+  playInternalEdgeDecision,
+  playInternalPreviewPath,
   playInternalPrerequisites,
 } from '../../packages/mobile-release/play-internal-android.ts';
 import {
@@ -85,9 +89,23 @@ test('Play internal prerequisites name missing repository settings and do not ec
 test('a protected redirect or non-preview health response cannot satisfy the Play internal API check', () => {
   assert.match(readFileSync(new URL('../../scripts/deployment-identity.mjs', import.meta.url), 'utf8'), new RegExp(`export const PROTECTED_PREVIEW_ALIAS = '${PROTECTED_PREVIEW_HOST}'`));
   assert.throws(() => playInternalApiOrigin(`https://${PROTECTED_PREVIEW_HOST}`), /PLAY_INTERNAL_PROTECTED_PREVIEW_FORBIDDEN/);
-  assert.throws(() => assertPlayInternalServiceSeparation({ enabled: '1', hosts: [PROTECTED_PREVIEW_HOST] }), /PLAY_INTERNAL_API_PROTECTED_HOST_FORBIDDEN/);
-  assert.doesNotThrow(() => assertPlayInternalServiceSeparation({ enabled: undefined, hosts: [PROTECTED_PREVIEW_HOST] }));
-  assert.doesNotThrow(() => assertPlayInternalServiceSeparation({ enabled: '1', hosts: ['focus-island-internal.vercel.app'] }));
+  assert.throws(() => assertPlayInternalServiceSeparation({ enabled: '1', vercel: true, environment: 'preview', servingHosts: [PROTECTED_PREVIEW_HOST], productionHost: PROTECTED_PREVIEW_HOST }), /PLAY_INTERNAL_API_PROTECTED_HOST_FORBIDDEN/);
+  assert.throws(() => assertPlayInternalServiceSeparation({ enabled: '1', vercel: true, environment: 'production', servingHosts: ['concentration-git-play.vercel.app'], productionHost: PROTECTED_PREVIEW_HOST }), /PLAY_INTERNAL_API_PREVIEW_REQUIRED/);
+  assert.deepEqual(assertPlayInternalServiceSeparation({ enabled: undefined, vercel: true, environment: 'production', servingHosts: [PROTECTED_PREVIEW_HOST], productionHost: PROTECTED_PREVIEW_HOST }), []);
+  assert.deepEqual(playInternalPreviewHosts(['concentration-git-play.vercel.app'], PROTECTED_PREVIEW_HOST), ['concentration-git-play.vercel.app']);
+  const denied = ['/', '/index.html', '/focus-sw.js', '/offline-shell.json', '/assets/index.js', '/studio', '/admin', '/support', '/media/guide.mp3', '/api/studio/me', '/api/admin', '/api/support', '/content-assets/../index.html'];
+  for (const path of denied) assert.equal(playInternalPreviewPath(path), 'deny', path);
+  assert.equal(playInternalPreviewPath('/api/health'), 'allow');
+  assert.equal(playInternalPreviewPath(`/content-assets/${'ab'.repeat(32)}.png`), 'allow');
+  assert.equal(playInternalEdgeDecision({ enabled: '1', environment: 'preview', pathname: '/focus-sw.js' }).code, 'PLAY_INTERNAL_API_ONLY');
+  assert.equal(playInternalEdgeDecision({ enabled: '1', environment: 'production', pathname: '/' }).action, 'continue');
+  assert.equal(playInternalEdgeDecision({ enabled: undefined, environment: 'preview', pathname: '/' }).apiOnly, false);
+  const localBuild = playInternalLocalBuildInputs(signing);
+  assert.equal(localBuild.origin, 'https://family.example.test');
+  assert.equal(JSON.stringify(localBuild).includes(password), false);
+  const middleware = readFileSync(new URL('../../middleware.ts', import.meta.url), 'utf8');
+  assert.match(middleware, /playInternalEdgeDecision/);
+  assert.doesNotMatch(middleware, /x-vercel-protection-bypass|protection-bypass|bypass token/i);
   const localStatus = familyPreviewStatus('0.46.0', 'local-development', {});
   assert.equal('audience' in localStatus, false);
   assert.equal(familyPreviewStatus('0.46.0', 'local-development', { FOCUS_PLAY_INTERNAL_API: '1' }).audience, 'play-internal');

@@ -1,8 +1,9 @@
 name: Android Play internal testing
 
 # Manual internal-testing candidate. The upload certificate is pinned in source.
-# The API origin must be a separate project: unauthenticated /api/health and
-# /api/ready return audience play-internal. concentration-two.vercel.app is rejected.
+# The API origin must be the API-only preview domain on project concentration.
+# concentration-two.vercel.app stays protected and is rejected.
+# When Actions secrets are absent, build on the parent machine with npm run mobile:play-internal.
 
 on:
   workflow_dispatch:

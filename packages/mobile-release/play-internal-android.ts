@@ -71,9 +71,72 @@ export function androidAppIdentity(env: Record<string, string | undefined>): {
   return { distribution: 'play-internal', name: PLAY_INTERNAL_APP_NAME, origin, local: false };
 }
 
-export function assertPlayInternalServiceSeparation(input: { enabled: string | undefined; hosts: Array<string | undefined> }): void {
-  if (input.enabled !== '1') return;
-  if (input.hosts.some(host => host?.split(':')[0] === PROTECTED_PREVIEW_HOST)) throw new Error('PLAY_INTERNAL_API_PROTECTED_HOST_FORBIDDEN');
+function previewHost(value: string): string {
+  const host = value.trim().toLowerCase();
+  if (!host || /[\s/?#@\\]/.test(host) || host.includes('://')) throw new Error('PLAY_INTERNAL_PREVIEW_HOST_INVALID');
+  return host.split(':')[0];
+}
+
+/** Hosts this preview deployment may answer. The protected production alias is never one of them. */
+export function playInternalPreviewHosts(values: Array<string | undefined>, productionHost?: string): string[] {
+  const production = productionHost?.trim() ? previewHost(productionHost) : undefined;
+  const hosts: string[] = [];
+  for (const value of values) {
+    if (!value?.trim()) continue;
+    const host = previewHost(value);
+    if (host === PROTECTED_PREVIEW_HOST || (production && host === production)) throw new Error('PLAY_INTERNAL_API_PROTECTED_HOST_FORBIDDEN');
+    if (!hosts.includes(host)) hosts.push(host);
+  }
+  return hosts;
+}
+
+export function assertPlayInternalServiceSeparation(input: {
+  enabled: string | undefined;
+  vercel?: boolean;
+  environment?: string;
+  servingHosts: Array<string | undefined>;
+  productionHost?: string;
+}): string[] {
+  if (input.enabled !== '1') return [];
+  if (input.vercel && input.environment !== 'preview') throw new Error('PLAY_INTERNAL_API_PREVIEW_REQUIRED');
+  const hosts = playInternalPreviewHosts(input.servingHosts, input.productionHost);
+  if (input.vercel && hosts.length === 0) throw new Error('PLAY_INTERNAL_API_HOST_REQUIRED');
+  return hosts;
+}
+
+export function playInternalLocalBuildInputs(env: Record<string, string | undefined>): { origin: string; certificateSha256: string; storeFile: string } {
+  if (env.FOCUS_ANDROID_DISTRIBUTION !== PLAY_INTERNAL_DISTRIBUTION) throw new Error('PLAY_INTERNAL_DISTRIBUTION_REQUIRED');
+  const origin = playInternalApiOrigin(env.EXPO_PUBLIC_FOCUS_API_ORIGIN);
+  const certificateSha256 = playInternalCertificateSha256(env.FOCUS_PLAY_UPLOAD_CERT_SHA256);
+  const storeFile = env.FOCUS_UPLOAD_STORE_FILE ?? '';
+  if (!storeFile.trim() || /[\r\n]/.test(storeFile)) throw new Error('PLAY_INTERNAL_SIGNING_CONFIG_MISSING:FOCUS_UPLOAD_STORE_FILE');
+  if (env.FOCUS_PLAY_UPLOAD_KEY_ALIAS !== PLAY_INTERNAL_UPLOAD_KEY_ALIAS) throw new Error('PLAY_INTERNAL_KEY_ALIAS_UNEXPECTED');
+  for (const name of ['FOCUS_PLAY_UPLOAD_STORE_PASSWORD', 'FOCUS_PLAY_UPLOAD_KEY_PASSWORD'] as const) {
+    const value = env[name] ?? '';
+    if (!value.trim()) throw new Error(`PLAY_INTERNAL_SIGNING_CONFIG_MISSING:${name}`);
+    if (/[\r\n]/.test(value)) throw new Error('PLAY_INTERNAL_SIGNING_SECRET_INVALID');
+  }
+  return { origin, certificateSha256, storeFile };
+}
+
+const CONTENT_ASSET_PATH = /^\/content-assets\/[a-f0-9]{64}\.(png|mp3)$/;
+
+/** Routes a Play internal preview may answer. Everything else is the website, studio, or admin surface. */
+export function playInternalPreviewPath(pathname: string): 'allow' | 'deny' {
+  if (!pathname.startsWith('/') || pathname.includes('\\') || pathname.includes('\0')) return 'deny';
+  const path = pathname.toLowerCase();
+  if (path === '/api/health' || path === '/api/ready') return 'allow';
+  if (path.startsWith('/api/studio') || path.startsWith('/api/admin') || path.startsWith('/api/support')) return 'deny';
+  if (path.startsWith('/api/')) return 'allow';
+  if (CONTENT_ASSET_PATH.test(pathname)) return 'allow';
+  return 'deny';
+}
+
+export function playInternalEdgeDecision(input: { enabled: string | undefined; environment: string | undefined; pathname: string }): { action: 'continue' | 'deny'; apiOnly: boolean; status?: 404; code?: 'PLAY_INTERNAL_API_ONLY' } {
+  const apiOnly = input.enabled === '1' && input.environment !== 'production';
+  if (!apiOnly) return { action: 'continue', apiOnly: false };
+  if (playInternalPreviewPath(input.pathname) === 'allow') return { action: 'continue', apiOnly: true };
+  return { action: 'deny', apiOnly: true, status: 404, code: 'PLAY_INTERNAL_API_ONLY' };
 }
 
 export function familyPreviewStatus(version: string, releaseScopeVersion: string, env: { FOCUS_PLAY_INTERNAL_API?: string } = {}): {

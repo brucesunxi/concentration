@@ -168,11 +168,39 @@ Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 
 - `FOCUS_PLAY_UPLOAD_KEY_ALIAS`：精确等于 `focus-island-upload`。
 - `FOCUS_PLAY_UPLOAD_KEY_PASSWORD`
 
-现有项目 `concentration`（`https://concentration-two.vercel.app`）的家庭 API 代码本身不要求交互式登录，但 Vercel Authentication 挡在前面。2026-11-08 未登录请求 `/`、`/api/health`、`/api/ready` 均为 302 到 Vercel 登录页。不要关闭该项目的 Deployment Protection，也不要把 Vercel 绕过凭据编进安装包。手机测试需要另一个 Vercel 项目，使用同一仓库的 `vercel.json` 与 `api/index.ts`，Deployment Protection 设为关闭，并且只在现有 Neon 项目允许且不产生新费用时新建空数据库。Neon 计划若拒绝再建数据库，就停止，不要升级套餐。
+现有项目 `concentration` 继续服务 `https://concentration-two.vercel.app`，`ssoProtection.deploymentType` 保持 `all`。不要关闭 Deployment Protection，不要把例外加到这个生产域名，也不要把 Vercel bypass token 放进安装包。Vercel 的保护例外按整个预览域名生效，不能只放开 `/api`。因此例外域名上的部署必须是 API-only：页面、静态文件、service worker、`/studio`、`/admin`、`/support` 和 `/media` 返回 JSON 404；`/api/*` 仍要登录；`/api/health` 与 `/api/ready` 匿名返回 `audience=play-internal`。练习素材仍只走 `/content-assets/<64位哈希>.png|mp3`。
 
-专用库不要从预览库分支复制，也不要复用受保护项目的 `DATABASE_URL` 或 `FOCUS_SESSION_SIGNING_JWK`。在本机私密环境对新库执行 `npm run db:prepare`（需要 `DATABASE_MIGRATION_URL`、`FOCUS_DATABASE_ROLE`、`FOCUS_DATA_DIR`）。它迁移到 schema 32、安装内置预览内容并写出 `session-signing.jwk.json`。不要设置 `FOCUS_STUDIO_DATABASE_ROLE`。运行角色使用新名字（例如 `focus_play_internal_runtime`），且不能是超级用户。准备命令不创建家庭或儿童账号；测试人员在 App 内用虚构家庭自行注册。
+只使用现有 Neon 项目 `steep-waterfall-35706280`、生产分支 `br-ancient-math-b5mufwu8`、端点 `ep-winter-rain-b51yahyp`、数据库 `neondb`。不要创建、克隆、迁移或重置数据库。运行账号仍是已授权的 `focus_family_runtime`。在 Vercel 的 Preview 环境（不是 Production）设置 `FOCUS_PLAY_INTERNAL_API=1`、现有池化运行连接 `DATABASE_URL`，以及一把新的 `FOCUS_SESSION_SIGNING_JWK`。Production 环境不要加这个标志，也不要替换原来的 JWK。然后把本分支部署为 Preview，把 Deployment Protection Exception 只加到该预览域名。例外按整个域名生效。分支别名由 `VERCEL_BRANCH_URL` 自动允许。如果例外域名不是 `VERCEL_URL` 或 `VERCEL_BRANCH_URL`，再在 Preview 设置 `FOCUS_PLAY_INTERNAL_PREVIEW_HOST` 为那个主机名，不要写协议或路径。`FOCUS_PLAY_INTERNAL_API=1` 在 Production，或服务主机是 `concentration-two.vercel.app` 时，会拒绝启动。
 
-新 Vercel 项目只设置三个环境值：池化运行账号 `DATABASE_URL`、上述 JWK 的 `FOCUS_SESSION_SIGNING_JWK`，以及 `FOCUS_PLAY_INTERNAL_API=1`。平台会提供 `VERCEL=1`。`FOCUS_PLAY_INTERNAL_API=1` 不得出现在项目 `concentration` 上；若该项目的主机环境仍是 `concentration-two.vercel.app`，服务会拒绝启动。部署到新项目的 Production 后，未登录的 `GET /api/health` 和 `GET /api/ready` 都必须是 HTTP 200、无跳转，且 JSON 含 `mode=local-development` 与 `audience=play-internal`。确认这两项之后，才把该源地址写入 `FOCUS_PLAY_INTERNAL_API_ORIGIN` 并手动运行工作流。家长把产物 AAB 上传到已有的 Play 内部测试轨道。通过的报告不是公开上架、真实家庭使用、隐私政策、价格保存或设备验收。
+新的会话公钥要追加到现有 `session_authorities`，不能使用 `npm run db:prepare`。在仓库外的私密目录执行：
+
+```sh
+node scripts/register-play-session-authority.ts --write-new-jwk --jwk-file /安全目录/play-internal-session.jwk.json
+```
+
+把该文件的完整 JSON 放进 Preview 的 `FOCUS_SESSION_SIGNING_JWK`。再用数据库所有者连接（不是 `focus_family_runtime`）执行：
+
+```sh
+DATABASE_MIGRATION_URL='所有者连接' node scripts/register-play-session-authority.ts --register --jwk-file /安全目录/play-internal-session.jwk.json
+```
+
+脚本只在 schema 已是 32 时插入一行公钥。旧行保留。它不打印私钥，也不创建角色。
+
+预览域名的未登录 `GET /api/health` 和 `GET /api/ready` 都是 HTTP 200、无跳转，且带 `audience=play-internal` 之后，在已经拥有上传 p12 的电脑上构建。不要再生成上传密钥。GitHub Actions 目前没有这些密钥，不能代替本机构建：
+
+```sh
+export FOCUS_ANDROID_DISTRIBUTION=play-internal
+export EXPO_PUBLIC_FOCUS_API_ORIGIN='https://已验证的预览域名'
+export FOCUS_UPLOAD_STORE_FILE='仓库外的 focus-island-upload.p12 绝对路径'
+export FOCUS_PLAY_UPLOAD_KEY_ALIAS=focus-island-upload
+export FOCUS_PLAY_UPLOAD_STORE_PASSWORD='本机已有的库密码'
+export FOCUS_PLAY_UPLOAD_KEY_PASSWORD='本机已有的密钥密码'
+export JAVA_HOME='现有 JDK'
+export ANDROID_HOME='现有 Android SDK'
+npm run mobile:play-internal
+```
+
+输入检查可用 `node scripts/build-play-internal-android.mjs --check`。它不编译，也不表示可以上传。完整命令会先请求 health 和 ready，再用这把 p12 打 release，并核对固定证书指纹。通过的报告不是公开上架、真实儿童使用或价格保存。
 
 ### Android 开发包
 
