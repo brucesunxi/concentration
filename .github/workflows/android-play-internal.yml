@@ -1,0 +1,85 @@
+name: Android Play internal testing
+
+on:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  build:
+    runs-on: ubuntu-24.04
+    timeout-minutes: 50
+    env:
+      FOCUS_ANDROID_DISTRIBUTION: play-internal
+      EXPO_PUBLIC_FOCUS_API_ORIGIN: ${{ vars.FOCUS_PLAY_INTERNAL_API_ORIGIN }}
+      FOCUS_PLAY_UPLOAD_CERT_SHA256: ${{ vars.FOCUS_PLAY_UPLOAD_CERT_SHA256 }}
+      FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64: ${{ secrets.FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64 }}
+      FOCUS_PLAY_UPLOAD_STORE_PASSWORD: ${{ secrets.FOCUS_PLAY_UPLOAD_STORE_PASSWORD }}
+      FOCUS_PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.FOCUS_PLAY_UPLOAD_KEY_ALIAS }}
+      FOCUS_PLAY_UPLOAD_KEY_PASSWORD: ${{ secrets.FOCUS_PLAY_UPLOAD_KEY_PASSWORD }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v7
+        with:
+          node-version: '26'
+          cache: npm
+      - uses: actions/setup-java@v5
+        with:
+          distribution: temurin
+          java-version: '17'
+      - name: Require Play internal settings
+        run: node scripts/check-play-internal-prerequisites.mjs
+      - name: Require a reachable HTTPS test API
+        run: node scripts/check-play-internal-api.mjs --output dist/mobile-native/android-play-internal/api-health.json
+      - run: npm ci
+      - name: Check native contracts
+        run: npm run mobile:check
+      - name: Prepare upload keystore outside the workspace
+        run: node scripts/materialize-play-upload-keystore.mjs --output "$RUNNER_TEMP/focus-play-upload.p12"
+      - name: Point the build at the upload keystore path
+        run: echo "FOCUS_UPLOAD_STORE_FILE=$RUNNER_TEMP/focus-play-upload.p12" >> "$GITHUB_ENV"
+      - name: Record exact mobile source
+        run: node scripts/snapshot-mobile-source.mjs dist/mobile-native/android-play-internal/source-snapshot.json
+      - name: Generate Android project
+        run: node scripts/mobile.mjs prebuild --platform android --clean --no-install
+      - name: Require the Play internal upload key for release
+        run: node scripts/configure-android-play-internal.mjs --gradle apps/family-mobile/android/app/build.gradle
+      - name: Build the internal testing packages
+        working-directory: apps/family-mobile/android
+        run: bash ./gradlew :app:assembleRelease :app:bundleRelease --no-daemon --max-workers=2
+      - name: Preserve packages
+        run: |
+          cp apps/family-mobile/android/app/build/outputs/bundle/release/app-release.aab \
+            dist/mobile-native/android-play-internal/FocusIsland-play-internal.aab
+          cp apps/family-mobile/android/app/build/outputs/apk/release/app-release.apk \
+            dist/mobile-native/android-play-internal/FocusIsland-play-internal.apk
+      - name: Verify the internal testing bundle
+        run: |
+          ANDROID_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
+          test -x "$ANDROID_TOOLS/aapt2" && test -x "$ANDROID_TOOLS/apksigner"
+          node scripts/verify-android-play-internal.mjs \
+            --aab dist/mobile-native/android-play-internal/FocusIsland-play-internal.aab \
+            --apk dist/mobile-native/android-play-internal/FocusIsland-play-internal.apk \
+            --snapshot dist/mobile-native/android-play-internal/source-snapshot.json \
+            --api-health dist/mobile-native/android-play-internal/api-health.json \
+            --api-origin "$EXPO_PUBLIC_FOCUS_API_ORIGIN" \
+            --expected-cert-sha256 "$FOCUS_PLAY_UPLOAD_CERT_SHA256" \
+            --source-ref "$GITHUB_SHA" --java-home "$JAVA_HOME" --android-tools "$ANDROID_TOOLS" \
+            --output dist/mobile-native/android-play-internal/play-internal-report.json
+      - name: Remove the upload keystore
+        if: always()
+        run: rm -f "$RUNNER_TEMP/focus-play-upload.p12"
+      - uses: actions/upload-artifact@v7
+        with:
+          name: focus-island-play-internal-${{ github.sha }}
+          path: |
+            dist/mobile-native/android-play-internal/FocusIsland-play-internal.aab
+            dist/mobile-native/android-play-internal/FocusIsland-play-internal.apk
+            dist/mobile-native/android-play-internal/source-snapshot.json
+            dist/mobile-native/android-play-internal/api-health.json
+            dist/mobile-native/android-play-internal/play-internal-report.json
+          if-no-files-found: error
+          retention-days: 14

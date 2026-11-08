@@ -3,7 +3,8 @@ import { Text, View } from 'react-native';
 import { randomUUID } from 'expo-crypto';
 import type { Child } from '../../../packages/contracts/models.ts';
 import type { AgeBand, Locale } from '../../../packages/task-engine/index.ts';
-import { MobileClient, MobileRequestError } from './client';
+import { API_IS_LOCAL, MobileClient, MobileRequestError } from './client';
+import { mobileAgeReviewAcknowledgement } from '../../../packages/session-runtime/mobile-preview-copy.ts';
 import { Button, CheckBox, Choice, Notice, s } from './ui';
 
 type Space={childId:string;currentAgeBand:AgeBand;version:number;state:'current'|'due'|'pending'|'adult-pending';dueAt:string;targetAgeBand:AgeBand|'18+'|null;unfinished:{id:string;createdAt:string;uploadUntil:string|null;uploadExpired:boolean}[]};
@@ -40,7 +41,7 @@ export function AgeReview({child,locale,mode,client,onChanged,onRequireLogin}:{c
       {space.unfinished.map(item=><Text key={item.id} style={s.muted}>{new Date(item.createdAt).toLocaleString(locale)} · {item.uploadUntil?item.uploadExpired?t('补传期限已过','Upload deadline passed'):t(`可补传至 ${new Date(item.uploadUntil).toLocaleString(locale)}`,`Upload until ${new Date(item.uploadUntil).toLocaleString(locale)}`):t('请在原设备处理','Resolve on the original device')}</Text>)}
       <Text style={s.muted}>{t('确认适合的年龄档','Confirm the age band')}</Text><View style={s.row}>{bands.map(b=><Choice key={b} label={b} selected={target===b} disabled={busy} onPress={()=>{setTarget(b);setAck(false);setLocalAck(false);setExpiredAck(false);}}/>)}</View>
       <CheckBox value={ack} disabled={busy} onChange={setAck} label={t('我已核对年龄档；变更前会处理旧设备的练习与本机记录。','I checked the age band and will resolve older device practice and local records before applying a change.')}/>
-      {space.state==='pending'&&target===space.targetAgeBand&&mode==='local-development'&&<CheckBox value={localAck} disabled={busy} onChange={setLocalAck} label={t('我同意在这台设备继续保存新年龄档的本地测试记录，并会让孩子每次自行选择是否参加。','I agree to save local test records for the new age band on this device and let my child choose each time whether to take part.')}/>}
+      {space.state==='pending'&&target===space.targetAgeBand&&mode==='local-development'&&<CheckBox value={localAck} disabled={busy} onChange={setLocalAck} label={mobileAgeReviewAcknowledgement(locale, !API_IS_LOCAL)}/>}
       {canResolveExpired&&target===space.targetAgeBand&&<CheckBox value={expiredAck} disabled={busy} onChange={setExpiredAck} label={t('我知道补传期限已过。服务器会保留已收到的步骤，但不能合并原设备上未上传的步骤；我会自行保留或导出原设备记录。','I understand the upload deadlines passed. The server keeps received steps but cannot merge steps left only on the old device. I will keep or export its records separately.')}/>}
       <Button title={space.state==='adult-pending'&&target==='18+'?t('等待独立权利核验','Await rights review'):space.state==='pending'&&target===space.targetAgeBand?t('让新年龄档生效','Apply the new age band'):target===space.currentAgeBand?t('确认当前年龄档','Confirm current band'):t('提出年龄档变更','Request age band change')} disabled={!ack||busy||(space.state==='adult-pending'&&target==='18+')||(space.state==='pending'&&target===space.targetAgeBand&&mode==='local-development'&&!localAck)||(canResolveExpired&&target===space.targetAgeBand&&!expiredAck)} onPress={()=>void act(space.state==='pending'&&target===space.targetAgeBand?'apply':'request')}/>
       {space.state==='pending'&&<Text style={s.muted}>{t('生效后年龄相关进度和每日额度会重置，监护许可重新核对；历史记录保留原年龄。','Applying resets age-specific progress and daily limits and rechecks guardian permission. Earlier records keep their original age band.')}</Text>}

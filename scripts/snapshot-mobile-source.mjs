@@ -11,6 +11,9 @@ const output = resolve(process.argv[2]);
 assert(output.startsWith(root + sep), 'Snapshot output must be inside the workspace');
 const sources = [
   'package.json', 'package-lock.json', 'tsconfig.json', 'packages', 'scripts/mobile.mjs',
+  'scripts/configure-android-play-internal.mjs', 'scripts/verify-android-play-internal.mjs',
+  'scripts/check-play-internal-prerequisites.mjs', 'scripts/check-play-internal-api.mjs',
+  'scripts/materialize-play-upload-keystore.mjs',
   'apps/family-mobile/package.json', 'apps/family-mobile/build-identity.json',
   'apps/family-mobile/app.config.ts', 'apps/family-mobile/metro.config.cjs',
   'apps/family-mobile/tsconfig.json', 'apps/family-mobile/Gemfile',

@@ -15,7 +15,9 @@ import { validRequestReference } from '../../../packages/contracts/request-refer
 import { completeSignOut } from '../../../packages/session-runtime/complete-sign-out.ts';
 
 // Public build-time routing only. Server policy still decides which market may open.
-export const API_ORIGIN = mobileApiOrigin(process.env.EXPO_PUBLIC_FOCUS_API_ORIGIN).origin;
+const apiRoute = mobileApiOrigin(process.env.EXPO_PUBLIC_FOCUS_API_ORIGIN);
+export const API_ORIGIN = apiRoute.origin;
+export const API_IS_LOCAL = apiRoute.local;
 const CHILD_TOKEN = 'focus.local.child-token.v1';
 const options = { keychainAccessible: SecureStore.WHEN_UNLOCKED_THIS_DEVICE_ONLY };
 export class MobileRequestError extends Error {

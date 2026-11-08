@@ -151,6 +151,37 @@ Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 
 
 这只是连接配置，不会开放新市场或绕过服务端授权。当前 Vercel 预览受 Vercel Authentication 保护，原生 App 不能直接完成该网页登录；不要把预览绕过凭据编入 App。正式区域路由、可验证监护同意、真实设备联调和生产发布仍待完成，见[远端路由验收](qa/mobile-api-routing-v0.46-qa.md)。
 
+### Play 内部测试包
+
+`Android test packages` 工作流仍生成调试证书和 `http://localhost:4181` 明文包，不能上传 Google Play。Play 内部测试使用单独的手动工作流 `Android Play internal testing`。它不设置 `APP_MODE=production`，安装包名称是 Focus Island Preview，Android 版本码从被拒绝的 17 增到 18（应用版本 0.2.17）。本地开发构建不读取这组 Play 变量。
+
+工作流在仓库变量和密钥不齐、上传证书不是配置的公钥指纹、或测试 API 不可达时直接失败，不会退回调试证书。私钥只留在 GitHub Actions 密钥和家长自己的保管位置，不进入 Git、产物报告或日志。本仓库不生成长期上传密钥。
+
+需要的仓库变量：
+
+- `FOCUS_PLAY_INTERNAL_API_ORIGIN`：公网 HTTPS 根地址，不能带账号、路径、查询或片段。
+- `FOCUS_PLAY_UPLOAD_CERT_SHA256`：上传证书 SHA-256，64 位小写十六进制，不含冒号。
+
+需要的仓库密钥：
+
+- `FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64`
+- `FOCUS_PLAY_UPLOAD_STORE_PASSWORD`
+- `FOCUS_PLAY_UPLOAD_KEY_ALIAS`：只含字母、数字、点、下划线和连字符。
+- `FOCUS_PLAY_UPLOAD_KEY_PASSWORD`
+
+2026-11-08 从公网请求 `https://concentration-two.vercel.app` 的 `/api/health`、`/api/ready` 和 `/`，均返回 302 到 Vercel 登录页。它现在不能作为测试机可访问的家庭 API。工作流只接受未跳转、HTTP 200、且 JSON `mode` 为 `local-development` 的 `/api/health`。关闭现有预览的登录保护会把网页一起公开，需要单独决定；更稳妥的是一个不要求交互式 Vercel 登录的专用测试部署。这次改动不会创建该部署，也不会产生费用。
+
+家长确认自己保管上传密钥后，可在自己的电脑生成 PKCS#12，并把证书指纹和密钥内容分别放进上面的变量和密钥。不要把生成的文件或 Base64 提交到仓库：
+
+```sh
+keytool -genkeypair -v -keystore focus-island-play-upload.p12 -storetype PKCS12 \
+  -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
+  -dname "CN=Focus Island Upload, OU=Internal Testing, O=Focus Island, C=US"
+keytool -list -v -keystore focus-island-play-upload.p12 -alias upload
+```
+
+Play 应用签名密钥由 Google Play App Signing 保管。这里的密钥只用于上传。静态报告通过也不表示已经完成公开上架、真实家庭使用、隐私政策、价格保存或设备验收。
+
 ### Android 开发包
 
 本批在隔离目录安装并校验 Temurin JDK 21.0.12.1、Android SDK/Build Tools 36、NDK 27.1.12297006、CMake 3.22.1，未替换系统 Java。依赖源与下载校验记录保留在构建目录的 `.native-tools/android-build/`。Gradle wrapper 9.3.1、AGP 8.12.0 由当前工程固定。
