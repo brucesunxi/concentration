@@ -6,6 +6,11 @@ export const PLAY_INTERNAL_APP_NAME = 'Focus Island Preview';
 export const LOCAL_ANDROID_APP_NAME = 'Focus Island Dev';
 export const PLAY_INTERNAL_MIN_VERSION_CODE = 18;
 export const HOSTED_SERVICE_MARKER = HOSTED_TEST_SERVICE_MARKER;
+export const PLAY_INTERNAL_API_AUDIENCE = 'play-internal';
+export const PLAY_INTERNAL_UPLOAD_KEY_ALIAS = 'focus-island-upload';
+/** Public upload certificate fingerprint. Not a private key. */
+export const PLAY_INTERNAL_UPLOAD_CERT_SHA256 = '8471406ac196ee358f777ee2574c86a94d6be86eea0d50fd4e1c242f8f4894fa';
+export const PROTECTED_PREVIEW_HOST = 'concentration-two.vercel.app';
 
 const REPO_SIGNING_SETTINGS = [
   'FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64',
@@ -17,22 +22,25 @@ const REPO_SIGNING_SETTINGS = [
 export function playInternalApiOrigin(raw: string | undefined): string {
   const parsed = mobileApiOrigin(raw);
   if (parsed.local || !parsed.origin.startsWith('https://')) throw new Error('PLAY_INTERNAL_HTTPS_API_REQUIRED');
+  if (new URL(parsed.origin).hostname === PROTECTED_PREVIEW_HOST) throw new Error('PLAY_INTERNAL_PROTECTED_PREVIEW_FORBIDDEN');
   return parsed.origin;
 }
 
 export function playInternalCertificateSha256(raw: string | undefined): string {
-  const value = (raw ?? '').trim().toLowerCase();
+  const value = (raw ?? '').trim().toLowerCase().replace(/:/g, '');
+  if (!value) return PLAY_INTERNAL_UPLOAD_CERT_SHA256;
   if (!/^[a-f0-9]{64}$/.test(value)) throw new Error('PLAY_INTERNAL_CERT_SHA256_INVALID');
+  if (value !== PLAY_INTERNAL_UPLOAD_CERT_SHA256) throw new Error('PLAY_INTERNAL_CERT_SHA256_MISMATCH');
   return value;
 }
 
 function signingMaterial(env: Record<string, string | undefined>, names: readonly string[]): void {
   const missing = names.filter(name => !env[name]?.trim());
   if (missing.length) throw new Error(`PLAY_INTERNAL_SIGNING_CONFIG_MISSING:${missing.join(',')}`);
+  if (env.FOCUS_PLAY_UPLOAD_KEY_ALIAS !== PLAY_INTERNAL_UPLOAD_KEY_ALIAS) throw new Error('PLAY_INTERNAL_KEY_ALIAS_UNEXPECTED');
   if (/[\r\n]/.test(env.FOCUS_PLAY_UPLOAD_STORE_PASSWORD ?? '') || /[\r\n]/.test(env.FOCUS_PLAY_UPLOAD_KEY_PASSWORD ?? '')) {
     throw new Error('PLAY_INTERNAL_SIGNING_SECRET_INVALID');
   }
-  if (!/^[A-Za-z0-9._-]{1,64}$/.test(env.FOCUS_PLAY_UPLOAD_KEY_ALIAS ?? '')) throw new Error('PLAY_INTERNAL_KEY_ALIAS_INVALID');
 }
 
 /** Repository settings required before a Play internal workflow may build. Values are never returned. */
@@ -63,21 +71,34 @@ export function androidAppIdentity(env: Record<string, string | undefined>): {
   return { distribution: 'play-internal', name: PLAY_INTERNAL_APP_NAME, origin, local: false };
 }
 
-export function assessPlayInternalHealth(input: { httpStatus: number; redirected: boolean; body: unknown }): { mode: 'local-development' } {
-  if (input.redirected || input.httpStatus !== 200) throw new Error('PLAY_INTERNAL_API_UNREACHABLE');
-  if (!input.body || typeof input.body !== 'object' || Array.isArray(input.body)) throw new Error('PLAY_INTERNAL_API_HEALTH_INVALID');
-  const body = input.body as { status?: unknown; mode?: unknown };
-  if (body.status !== 'ok' || body.mode !== 'local-development') throw new Error('PLAY_INTERNAL_API_HEALTH_INVALID');
-  return { mode: 'local-development' };
+export function assertPlayInternalServiceSeparation(input: { enabled: string | undefined; hosts: Array<string | undefined> }): void {
+  if (input.enabled !== '1') return;
+  if (input.hosts.some(host => host?.split(':')[0] === PROTECTED_PREVIEW_HOST)) throw new Error('PLAY_INTERNAL_API_PROTECTED_HOST_FORBIDDEN');
 }
 
-export function assertPlayInternalHealthReport(value: unknown, origin: string): { origin: string; httpStatus: 200; mode: 'local-development'; redirected: false } {
+export function familyPreviewStatus(version: string, releaseScopeVersion: string, env: { FOCUS_PLAY_INTERNAL_API?: string } = {}): {
+  status: 'ok'; mode: 'local-development'; version: string; releaseScopeVersion: string; audience?: typeof PLAY_INTERNAL_API_AUDIENCE;
+} {
+  const status = { status: 'ok' as const, mode: 'local-development' as const, version, releaseScopeVersion };
+  if (env.FOCUS_PLAY_INTERNAL_API === '1') return { ...status, audience: PLAY_INTERNAL_API_AUDIENCE };
+  return status;
+}
+
+export function assessPlayInternalHealth(input: { httpStatus: number; redirected: boolean; body: unknown }): { mode: 'local-development'; audience: typeof PLAY_INTERNAL_API_AUDIENCE } {
+  if (input.redirected || input.httpStatus !== 200) throw new Error('PLAY_INTERNAL_API_UNREACHABLE');
+  if (!input.body || typeof input.body !== 'object' || Array.isArray(input.body)) throw new Error('PLAY_INTERNAL_API_HEALTH_INVALID');
+  const body = input.body as { status?: unknown; mode?: unknown; audience?: unknown };
+  if (body.status !== 'ok' || body.mode !== 'local-development' || body.audience !== PLAY_INTERNAL_API_AUDIENCE) throw new Error('PLAY_INTERNAL_API_HEALTH_INVALID');
+  return { mode: 'local-development', audience: PLAY_INTERNAL_API_AUDIENCE };
+}
+
+export function assertPlayInternalHealthReport(value: unknown, origin: string): { origin: string; httpStatus: 200; mode: 'local-development'; audience: typeof PLAY_INTERNAL_API_AUDIENCE; ready: true; redirected: false } {
   if (!value || typeof value !== 'object' || Array.isArray(value)) throw new Error('PLAY_INTERNAL_API_HEALTH_INVALID');
-  const report = value as { origin?: unknown; httpStatus?: unknown; mode?: unknown; redirected?: unknown };
-  if (report.origin !== origin || report.httpStatus !== 200 || report.mode !== 'local-development' || report.redirected !== false) {
+  const report = value as { origin?: unknown; httpStatus?: unknown; mode?: unknown; audience?: unknown; ready?: unknown; redirected?: unknown };
+  if (report.origin !== origin || report.httpStatus !== 200 || report.mode !== 'local-development' || report.audience !== PLAY_INTERNAL_API_AUDIENCE || report.ready !== true || report.redirected !== false) {
     throw new Error('PLAY_INTERNAL_API_HEALTH_INVALID');
   }
-  return { origin, httpStatus: 200, mode: 'local-development', redirected: false };
+  return { origin, httpStatus: 200, mode: 'local-development', audience: PLAY_INTERNAL_API_AUDIENCE, ready: true, redirected: false };
 }
 
 export function assertPlayInternalSigner(signer: string, certificateSha256: string, expectedCertificateSha256: string): void {

@@ -163,7 +163,7 @@ async function main() {
       'Internal testing candidate only. Not a production release and not approved for real-family use.',
       'The client still requires the family service to answer in local-development mode. Production market gates stay closed.',
       'The upload certificate matches the configured public fingerprint. The private key is not part of this report.',
-      'A passing health check is one public request for /api/health. It does not prove tester accounts, privacy-policy URLs, payments, content review, or a specific device.',
+      'A passing health check is unauthenticated HTTP 200 from /api/health and /api/ready, with audience play-internal. It does not prove tester accounts, privacy-policy URLs, payments, content review, or a specific device.',
       'Static checks do not prove device behavior, Play Console submission, or data deletion outside this service.',
     ],
   };

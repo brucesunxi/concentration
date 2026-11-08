@@ -49,9 +49,8 @@ test('Play internal command checks fail closed without printing a sentinel secre
     env: {
       PATH: process.env.PATH, FOCUS_ANDROID_DISTRIBUTION: 'play-internal',
       EXPO_PUBLIC_FOCUS_API_ORIGIN: 'https://family.example.test',
-      FOCUS_PLAY_UPLOAD_CERT_SHA256: 'ab'.repeat(32),
       FOCUS_PLAY_UPLOAD_STORE_PASSWORD: password,
-      FOCUS_PLAY_UPLOAD_KEY_ALIAS: 'upload',
+      FOCUS_PLAY_UPLOAD_KEY_ALIAS: 'focus-island-upload',
       FOCUS_PLAY_UPLOAD_KEY_PASSWORD: password,
     },
   });
@@ -64,6 +63,12 @@ test('Play internal command checks fail closed without printing a sentinel secre
   });
   assert.equal(unreachable.status, 1);
   assert.match(unreachable.stderr, /PLAY_INTERNAL_HTTPS_API_REQUIRED/);
+
+  const protectedPreview = spawnSync(process.execPath, ['scripts/check-play-internal-api.mjs', '--output', 'dist/not-written.json'], {
+    cwd: root, encoding: 'utf8', env: { PATH: process.env.PATH, EXPO_PUBLIC_FOCUS_API_ORIGIN: 'https://concentration-two.vercel.app' },
+  });
+  assert.equal(protectedPreview.status, 1);
+  assert.match(protectedPreview.stderr, /PLAY_INTERNAL_PROTECTED_PREVIEW_FORBIDDEN/);
 
   const directory = await mkdtemp(join(tmpdir(), 'focus-play-keystore-'));
   try {

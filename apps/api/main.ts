@@ -20,9 +20,11 @@ import { databaseEntitlementReader } from './billing-access.ts';
 import { requestQuery } from './request-query.ts';
 import { observeFamilyRequest, familyRequestLoggingEnabled } from './request-observation.ts';
 import { deliverChildExportFile } from './export-file.ts';
+import { assertPlayInternalServiceSeparation, familyPreviewStatus } from '../../packages/mobile-release/play-internal-android.ts';
 
 export async function createFamilyServer(options: { serverless?: boolean } = {}) {
 if (process.env.APP_MODE === 'production') throw new Error('Production release remains gated: verified guardian consent, OIDC, regional review, and operational validation are not yet complete.');
+assertPlayInternalServiceSeparation({ enabled: process.env.FOCUS_PLAY_INTERNAL_API, hosts: [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL] });
 if (options.serverless && (!process.env.DATABASE_URL || !process.env.FOCUS_SESSION_SIGNING_JWK || process.env.VERCEL !== '1')) throw new Error('VERCEL_RUNTIME_CONFIG_REQUIRED');
 const root = resolve(import.meta.dirname, '../..');
 const sourceVersion = (JSON.parse(await readFile(resolve(root, 'package.json'), 'utf8')) as { version: string }).version;
@@ -76,10 +78,11 @@ const server = http.createServer(async (req, res) => {
       if (asset.release) res.setHeader('X-Focus-Web-Release', asset.release);
       res.writeHead(200, { 'Content-Type': asset.mime, 'Cache-Control': asset.cacheControl, 'Content-Security-Policy': "default-src 'self'; img-src 'self' data: blob:; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; media-src 'self' blob:; frame-ancestors 'none'; base-uri 'self'; form-action 'self'" }); res.end(method === 'HEAD' ? undefined : asset.bytes); return;
     }
-    if (method === 'GET' && url.pathname === '/api/health') { json({ status: 'ok', mode: 'local-development', version: sourceVersion, releaseScopeVersion: localReleaseScope.version }); return; }
+    const previewStatus = () => familyPreviewStatus(sourceVersion, localReleaseScope.version, process.env);
+    if (method === 'GET' && url.pathname === '/api/health') { json(previewStatus()); return; }
     if (method === 'GET' && url.pathname === '/api/ready') {
       if (!await databaseReady(db)) { json({ status: 'unavailable', code: 'DATABASE_NOT_READY', requestId }, 503); return; }
-      json({ status: 'ok', mode: 'local-development', version: sourceVersion, releaseScopeVersion: localReleaseScope.version }); return;
+      json(previewStatus()); return;
     }
     const native = req.headers['x-focus-client'] === 'native-local-v1';
     if (native && (req.headers.origin || req.headers.cookie)) throw new ApiError(403, 'NATIVE_REQUEST_REJECTED', '原生请求不能混用浏览器身份。');

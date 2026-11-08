@@ -155,32 +155,24 @@ Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 
 
 `Android test packages` 工作流仍生成调试证书和 `http://localhost:4181` 明文包，不能上传 Google Play。Play 内部测试使用单独的手动工作流 `Android Play internal testing`。它不设置 `APP_MODE=production`，安装包名称是 Focus Island Preview，Android 版本码从被拒绝的 17 增到 18（应用版本 0.2.17）。本地开发构建不读取这组 Play 变量。
 
-工作流在仓库变量和密钥不齐、上传证书不是配置的公钥指纹、或测试 API 不可达时直接失败，不会退回调试证书。私钥只留在 GitHub Actions 密钥和家长自己的保管位置，不进入 Git、产物报告或日志。本仓库不生成长期上传密钥。
+工作流在仓库变量和密钥不齐、上传证书不是已固定的公钥指纹、或测试 API 不可达时直接失败，不会退回调试证书。私钥只留在 GitHub Actions 密钥和家长自己的保管位置，不进入 Git、产物报告或日志。不要再生成第二把上传密钥。已登记的公钥指纹是 `8471406ac196ee358f777ee2574c86a94d6be86eea0d50fd4e1c242f8f4894fa`，别名必须是 `focus-island-upload`。
 
 需要的仓库变量：
 
-- `FOCUS_PLAY_INTERNAL_API_ORIGIN`：公网 HTTPS 根地址，不能带账号、路径、查询或片段。
-- `FOCUS_PLAY_UPLOAD_CERT_SHA256`：上传证书 SHA-256，64 位小写十六进制，不含冒号。
+- `FOCUS_PLAY_INTERNAL_API_ORIGIN`：专用测试服务的公网 HTTPS 根地址，不能带账号、路径、查询或片段，也不能是 `https://concentration-two.vercel.app`。
 
 需要的仓库密钥：
 
 - `FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64`
 - `FOCUS_PLAY_UPLOAD_STORE_PASSWORD`
-- `FOCUS_PLAY_UPLOAD_KEY_ALIAS`：只含字母、数字、点、下划线和连字符。
+- `FOCUS_PLAY_UPLOAD_KEY_ALIAS`：精确等于 `focus-island-upload`。
 - `FOCUS_PLAY_UPLOAD_KEY_PASSWORD`
 
-2026-11-08 从公网请求 `https://concentration-two.vercel.app` 的 `/api/health`、`/api/ready` 和 `/`，均返回 302 到 Vercel 登录页。它现在不能作为测试机可访问的家庭 API。工作流只接受未跳转、HTTP 200、且 JSON `mode` 为 `local-development` 的 `/api/health`。关闭现有预览的登录保护会把网页一起公开，需要单独决定；更稳妥的是一个不要求交互式 Vercel 登录的专用测试部署。这次改动不会创建该部署，也不会产生费用。
+现有项目 `concentration`（`https://concentration-two.vercel.app`）的家庭 API 代码本身不要求交互式登录，但 Vercel Authentication 挡在前面。2026-11-08 未登录请求 `/`、`/api/health`、`/api/ready` 均为 302 到 Vercel 登录页。不要关闭该项目的 Deployment Protection，也不要把 Vercel 绕过凭据编进安装包。手机测试需要另一个 Vercel 项目，使用同一仓库的 `vercel.json` 与 `api/index.ts`，Deployment Protection 设为关闭，并且只在现有 Neon 项目允许且不产生新费用时新建空数据库。Neon 计划若拒绝再建数据库，就停止，不要升级套餐。
 
-家长确认自己保管上传密钥后，可在自己的电脑生成 PKCS#12，并把证书指纹和密钥内容分别放进上面的变量和密钥。不要把生成的文件或 Base64 提交到仓库：
+专用库不要从预览库分支复制，也不要复用受保护项目的 `DATABASE_URL` 或 `FOCUS_SESSION_SIGNING_JWK`。在本机私密环境对新库执行 `npm run db:prepare`（需要 `DATABASE_MIGRATION_URL`、`FOCUS_DATABASE_ROLE`、`FOCUS_DATA_DIR`）。它迁移到 schema 32、安装内置预览内容并写出 `session-signing.jwk.json`。不要设置 `FOCUS_STUDIO_DATABASE_ROLE`。运行角色使用新名字（例如 `focus_play_internal_runtime`），且不能是超级用户。准备命令不创建家庭或儿童账号；测试人员在 App 内用虚构家庭自行注册。
 
-```sh
-keytool -genkeypair -v -keystore focus-island-play-upload.p12 -storetype PKCS12 \
-  -alias upload -keyalg RSA -keysize 2048 -validity 10000 \
-  -dname "CN=Focus Island Upload, OU=Internal Testing, O=Focus Island, C=US"
-keytool -list -v -keystore focus-island-play-upload.p12 -alias upload
-```
-
-Play 应用签名密钥由 Google Play App Signing 保管。这里的密钥只用于上传。静态报告通过也不表示已经完成公开上架、真实家庭使用、隐私政策、价格保存或设备验收。
+新 Vercel 项目只设置三个环境值：池化运行账号 `DATABASE_URL`、上述 JWK 的 `FOCUS_SESSION_SIGNING_JWK`，以及 `FOCUS_PLAY_INTERNAL_API=1`。平台会提供 `VERCEL=1`。`FOCUS_PLAY_INTERNAL_API=1` 不得出现在项目 `concentration` 上；若该项目的主机环境仍是 `concentration-two.vercel.app`，服务会拒绝启动。部署到新项目的 Production 后，未登录的 `GET /api/health` 和 `GET /api/ready` 都必须是 HTTP 200、无跳转，且 JSON 含 `mode=local-development` 与 `audience=play-internal`。确认这两项之后，才把该源地址写入 `FOCUS_PLAY_INTERNAL_API_ORIGIN` 并手动运行工作流。家长把产物 AAB 上传到已有的 Play 内部测试轨道。通过的报告不是公开上架、真实家庭使用、隐私政策、价格保存或设备验收。
 
 ### Android 开发包
 

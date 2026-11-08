@@ -1,5 +1,9 @@
 name: Android Play internal testing
 
+# Manual internal-testing candidate. The upload certificate is pinned in source.
+# The API origin must be a separate project: unauthenticated /api/health and
+# /api/ready return audience play-internal. concentration-two.vercel.app is rejected.
+
 on:
   workflow_dispatch:
 
@@ -13,7 +17,6 @@ jobs:
     env:
       FOCUS_ANDROID_DISTRIBUTION: play-internal
       EXPO_PUBLIC_FOCUS_API_ORIGIN: ${{ vars.FOCUS_PLAY_INTERNAL_API_ORIGIN }}
-      FOCUS_PLAY_UPLOAD_CERT_SHA256: ${{ vars.FOCUS_PLAY_UPLOAD_CERT_SHA256 }}
       FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64: ${{ secrets.FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64 }}
       FOCUS_PLAY_UPLOAD_STORE_PASSWORD: ${{ secrets.FOCUS_PLAY_UPLOAD_STORE_PASSWORD }}
       FOCUS_PLAY_UPLOAD_KEY_ALIAS: ${{ secrets.FOCUS_PLAY_UPLOAD_KEY_ALIAS }}
@@ -60,13 +63,14 @@ jobs:
         run: |
           ANDROID_TOOLS="$(find "$ANDROID_HOME/build-tools" -mindepth 1 -maxdepth 1 -type d | sort -V | tail -n 1)"
           test -x "$ANDROID_TOOLS/aapt2" && test -x "$ANDROID_TOOLS/apksigner"
+          CERT="$(node --input-type=module -e "import { PLAY_INTERNAL_UPLOAD_CERT_SHA256 } from './packages/mobile-release/play-internal-android.ts'; process.stdout.write(PLAY_INTERNAL_UPLOAD_CERT_SHA256)")"
           node scripts/verify-android-play-internal.mjs \
             --aab dist/mobile-native/android-play-internal/FocusIsland-play-internal.aab \
             --apk dist/mobile-native/android-play-internal/FocusIsland-play-internal.apk \
             --snapshot dist/mobile-native/android-play-internal/source-snapshot.json \
             --api-health dist/mobile-native/android-play-internal/api-health.json \
             --api-origin "$EXPO_PUBLIC_FOCUS_API_ORIGIN" \
-            --expected-cert-sha256 "$FOCUS_PLAY_UPLOAD_CERT_SHA256" \
+            --expected-cert-sha256 "$CERT" \
             --source-ref "$GITHUB_SHA" --java-home "$JAVA_HOME" --android-tools "$ANDROID_TOOLS" \
             --output dist/mobile-native/android-play-internal/play-internal-report.json
       - name: Remove the upload keystore

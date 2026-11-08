@@ -1,16 +1,24 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
+import { readFileSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import {
   PLAY_INTERNAL_APP_NAME,
   PLAY_INTERNAL_MIN_VERSION_CODE,
+  PLAY_INTERNAL_UPLOAD_CERT_SHA256,
+  PLAY_INTERNAL_UPLOAD_KEY_ALIAS,
+  PROTECTED_PREVIEW_HOST,
   androidAppIdentity,
   assertPlayInternalBundle,
   assertPlayInternalHealthReport,
   assertPlayInternalManifest,
+  assertPlayInternalServiceSeparation,
   assertPlayInternalSigner,
   assertSecretsNotPackaged,
   assessPlayInternalHealth,
+  familyPreviewStatus,
+  playInternalApiOrigin,
+  playInternalCertificateSha256,
   playInternalPrerequisites,
 } from '../../packages/mobile-release/play-internal-android.ts';
 import {
@@ -26,10 +34,9 @@ const password = 'sentinel-play-password-not-a-real-secret';
 const signing = {
   FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64: 'AAAA',
   FOCUS_PLAY_UPLOAD_STORE_PASSWORD: password,
-  FOCUS_PLAY_UPLOAD_KEY_ALIAS: 'upload',
+  FOCUS_PLAY_UPLOAD_KEY_ALIAS: PLAY_INTERNAL_UPLOAD_KEY_ALIAS,
   FOCUS_PLAY_UPLOAD_KEY_PASSWORD: password,
   FOCUS_UPLOAD_STORE_FILE: '/tmp/focus-play-upload.p12',
-  FOCUS_PLAY_UPLOAD_CERT_SHA256: 'ab'.repeat(32),
   EXPO_PUBLIC_FOCUS_API_ORIGIN: 'https://family.example.test',
   FOCUS_ANDROID_DISTRIBUTION: 'play-internal',
 };
@@ -49,6 +56,7 @@ test('Play internal config requires a non-local HTTPS origin and refuses product
   assert.throws(() => androidAppIdentity({ APP_MODE: 'production' }), /Mobile production release requires approved identity/);
   assert.throws(() => androidAppIdentity({ ...signing, EXPO_PUBLIC_FOCUS_API_ORIGIN: 'http://localhost:4181' }), /PLAY_INTERNAL_HTTPS_API_REQUIRED/);
   assert.throws(() => androidAppIdentity({ ...signing, EXPO_PUBLIC_FOCUS_API_ORIGIN: 'http://family.example.test' }), /MOBILE_API_ORIGIN_HTTPS_REQUIRED/);
+  assert.throws(() => androidAppIdentity({ ...signing, EXPO_PUBLIC_FOCUS_API_ORIGIN: `https://${PROTECTED_PREVIEW_HOST}` }), /PLAY_INTERNAL_PROTECTED_PREVIEW_FORBIDDEN/);
   assert.throws(() => androidAppIdentity({ ...signing, FOCUS_PLAY_UPLOAD_STORE_PASSWORD: '' }), /PLAY_INTERNAL_SIGNING_CONFIG_MISSING:FOCUS_PLAY_UPLOAD_STORE_PASSWORD/);
   try {
     androidAppIdentity({ ...signing, FOCUS_PLAY_UPLOAD_STORE_PASSWORD: '' });
@@ -64,21 +72,32 @@ test('Play internal config requires a non-local HTTPS origin and refuses product
 
 test('Play internal prerequisites name missing repository settings and do not echo secret values', () => {
   assert.throws(() => playInternalPrerequisites({ ...signing, FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64: '   ' }), /FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64/);
-  assert.throws(() => playInternalPrerequisites({ ...signing, FOCUS_PLAY_UPLOAD_KEY_ALIAS: 'upload key' }), /PLAY_INTERNAL_KEY_ALIAS_INVALID/);
+  assert.throws(() => playInternalPrerequisites({ ...signing, FOCUS_PLAY_UPLOAD_KEY_ALIAS: 'upload' }), /PLAY_INTERNAL_KEY_ALIAS_UNEXPECTED/);
   assert.throws(() => playInternalPrerequisites({ ...signing, FOCUS_PLAY_UPLOAD_CERT_SHA256: 'abcd' }), /PLAY_INTERNAL_CERT_SHA256_INVALID/);
+  assert.throws(() => playInternalPrerequisites({ ...signing, FOCUS_PLAY_UPLOAD_CERT_SHA256: 'ab'.repeat(32) }), /PLAY_INTERNAL_CERT_SHA256_MISMATCH/);
   const ready = playInternalPrerequisites(signing);
   assert.equal(ready.origin, 'https://family.example.test');
-  assert.equal(ready.certificateSha256, 'ab'.repeat(32));
+  assert.equal(ready.certificateSha256, PLAY_INTERNAL_UPLOAD_CERT_SHA256);
+  assert.equal(playInternalCertificateSha256('84:71:40:6A:C1:96:EE:35:8F:77:7E:E2:57:4C:86:A9:4D:6B:E8:6E:EA:0D:50:FD:4E:1C:24:2F:8F:48:94:FA'), PLAY_INTERNAL_UPLOAD_CERT_SHA256);
   assert.equal(JSON.stringify(ready).includes(password), false);
 });
 
 test('a protected redirect or non-preview health response cannot satisfy the Play internal API check', () => {
+  assert.match(readFileSync(new URL('../../scripts/deployment-identity.mjs', import.meta.url), 'utf8'), new RegExp(`export const PROTECTED_PREVIEW_ALIAS = '${PROTECTED_PREVIEW_HOST}'`));
+  assert.throws(() => playInternalApiOrigin(`https://${PROTECTED_PREVIEW_HOST}`), /PLAY_INTERNAL_PROTECTED_PREVIEW_FORBIDDEN/);
+  assert.throws(() => assertPlayInternalServiceSeparation({ enabled: '1', hosts: [PROTECTED_PREVIEW_HOST] }), /PLAY_INTERNAL_API_PROTECTED_HOST_FORBIDDEN/);
+  assert.doesNotThrow(() => assertPlayInternalServiceSeparation({ enabled: undefined, hosts: [PROTECTED_PREVIEW_HOST] }));
+  assert.doesNotThrow(() => assertPlayInternalServiceSeparation({ enabled: '1', hosts: ['focus-island-internal.vercel.app'] }));
+  const localStatus = familyPreviewStatus('0.46.0', 'local-development', {});
+  assert.equal('audience' in localStatus, false);
+  assert.equal(familyPreviewStatus('0.46.0', 'local-development', { FOCUS_PLAY_INTERNAL_API: '1' }).audience, 'play-internal');
   assert.throws(() => assessPlayInternalHealth({ httpStatus: 302, redirected: true, body: undefined }), /PLAY_INTERNAL_API_UNREACHABLE/);
-  assert.throws(() => assessPlayInternalHealth({ httpStatus: 200, redirected: false, body: { status: 'ok', mode: 'production' } }), /PLAY_INTERNAL_API_HEALTH_INVALID/);
-  assert.deepEqual(assessPlayInternalHealth({ httpStatus: 200, redirected: false, body: { status: 'ok', mode: 'local-development', version: '0.46.0' } }), { mode: 'local-development' });
-  const report = assertPlayInternalHealthReport({ origin: 'https://family.example.test', httpStatus: 200, mode: 'local-development', redirected: false }, 'https://family.example.test');
-  assert.equal(report.redirected, false);
-  assert.throws(() => assertPlayInternalHealthReport({ origin: 'https://other.example.test', httpStatus: 200, mode: 'local-development', redirected: false }, 'https://family.example.test'), /PLAY_INTERNAL_API_HEALTH_INVALID/);
+  assert.throws(() => assessPlayInternalHealth({ httpStatus: 200, redirected: false, body: { status: 'ok', mode: 'local-development', version: '0.46.0' } }), /PLAY_INTERNAL_API_HEALTH_INVALID/);
+  const healthy = { status: 'ok', mode: 'local-development', version: '0.46.0', audience: 'play-internal' };
+  assert.deepEqual(assessPlayInternalHealth({ httpStatus: 200, redirected: false, body: healthy }), { mode: 'local-development', audience: 'play-internal' });
+  const report = assertPlayInternalHealthReport({ origin: 'https://family.example.test', httpStatus: 200, mode: 'local-development', audience: 'play-internal', ready: true, redirected: false }, 'https://family.example.test');
+  assert.equal(report.ready, true);
+  assert.throws(() => assertPlayInternalHealthReport({ origin: 'https://family.example.test', httpStatus: 200, mode: 'local-development', redirected: false }, 'https://family.example.test'), /PLAY_INTERNAL_API_HEALTH_INVALID/);
 });
 
 test('Play internal artifact policy rejects the debug certificate, cleartext, localhost and the old version code', () => {
