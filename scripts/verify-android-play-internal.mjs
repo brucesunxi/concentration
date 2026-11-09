@@ -6,7 +6,9 @@ import { readFile, realpath, stat, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { readAndroidBundleManifest } from '../packages/mobile-release/android-bundle-manifest.mjs';
+import { assertPlayInternalAppLabel, readArchiveEntries } from '../packages/mobile-release/android-bundle-resources.mjs';
 import {
+  LOCAL_ANDROID_APP_NAME,
   PLAY_INTERNAL_APP_NAME,
   assertPlayInternalBundle,
   assertPlayInternalHealthReport,
@@ -67,7 +69,7 @@ async function main() {
   for (const required of [
     'package.json', 'package-lock.json', 'apps/family-mobile/package.json', 'apps/family-mobile/app.config.ts',
     'apps/family-mobile/build-identity.json', 'apps/family-mobile/src/App.tsx',
-    'packages/mobile-release/play-internal-android.ts', 'packages/mobile-release/play-internal-source.mjs', 'packages/mobile-release/android-play-signing.mjs',
+    'packages/mobile-release/play-internal-android.ts', 'packages/mobile-release/play-internal-source.mjs', 'packages/mobile-release/android-bundle-resources.mjs', 'packages/mobile-release/android-play-signing.mjs',
     'packages/session-runtime/mobile-preview-copy.ts', 'scripts/configure-android-play-internal.mjs',
     'scripts/verify-android-play-internal.mjs', 'scripts/check-play-internal-api.mjs',
     'scripts/build-play-internal-android.mjs',
@@ -93,8 +95,7 @@ async function main() {
   const bundle = run('/usr/bin/unzip', ['-p', aab, 'base/assets/index.android.bundle'], true);
   assertPlayInternalBundle(bundle, origin);
   const aabBytes = await readFile(aab);
-  assert(bundleHasText(aabBytes, PLAY_INTERNAL_APP_NAME), 'Play internal app name was not packaged');
-  assert(!bundleHasText(aabBytes, 'Focus Island Dev'), 'Local development app name is still packaged');
+  assertPlayInternalAppLabel(readArchiveEntries(aab, /(^|\/)resources\.pb$/));
   const keystoreBase64 = process.env.FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64?.replace(/\s+/g, '');
   assertSecretsNotPackaged(aabBytes, [process.env.FOCUS_PLAY_UPLOAD_STORE_PASSWORD, process.env.FOCUS_PLAY_UPLOAD_KEY_PASSWORD, keystoreBase64]);
   if (keystoreBase64 && keystoreBase64.length >= 32 && /^[A-Za-z0-9+/]+={0,2}$/.test(keystoreBase64)) {
@@ -135,7 +136,9 @@ async function main() {
     const apkBundle = run('/usr/bin/unzip', ['-p', apk, 'assets/index.android.bundle'], true);
     assertPlayInternalBundle(apkBundle, origin);
     const apkBytes = await readFile(apk);
-    assert(bundleHasText(apkBytes, PLAY_INTERNAL_APP_NAME) && !bundleHasText(apkBytes, 'Focus Island Dev'), 'Unexpected APK app name');
+    const apkResources = readArchiveEntries(apk, /(^|\/)resources\.arsc$/);
+    const apkLabeled = badging.includes(`application-label:'${PLAY_INTERNAL_APP_NAME}'`) || badging.includes(`label='${PLAY_INTERNAL_APP_NAME}'`) || bundleHasText(apkResources, PLAY_INTERNAL_APP_NAME) || bundleHasText(apkBytes, PLAY_INTERNAL_APP_NAME);
+    if (!apkLabeled || badging.includes(LOCAL_ANDROID_APP_NAME) || bundleHasText(apkResources, LOCAL_ANDROID_APP_NAME) || bundleHasText(apkBytes, LOCAL_ANDROID_APP_NAME)) throw new Error('Unexpected APK app name');
     assertSecretsNotPackaged(apkBytes, [process.env.FOCUS_PLAY_UPLOAD_STORE_PASSWORD, process.env.FOCUS_PLAY_UPLOAD_KEY_PASSWORD, keystoreBase64]);
     if (keystoreBase64 && keystoreBase64.length >= 32 && /^[A-Za-z0-9+/]+={0,2}$/.test(keystoreBase64)) {
       const keystoreBytes = Buffer.from(keystoreBase64, 'base64');

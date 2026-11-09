@@ -5,7 +5,10 @@ import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
+import { crc32, deflateRawSync } from 'node:zlib';
 import { applyPlayInternalReleaseSigning } from '../../packages/mobile-release/android-play-signing.mjs';
+import { assertPlayInternalAppLabel, readArchiveEntries } from '../../packages/mobile-release/android-bundle-resources.mjs';
+import { bundleHasText } from '../../packages/mobile-release/play-internal-android.ts';
 import { filesystemSourceFiles, gitSourceFiles, readVerifiedSourceFile, resolveSourceCommit } from '../../packages/mobile-release/play-internal-source.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
@@ -142,4 +145,69 @@ test('a source archive without git matches the tracked mobile sources and can na
   assert.match(checkout.commit, /^[a-f0-9]{40}$/);
   const packaged = await readVerifiedSourceFile(root, checkout, 'apps/family-mobile/package.json');
   assert.match(packaged.toString('utf8'), /"version": "0.2.17"/);
+});
+
+function zipArchive(entries) {
+  const locals = [];
+  const central = [];
+  let offset = 0;
+  for (const entry of entries) {
+    const name = Buffer.from(entry.name);
+    const raw = Buffer.from(entry.data);
+    const method = entry.method ?? 8;
+    const compressed = method === 8 ? deflateRawSync(raw) : raw;
+    const crc = crc32(raw);
+    const local = Buffer.alloc(30);
+    local.writeUInt32LE(0x04034b50, 0);
+    local.writeUInt16LE(20, 4);
+    local.writeUInt16LE(method, 8);
+    local.writeUInt32LE(crc >>> 0, 14);
+    local.writeUInt32LE(compressed.length, 18);
+    local.writeUInt32LE(raw.length, 22);
+    local.writeUInt16LE(name.length, 26);
+    const centralHeader = Buffer.alloc(46);
+    centralHeader.writeUInt32LE(0x02014b50, 0);
+    centralHeader.writeUInt16LE(20, 4);
+    centralHeader.writeUInt16LE(20, 6);
+    centralHeader.writeUInt16LE(method, 10);
+    centralHeader.writeUInt32LE(crc >>> 0, 16);
+    centralHeader.writeUInt32LE(compressed.length, 20);
+    centralHeader.writeUInt32LE(raw.length, 24);
+    centralHeader.writeUInt16LE(name.length, 28);
+    centralHeader.writeUInt32LE(offset, 42);
+    locals.push(local, name, compressed);
+    central.push(centralHeader, name);
+    offset += local.length + name.length + compressed.length;
+  }
+  const centralBytes = Buffer.concat(central);
+  const end = Buffer.alloc(22);
+  end.writeUInt32LE(0x06054b50, 0);
+  end.writeUInt16LE(entries.length, 8);
+  end.writeUInt16LE(entries.length, 10);
+  end.writeUInt32LE(centralBytes.length, 12);
+  end.writeUInt32LE(offset, 16);
+  return Buffer.concat([...locals, centralBytes, end]);
+}
+
+test('deflated bundle resources still count as the Play internal app name', async () => {
+  const label = 'Focus Island Preview';
+  const payload = Buffer.from(`${'android-resource-'.repeat(400)}${label}${' pool'.repeat(400)}`);
+  const directory = await mkdtemp(join(tmpdir(), 'focus-aab-label-'));
+  const archive = join(directory, 'app.aab');
+  try {
+    await writeFile(archive, zipArchive([{ name: 'base/resources.pb', data: payload, method: 8 }]));
+    const raw = await readFile(archive);
+    assert.equal(bundleHasText(raw, label), false);
+    const resources = readArchiveEntries(archive, /(^|\/)resources\.pb$/);
+    assert.equal(bundleHasText(resources, label), true);
+    assert.doesNotThrow(() => assertPlayInternalAppLabel(resources));
+    await writeFile(archive, zipArchive([{ name: 'base/resources.pb', data: Buffer.from('no label here'.repeat(80)), method: 8 }]));
+    assert.throws(() => assertPlayInternalAppLabel(readArchiveEntries(archive, /(^|\/)resources\.pb$/)), /Play internal app name was not packaged/);
+    await writeFile(archive, zipArchive([{ name: 'base/resources.pb', data: Buffer.from(`${'x'.repeat(2000)}Focus Island Dev${'y'.repeat(2000)}`), method: 0 }]));
+    assert.throws(() => assertPlayInternalAppLabel(readArchiveEntries(archive, /(^|\/)resources\.pb$/)), /Local development app name is still packaged/);
+    await writeFile(archive, zipArchive([{ name: 'base/resources.pb', data: payload, method: 0 }]));
+    assert.doesNotThrow(() => assertPlayInternalAppLabel(readArchiveEntries(archive, /(^|\/)resources\.pb$/)));
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
 });
