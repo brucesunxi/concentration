@@ -48,6 +48,8 @@ try {
     cp apps/family-mobile/android/app/build/outputs/bundle/release/app-release.aab dist/mobile-native/android-play-internal/FocusIsland-play-internal.aab
     cp apps/family-mobile/android/app/build/outputs/apk/release/app-release.apk dist/mobile-native/android-play-internal/FocusIsland-play-internal.apk
     CERT="$(node --input-type=module -e "import { PLAY_INTERNAL_UPLOAD_CERT_SHA256 } from './packages/mobile-release/play-internal-android.ts'; process.stdout.write(PLAY_INTERNAL_UPLOAD_CERT_SHA256)")"
+    if git rev-parse --is-inside-work-tree >/dev/null 2>&1; then SOURCE_REF="$(git rev-parse --verify HEAD)"; else SOURCE_REF="\${FOCUS_PLAY_SOURCE_REF:-}"; fi
+    printf '%s' "$SOURCE_REF" | grep -Eq '^[a-f0-9]{40}$' || { echo PLAY_INTERNAL_SOURCE_REF_REQUIRED >&2; exit 1; }
     node scripts/verify-android-play-internal.mjs \
       --aab dist/mobile-native/android-play-internal/FocusIsland-play-internal.aab \
       --apk dist/mobile-native/android-play-internal/FocusIsland-play-internal.apk \
@@ -55,7 +57,7 @@ try {
       --api-health dist/mobile-native/android-play-internal/api-health.json \
       --api-origin "$EXPO_PUBLIC_FOCUS_API_ORIGIN" \
       --expected-cert-sha256 "$CERT" \
-      --source-ref "$(git rev-parse HEAD)" --java-home "$JAVA_HOME" --android-tools "$ANDROID_TOOLS" \
+      --source-ref "$SOURCE_REF" --java-home "$JAVA_HOME" --android-tools "$ANDROID_TOOLS" \
       --output dist/mobile-native/android-play-internal/play-internal-report.json
   `], root);
   console.log(JSON.stringify({ ok: true, stage: 'verified', uploadable: true, origin: inputs.origin }));

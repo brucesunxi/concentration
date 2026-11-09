@@ -6,6 +6,7 @@ import { join } from 'node:path';
 import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import { applyPlayInternalReleaseSigning } from '../../packages/mobile-release/android-play-signing.mjs';
+import { filesystemSourceFiles, gitSourceFiles, readVerifiedSourceFile, resolveSourceCommit } from '../../packages/mobile-release/play-internal-source.mjs';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -118,4 +119,27 @@ test('Play internal command checks fail closed without printing a sentinel secre
     await rm(directory, { recursive: true, force: true });
     await rm(join(root, 'upload.p12'), { force: true });
   }
+});
+
+test('a source archive without git matches the tracked mobile sources and can name its commit', async () => {
+  const tracked = gitSourceFiles(root).sort();
+  const disk = await filesystemSourceFiles(root);
+  assert.deepEqual(disk.filter(path => tracked.includes(path)), tracked);
+  assert.ok(disk.includes('packages/mobile-release/play-internal-source.mjs'));
+  const directory = await mkdtemp(join(tmpdir(), 'focus-play-source-'));
+  try {
+    await writeFile(join(directory, 'package.json'), '{"version":"0.46.0"}\n');
+    const resolved = resolveSourceCommit(directory, 'a'.repeat(40));
+    assert.equal(resolved.git, false);
+    assert.equal((await readVerifiedSourceFile(directory, resolved, 'package.json')).toString('utf8'), '{"version":"0.46.0"}\n');
+    assert.throws(() => resolveSourceCommit(directory, 'HEAD'), /Source reference must resolve to a commit/);
+    await assert.rejects(readVerifiedSourceFile(directory, resolved, '../package.json'), /Unsafe or duplicate source path/);
+  } finally {
+    await rm(directory, { recursive: true, force: true });
+  }
+  const checkout = resolveSourceCommit(root, 'HEAD');
+  assert.equal(checkout.git, true);
+  assert.match(checkout.commit, /^[a-f0-9]{40}$/);
+  const packaged = await readVerifiedSourceFile(root, checkout, 'apps/family-mobile/package.json');
+  assert.match(packaged.toString('utf8'), /"version": "0.2.17"/);
 });

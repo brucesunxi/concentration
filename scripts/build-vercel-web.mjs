@@ -1,6 +1,6 @@
 import { build } from 'vite';
 import { spawn } from 'node:child_process';
-import { copyFile, mkdir, readdir, rm, stat } from 'node:fs/promises';
+import { copyFile, mkdir, readdir, rm, stat, writeFile } from 'node:fs/promises';
 import { resolve } from 'node:path';
 import { auditDirectory } from '../packages/release-safety/public-secret-scan.mjs';
 
@@ -11,7 +11,13 @@ if (process.env.FOCUS_PLAY_INTERNAL_API === '1') {
   if (process.env.VERCEL_ENV === 'production') throw new Error('PLAY_INTERNAL_API_PRODUCTION_FORBIDDEN');
   await rm(output, { recursive: true, force: true });
   await mkdir(output, { recursive: true });
-  console.log(JSON.stringify({ playInternalApiOnly: true, staticFiles: 0 }));
+  // Keep this name aligned with PLAY_INTERNAL_OUTPUT_FILE. Vercel prints basename("dist/web"), which is "web".
+  const marker = 'play-internal-api-only.json';
+  await writeFile(resolve(output, marker), '{"code":"PLAY_INTERNAL_API_ONLY"}\n');
+  const published = (await readdir(output, { recursive: true })).map(entry => entry.toString());
+  const website = published.filter(name => /\.(html|js|css|mjs|map)$/i.test(name) || name.includes('focus-sw') || name.startsWith('assets') || name.startsWith('media') || name.startsWith('studio'));
+  if (published.length === 0 || published.some(name => name !== marker) || website.length > 0) throw new Error('PLAY_INTERNAL_API_OUTPUT_UNSAFE');
+  console.log(JSON.stringify({ playInternalApiOnly: true, staticFiles: published.length, outputDirectory: 'dist/web', files: published }));
 } else {
 
 async function check(script) {

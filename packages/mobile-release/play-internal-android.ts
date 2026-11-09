@@ -139,6 +139,52 @@ export function playInternalEdgeDecision(input: { enabled: string | undefined; e
   return { action: 'deny', apiOnly: true, status: 404, code: 'PLAY_INTERNAL_API_ONLY' };
 }
 
+/** One non-page file. Vercel rejects an empty output directory; this is not a website entry. */
+export const PLAY_INTERNAL_OUTPUT_FILE = 'play-internal-api-only.json';
+export const PLAY_INTERNAL_OUTPUT_BODY = '{"code":"PLAY_INTERNAL_API_ONLY"}\n';
+
+export type DeploymentResponse =
+  | { layer: 'middleware'; status: 404; code: 'PLAY_INTERNAL_API_ONLY'; contentType: 'application/json' }
+  | { layer: 'filesystem'; file: string }
+  | { layer: 'rewrite'; destination: string }
+  | { layer: 'platform-missing'; destination: '/index.html' };
+
+/** Vercel path patterns used by this repo: an exact path, or a prefix plus `/:path*`. */
+export function vercelSourceMatches(source: string, pathname: string): boolean {
+  if (!pathname.startsWith('/') || pathname.includes('\\') || pathname.includes('\0') || pathname.includes('//')) return false;
+  if (source === pathname) return true;
+  const wildcard = '/:path*';
+  if (!source.endsWith(wildcard)) return false;
+  const prefix = source.slice(0, source.length - wildcard.length);
+  if (prefix === '') return true;
+  return pathname === prefix || pathname.startsWith(`${prefix}/`);
+}
+
+/**
+ * Vercel serves middleware, then an existing output file (including `index.html` for `/`), then the first rewrite.
+ * A rewrite to a missing `/index.html` stops there; it does not chain into another rewrite.
+ */
+export function resolveDeploymentRequest(input: {
+  pathname: string;
+  apiOnly: boolean;
+  outputFiles: readonly string[];
+  rewrites: readonly { source: string; destination: string }[];
+  middleware?: boolean;
+}): DeploymentResponse {
+  if (input.middleware !== false && input.apiOnly) {
+    const decision = playInternalEdgeDecision({ enabled: '1', environment: 'preview', pathname: input.pathname });
+    if (decision.action === 'deny') return { layer: 'middleware', status: 404, code: 'PLAY_INTERNAL_API_ONLY', contentType: 'application/json' };
+  }
+  const relative = input.pathname === '/' ? 'index.html' : input.pathname.slice(1);
+  if (relative && !relative.split('/').includes('..') && input.outputFiles.includes(relative)) return { layer: 'filesystem', file: relative };
+  for (const rule of input.rewrites) {
+    if (!vercelSourceMatches(rule.source, input.pathname)) continue;
+    if (rule.destination === '/index.html' && !input.outputFiles.includes('index.html')) return { layer: 'platform-missing', destination: '/index.html' };
+    return { layer: 'rewrite', destination: rule.destination };
+  }
+  return { layer: 'platform-missing', destination: '/index.html' };
+}
+
 export function familyPreviewStatus(version: string, releaseScopeVersion: string, env: { FOCUS_PLAY_INTERNAL_API?: string } = {}): {
   status: 'ok'; mode: 'local-development'; version: string; releaseScopeVersion: string; audience?: typeof PLAY_INTERNAL_API_AUDIENCE;
 } {

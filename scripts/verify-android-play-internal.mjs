@@ -17,6 +17,7 @@ import {
   playInternalApiOrigin,
   playInternalCertificateSha256,
 } from '../packages/mobile-release/play-internal-android.ts';
+import { readVerifiedSourceFile, resolveSourceCommit } from '../packages/mobile-release/play-internal-source.mjs';
 
 const root = await realpath(fileURLToPath(new URL('../', import.meta.url)));
 const options = new Map();
@@ -53,9 +54,9 @@ async function main() {
   const snapshotBytes = await readFile(snapshotPath);
   const source = JSON.parse(snapshotBytes.toString('utf8'));
   assert(source.schemaVersion === 1 && source.includesFamilyData === false && Array.isArray(source.sourceFiles) && source.sourceFiles.length > 0, 'Invalid source snapshot');
-  const sourceCommit = run('git', ['-C', root, 'rev-parse', '--verify', `${options.get('--source-ref')}^{commit}`]).trim();
-  assert(/^[a-f0-9]{40}$/.test(sourceCommit), 'Source reference must resolve to a commit');
-  const readSourceFile = async path => run('git', ['-C', root, 'show', `${sourceCommit}:${path}`], true);
+  const resolvedSource = resolveSourceCommit(root, options.get('--source-ref'));
+  const sourceCommit = resolvedSource.commit;
+  const readSourceFile = path => readVerifiedSourceFile(root, resolvedSource, path);
   const paths = new Set();
   for (const entry of source.sourceFiles) {
     assert(typeof entry.path === 'string' && !isAbsolute(entry.path) && !entry.path.split(/[\\/]/).includes('..') && !entry.path.startsWith('-') && !paths.has(entry.path), 'Unsafe or duplicate source path');
@@ -66,7 +67,7 @@ async function main() {
   for (const required of [
     'package.json', 'package-lock.json', 'apps/family-mobile/package.json', 'apps/family-mobile/app.config.ts',
     'apps/family-mobile/build-identity.json', 'apps/family-mobile/src/App.tsx',
-    'packages/mobile-release/play-internal-android.ts', 'packages/mobile-release/android-play-signing.mjs',
+    'packages/mobile-release/play-internal-android.ts', 'packages/mobile-release/play-internal-source.mjs', 'packages/mobile-release/android-play-signing.mjs',
     'packages/session-runtime/mobile-preview-copy.ts', 'scripts/configure-android-play-internal.mjs',
     'scripts/verify-android-play-internal.mjs', 'scripts/check-play-internal-api.mjs',
     'scripts/build-play-internal-android.mjs',

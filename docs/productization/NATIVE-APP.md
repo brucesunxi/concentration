@@ -168,7 +168,7 @@ Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 
 - `FOCUS_PLAY_UPLOAD_KEY_ALIAS`：精确等于 `focus-island-upload`。
 - `FOCUS_PLAY_UPLOAD_KEY_PASSWORD`
 
-现有项目 `concentration` 继续服务 `https://concentration-two.vercel.app`，`ssoProtection.deploymentType` 保持 `all`。不要关闭 Deployment Protection，不要把例外加到这个生产域名，也不要把 Vercel bypass token 放进安装包。Vercel 的保护例外按整个预览域名生效，不能只放开 `/api`。因此例外域名上的部署必须是 API-only：页面、静态文件、service worker、`/studio`、`/admin`、`/support` 和 `/media` 返回 JSON 404；`/api/*` 仍要登录；`/api/health` 与 `/api/ready` 匿名返回 `audience=play-internal`。练习素材仍只走 `/content-assets/<64位哈希>.png|mp3`。
+现有项目 `concentration` 继续服务 `https://concentration-two.vercel.app`，`ssoProtection.deploymentType` 保持 `all`。不要关闭 Deployment Protection，不要把例外加到这个生产域名，也不要把 Vercel bypass token 放进安装包。Vercel 的保护例外按整个预览域名生效，不能只放开 `/api`。因此例外域名上的部署必须是 API-only：页面、静态文件、service worker、`/studio`、`/admin`、`/support` 和 `/media` 返回 JSON 404；`/api/*` 仍要登录；`/api/health` 与 `/api/ready` 匿名返回 `audience=play-internal`。练习素材仍只走 `/content-assets/<64位哈希>.png|mp3`。API-only 构建会在 `dist/web` 写入一个非页面文件 `play-internal-api-only.json`。Vercel 拒绝空输出目录，失败日志里的 Output Directory `"web"` 指的就是 `dist/web` 的最后一段。这个文件不是网页。Middleware 在文件系统和 `/:path*` → `/index.html` 之前拒绝页面请求。网站构建不设置 `FOCUS_PLAY_INTERNAL_API`，仍输出完整页面，SPA 回退保持最后一条重写。已发布的 `index.html`、`focus-sw.js` 和 `/assets/*` 由文件系统优先返回；这些文件不存在时，同名请求改写到函数并返回 JSON。
 
 只使用现有 Neon 项目 `steep-waterfall-35706280`、生产分支 `br-ancient-math-b5mufwu8`、端点 `ep-winter-rain-b51yahyp`、数据库 `neondb`。不要创建、克隆、迁移或重置数据库。运行账号仍是已授权的 `focus_family_runtime`。在 Vercel 的 Preview 环境（不是 Production）设置 `FOCUS_PLAY_INTERNAL_API=1`、现有池化运行连接 `DATABASE_URL`，以及一把新的 `FOCUS_SESSION_SIGNING_JWK`。Production 环境不要加这个标志，也不要替换原来的 JWK。然后把本分支部署为 Preview，把 Deployment Protection Exception 只加到该预览域名。例外按整个域名生效。分支别名由 `VERCEL_BRANCH_URL` 自动允许。如果例外域名不是 `VERCEL_URL` 或 `VERCEL_BRANCH_URL`，再在 Preview 设置 `FOCUS_PLAY_INTERNAL_PREVIEW_HOST` 为那个主机名，不要写协议或路径。`FOCUS_PLAY_INTERNAL_API=1` 在 Production，或服务主机是 `concentration-two.vercel.app` 时，会拒绝启动。
 
@@ -200,7 +200,7 @@ export ANDROID_HOME='现有 Android SDK'
 npm run mobile:play-internal
 ```
 
-输入检查可用 `node scripts/build-play-internal-android.mjs --check`。它不编译，也不表示可以上传。完整命令会先请求 health 和 ready，再用这把 p12 打 release，并核对固定证书指纹。通过的报告不是公开上架、真实儿童使用或价格保存。
+输入检查可用 `node scripts/build-play-internal-android.mjs --check`。它不编译，也不表示可以上传。完整命令会先请求 health 和 ready，再用这把 p12 打 release，并核对固定证书指纹。通过的报告不是公开上架、真实儿童使用或价格保存。从不含 `.git` 的源码包构建时，再设置 `FOCUS_PLAY_SOURCE_REF` 为修订清单中的 40 位提交号。普通 git 检出仍使用当前 `HEAD`。
 
 ### Android 开发包
 

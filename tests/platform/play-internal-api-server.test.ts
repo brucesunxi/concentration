@@ -1,12 +1,13 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { spawn } from 'node:child_process';
-import { mkdtemp, mkdir, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, mkdir, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import http from 'node:http';
 import net from 'node:net';
+import { PLAY_INTERNAL_OUTPUT_BODY, PLAY_INTERNAL_OUTPUT_FILE } from '../../packages/mobile-release/play-internal-android.ts';
 
 const root = fileURLToPath(new URL('../../', import.meta.url));
 
@@ -129,6 +130,11 @@ test('API-only Vercel build publishes no website files and refuses production', 
   preview.stdout.on('data', chunk => { previewOut += chunk.toString(); });
   const previewCode = await new Promise<number>(resolve => preview.once('exit', code => resolve(code ?? 1)));
   assert.equal(previewCode, 0, previewOut);
-  assert.match(previewOut, /"staticFiles":0/);
+  assert.match(previewOut, /"staticFiles":1/);
+  assert.match(previewOut, /"outputDirectory":"dist\/web"/);
+  const published = (await readdir(web, { recursive: true })).map(entry => entry.toString());
+  assert.deepEqual(published, [PLAY_INTERNAL_OUTPUT_FILE]);
+  assert.equal(await readFile(join(web, PLAY_INTERNAL_OUTPUT_FILE), 'utf8'), PLAY_INTERNAL_OUTPUT_BODY);
   await assert.rejects(readFile(join(web, 'index.html'), 'utf8'));
+  assert.equal(published.some(name => /\.(html|js|css)$/i.test(name) || name.includes('focus-sw')), false);
 });

@@ -21,9 +21,12 @@ import {
   familyPreviewStatus,
   playInternalApiOrigin,
   playInternalCertificateSha256,
+  PLAY_INTERNAL_OUTPUT_BODY,
+  PLAY_INTERNAL_OUTPUT_FILE,
   playInternalEdgeDecision,
   playInternalPreviewPath,
   playInternalPrerequisites,
+  resolveDeploymentRequest,
 } from '../../packages/mobile-release/play-internal-android.ts';
 import {
   mobileAgeReviewAcknowledgement,
@@ -93,7 +96,7 @@ test('a protected redirect or non-preview health response cannot satisfy the Pla
   assert.throws(() => assertPlayInternalServiceSeparation({ enabled: '1', vercel: true, environment: 'production', servingHosts: ['concentration-git-play.vercel.app'], productionHost: PROTECTED_PREVIEW_HOST }), /PLAY_INTERNAL_API_PREVIEW_REQUIRED/);
   assert.deepEqual(assertPlayInternalServiceSeparation({ enabled: undefined, vercel: true, environment: 'production', servingHosts: [PROTECTED_PREVIEW_HOST], productionHost: PROTECTED_PREVIEW_HOST }), []);
   assert.deepEqual(playInternalPreviewHosts(['concentration-git-play.vercel.app'], PROTECTED_PREVIEW_HOST), ['concentration-git-play.vercel.app']);
-  const denied = ['/', '/index.html', '/focus-sw.js', '/offline-shell.json', '/assets/index.js', '/studio', '/admin', '/support', '/media/guide.mp3', '/api/studio/me', '/api/admin', '/api/support', '/content-assets/../index.html'];
+  const denied = ['/', '/index.html', '/focus-sw.js', '/offline-shell.json', '/assets/index.js', '/studio', '/admin', '/support', '/media/guide.mp3', '/api/studio/me', '/api/admin', '/api/support', '/content-assets/../index.html', `/${PLAY_INTERNAL_OUTPUT_FILE}`];
   for (const path of denied) assert.equal(playInternalPreviewPath(path), 'deny', path);
   assert.equal(playInternalPreviewPath('/api/health'), 'allow');
   assert.equal(playInternalPreviewPath(`/content-assets/${'ab'.repeat(32)}.png`), 'allow');
@@ -116,6 +119,40 @@ test('a protected redirect or non-preview health response cannot satisfy the Pla
   const report = assertPlayInternalHealthReport({ origin: 'https://family.example.test', httpStatus: 200, mode: 'local-development', audience: 'play-internal', ready: true, redirected: false }, 'https://family.example.test');
   assert.equal(report.ready, true);
   assert.throws(() => assertPlayInternalHealthReport({ origin: 'https://family.example.test', httpStatus: 200, mode: 'local-development', redirected: false }, 'https://family.example.test'), /PLAY_INTERNAL_API_HEALTH_INVALID/);
+});
+
+test('API-only output is nonempty and the SPA rewrite still serves the ordinary website', () => {
+  const vercel = JSON.parse(readFileSync(new URL('../../vercel.json', import.meta.url), 'utf8')) as { outputDirectory: string; rewrites: { source: string; destination: string }[] };
+  assert.equal(vercel.outputDirectory, 'dist/web');
+  assert.equal(vercel.outputDirectory.split('/').at(-1), 'web');
+  assert.deepEqual(vercel.rewrites.at(-1), { source: '/:path*', destination: '/index.html' });
+  for (const source of ['/index.html', '/focus-sw.js', '/offline-shell.json', '/budget.json', '/assets/:path*']) {
+    const rule = vercel.rewrites.find(item => item.source === source);
+    assert.equal(rule?.destination, '/api/index', source);
+    assert.ok(vercel.rewrites.indexOf(rule!) < vercel.rewrites.length - 1);
+  }
+  const apiOnlyFiles = [PLAY_INTERNAL_OUTPUT_FILE];
+  assert.equal(PLAY_INTERNAL_OUTPUT_BODY.includes('<'), false);
+  assert.equal(/\.(html|js|css)$/i.test(PLAY_INTERNAL_OUTPUT_FILE), false);
+  const denied = ['/', '/index.html', '/focus-sw.js', '/offline-shell.json', '/budget.json', '/assets/app.js', '/studio', '/admin', '/support', '/media/guide.mp3', `/${PLAY_INTERNAL_OUTPUT_FILE}`];
+  for (const pathname of denied) {
+    const response = resolveDeploymentRequest({ pathname, apiOnly: true, outputFiles: apiOnlyFiles, rewrites: vercel.rewrites });
+    assert.deepEqual(response, { layer: 'middleware', status: 404, code: 'PLAY_INTERNAL_API_ONLY', contentType: 'application/json' }, pathname);
+  }
+  const asset = `/content-assets/${'ab'.repeat(32)}.png`;
+  assert.deepEqual(resolveDeploymentRequest({ pathname: '/api/health', apiOnly: true, outputFiles: apiOnlyFiles, rewrites: vercel.rewrites }), { layer: 'rewrite', destination: '/api/index' });
+  assert.deepEqual(resolveDeploymentRequest({ pathname: asset, apiOnly: true, outputFiles: apiOnlyFiles, rewrites: vercel.rewrites }), { layer: 'rewrite', destination: '/api/index' });
+  assert.equal(resolveDeploymentRequest({ pathname: '/index.html', apiOnly: true, outputFiles: apiOnlyFiles, rewrites: vercel.rewrites, middleware: false }).layer, 'rewrite');
+  assert.equal(resolveDeploymentRequest({ pathname: '/', apiOnly: true, outputFiles: apiOnlyFiles, rewrites: vercel.rewrites, middleware: false }).layer, 'platform-missing');
+  const websiteFiles = ['index.html', 'focus-sw.js', 'offline-shell.json', 'budget.json', 'assets/app.js', 'media/guide.mp3'];
+  const website = (pathname: string) => resolveDeploymentRequest({ pathname, apiOnly: false, outputFiles: websiteFiles, rewrites: vercel.rewrites });
+  assert.deepEqual(website('/'), { layer: 'filesystem', file: 'index.html' });
+  assert.deepEqual(website('/index.html'), { layer: 'filesystem', file: 'index.html' });
+  assert.deepEqual(website('/focus-sw.js'), { layer: 'filesystem', file: 'focus-sw.js' });
+  assert.deepEqual(website('/assets/app.js'), { layer: 'filesystem', file: 'assets/app.js' });
+  assert.deepEqual(website('/parent'), { layer: 'rewrite', destination: '/index.html' });
+  assert.deepEqual(website('/studio'), { layer: 'rewrite', destination: '/index.html' });
+  assert.deepEqual(website('/api/health'), { layer: 'rewrite', destination: '/api/index' });
 });
 
 test('Play internal artifact policy rejects the debug certificate, cleartext, localhost and the old version code', () => {

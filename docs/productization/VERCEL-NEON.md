@@ -9,7 +9,7 @@
 - Neon 托管 PostgreSQL，schema 版本 32。准备过程使用数据库所有者身份；Vercel 只使用 `focus_family_runtime` 限权身份。
 - 会话签名私钥仅放在 Vercel Preview 与 Production 的 Sensitive 环境变量 `FOCUS_SESSION_SIGNING_JWK`；本地准备副本保存在被忽略的 `.focus-data/neon/`，不可提交。
 - Preview 与受保护的 Production 域名共用内部预览数据库。`DATABASE_URL` 是带连接池的应用运行账号 URL。所有者 URL 不进入 Vercel。公开商用前须拆分环境。
-- Vercel 项目 `concentration` 的 `ssoProtection.deploymentType` 必须保持 `all`。Play 内部测试不新建项目，也不关闭这个保护。只给一个预览域名添加 Deployment Protection Exception。该例外覆盖整个域名，所以对应部署必须是 API-only。步骤见 [原生 App 说明](NATIVE-APP.md)。不要把 `concentration-two.vercel.app` 放进例外，也不要新建或克隆数据库。
+- Vercel 项目 `concentration` 的 `ssoProtection.deploymentType` 必须保持 `all`。Play 内部测试不新建项目，也不关闭这个保护。只给一个预览域名添加 Deployment Protection Exception。该例外覆盖整个域名，所以对应部署必须是 API-only。`outputDirectory` 仍是 `dist/web`。API-only 构建放入非页面的 `play-internal-api-only.json`，避免空目录失败；页面请求由 Middleware 在 SPA 重写之前返回 JSON。普通网站构建不走这条路径。步骤见 [原生 App 说明](NATIVE-APP.md)。不要把 `concentration-two.vercel.app` 放进例外，也不要新建或克隆数据库。
 - 项目与 `brucesunxi/concentration` 的 `main` 分支相连。当前访问域名是 `https://concentration-two.vercel.app/`，属于受保护的内部预览，不代表产品获准公开。
 - 原生 App 已可在构建时指定公开的 HTTPS API 根地址；当前受 Vercel Authentication 保护的域名仍仅供已登录的内部网页预览，不能把 Vercel 登录或绕过凭据打进儿童设备包。手机真机联调需要另行批准的可达测试入口，且服务端 `ZZ` 准入与正式发布门槛保持有效。
 - 注册、登录与接受邀请分别按客户端来源共享 10 分钟窗口，每类最多 12 次请求；计数保存在 Neon，跨无服务器实例与重启生效。只保存使用会话密钥派生的来源摘要，不保存原始 IP。已存在的家长账号还受数据库中的密码错误锁定保护。
