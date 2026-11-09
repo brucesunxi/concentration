@@ -29,7 +29,7 @@ export function LifeGoals({ childId, role, locale, client, entering, error, onEn
     <Text style={s.label}>{t('怎样帮助比较合适？', 'What kind of help would suit you?')}</Text>
     {(Object.keys(supportLabels) as Support[]).map(value => <Choice key={value} label={supportLabels[value][locale]} selected={support === value} disabled={busy} onPress={() => setSupport(value)} />)}
   </View>;
-  return <Page title={t('生活小目标', 'Everyday goals')} subtitle={t('先在这里商量，离开屏幕后再去做。一个小目标，随时可以停。', 'Talk it through here, then try it away from the screen. One small goal; stop at any time.')}>
+  return <Page locale={locale} title={t('生活小目标', 'Everyday goals')} subtitle={t('先在这里商量，离开屏幕后再去做。一个小目标，随时可以停。', 'Talk it through here, then try it away from the screen. One small goal; stop at any time.')}>
     <Button quiet title={t('返回家庭空间', 'Back to family space')} disabled={entering} onPress={onBack} />
     <Notice>{role === 'parent' ? t('目标、帮助约定和回顾是否结束，家长可以看见。具体答案由孩子选择是否分享；未分享的答案不会保存。', 'You can see goals, agreed support and whether a reflection has finished. Children choose whether to share their answers. Unshared answers are not saved.') : t('目标、帮助约定和回顾是否结束，家长可以看见。每次答案由你选择是否分享；未分享的答案不会保存。', 'Parents can see the goal, agreed support and whether a reflection has finished. You choose whether to share the answers. Unshared answers are not saved.')}</Notice>
     <Notice>{error || (state.error && lifeError(state.error, locale))}</Notice>

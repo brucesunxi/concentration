@@ -31,7 +31,7 @@ export function PracticeInvitation({ child, task, client, canEdit, parentPresent
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void refresh(); });
     return () => listener.remove();
   }, [refresh]);
-  return <Page title={c.title} subtitle={taskContent(task, child.locale, child.ageBand).title}>
+  return <Page locale={child.locale} title={c.title} subtitle={taskContent(task, child.locale, child.ageBand).title}>
     <Text style={s.body}>{c.body}</Text>
     {state.busy && <Text accessibilityLiveRegion="polite" style={s.body}>{update.loading}</Text>}
     <Notice>{state.error && update.failed}</Notice>

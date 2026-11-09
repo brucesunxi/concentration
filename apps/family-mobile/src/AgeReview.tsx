@@ -5,6 +5,7 @@ import type { Child } from '../../../packages/contracts/models.ts';
 import type { AgeBand, Locale } from '../../../packages/task-engine/index.ts';
 import { API_IS_LOCAL, MobileClient, MobileRequestError } from './client';
 import { mobileAgeReviewAcknowledgement } from '../../../packages/session-runtime/mobile-preview-copy.ts';
+import { countCopy } from '../../../packages/content/plural.ts';
 import { Button, CheckBox, Choice, Notice, s } from './ui';
 
 type Space={childId:string;currentAgeBand:AgeBand;version:number;state:'current'|'due'|'pending'|'adult-pending';dueAt:string;targetAgeBand:AgeBand|'18+'|null;unfinished:{id:string;createdAt:string;uploadUntil:string|null;uploadExpired:boolean}[]};
@@ -37,7 +38,7 @@ export function AgeReview({child,locale,mode,client,onChanged,onRequireLogin}:{c
     {!space?<Text style={s.body}>{t('正在读取…','Loading…')}</Text>:<>
       <Text style={s.body}>{t(`当前 ${space.currentAgeBand} 岁；下次复核 ${new Date(space.dueAt).toLocaleDateString(locale)}。`,`Current band ${space.currentAgeBand}; next review ${new Date(space.dueAt).toLocaleDateString(locale)}.`)}</Text>
       {space.state!=='current'&&<Notice>{space.state==='adult-pending'?t('成年转换需要独立身份与资料权利流程。新练习已暂停。','Adult transition needs a separate identity and data-rights review. New practice is paused.'):space.state==='pending'?t(`准备变更为 ${space.targetAgeBand} 岁。新练习已暂停；旧记录保留。`,`Changing to ${space.targetAgeBand}. New practice is paused; earlier records are preserved.`):t('年龄档需要家长确认后才能开始新练习。','A parent needs to confirm the age band before new practice.')}</Notice>}
-      {space.unfinished.length>0&&<Notice>{t(`还有 ${space.unfinished.length} 次旧练习未结束。请先从恢复入口处理；未过期的练习可在原设备补传。`,`There are ${space.unfinished.length} unfinished earlier practices. Resolve them in Recovery; unexpired practice can still upload from its original device.`)}</Notice>}
+      {space.unfinished.length>0&&<Notice>{t(`还有 ${space.unfinished.length} 次旧练习未结束。请先从恢复入口处理；未过期的练习可在原设备补传。`,`${space.unfinished.length === 1 ? 'There is' : 'There are'} ${countCopy(locale, space.unfinished.length, 'unfinished earlier practice', 'unfinished earlier practices', '次旧练习')}. Resolve ${space.unfinished.length === 1 ? 'it' : 'them'} in Recovery; unexpired practice can still upload from its original device.`)}</Notice>}
       {space.unfinished.map(item=><Text key={item.id} style={s.muted}>{new Date(item.createdAt).toLocaleString(locale)} · {item.uploadUntil?item.uploadExpired?t('补传期限已过','Upload deadline passed'):t(`可补传至 ${new Date(item.uploadUntil).toLocaleString(locale)}`,`Upload until ${new Date(item.uploadUntil).toLocaleString(locale)}`):t('请在原设备处理','Resolve on the original device')}</Text>)}
       <Text style={s.muted}>{t('确认适合的年龄档','Confirm the age band')}</Text><View style={s.row}>{bands.map(b=><Choice key={b} label={b} selected={target===b} disabled={busy} onPress={()=>{setTarget(b);setAck(false);setLocalAck(false);setExpiredAck(false);}}/>)}</View>
       <CheckBox value={ack} disabled={busy} onChange={setAck} label={t('我已核对年龄档；变更前会处理旧设备的练习与本机记录。','I checked the age band and will resolve older device practice and local records before applying a change.')}/>

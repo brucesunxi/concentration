@@ -5,6 +5,7 @@ import type { Child, Me } from '../../../packages/contracts/models.ts';
 import type { Locale, TaskId } from '../../../packages/task-engine/index.ts';
 import { TASKS } from '../../../packages/task-engine/index.ts';
 import { taskContent, translate } from '../../../packages/content/copy.ts';
+import { countCopy } from '../../../packages/content/plural.ts';
 import { localRecoveryForExport, performProfileAction, requireCurrent } from '../../../packages/session-runtime/profile-actions.ts';
 import type { ProfileAction } from '../../../packages/session-runtime/profile-actions.ts';
 import { MobileClient, MobileRequestError } from './client';
@@ -111,7 +112,7 @@ export function ParentSpace({ child, family, mode, locale, client, onBack, onCha
     <Button quiet title={copy.older(kind)} disabled={busy||!report.history[kind].nextCursor} onPress={()=>void historyClient.current?.move(kind,'older')}/>
     {!report.history[kind].nextCursor&&report[kind].length>0&&<Text style={s.muted}>{copy.end}</Text>}
   </View>; }
-  return <Page title={`${child.alias} · ${t('家长空间', 'Parent space')}`} subtitle={t('关注具体尝试，也留意生活中的变化。', 'Notice specific attempts and everyday changes.')}>
+  return <Page locale={locale} title={`${child.alias} · ${t('家长空间', 'Parent space')}`} subtitle={t('关注具体尝试，也留意生活中的变化。', 'Notice specific attempts and everyday changes.')}>
     {!closed && <View style={s.row}>
       {([['records', t('练习与生活记录', 'Records')], ['observation', t('记一次观察', 'Add an observation')], ['privacy', t('资料与权限', 'Data & access')], ['age', t('年龄档复核', 'Age review')]] as const).filter(([value])=>canManage||!['privacy','age'].includes(value)).map(([value, label]) => <Button key={value} quiet={tab !== value} disabled={busy} title={label} onPress={() => { setTab(value); setError(''); setNotice(''); setIntent(null); setPassword(''); }} />)}
     </View>}
@@ -127,15 +128,15 @@ export function ParentSpace({ child, family, mode, locale, client, onBack, onCha
       {report?.sessions.map(({ id, result, created_at }) => <View key={id} style={s.card}>
         <Text style={s.heading}>{taskContent(result.task, locale, child.ageBand).title}</Text>
         <Text style={s.muted}>{new Date(created_at).toLocaleString(locale)}</Text>
-        <Text style={s.body}>{result.environment?.input === 'assistive' ? t(`读屏方式完成正式步骤 ${result.metrics.trials + result.metrics.assisted} 个，单独保留，不做正确率或能力判断。`, `${result.metrics.trials + result.metrics.assisted} formal screen reader steps, kept separately without an accuracy or ability rating.`) : result.metrics.trials ? t(`独立正确 ${result.metrics.correct} / ${result.metrics.trials} 个步骤`, `${result.metrics.correct} / ${result.metrics.trials} independent steps correct`) : t('尚无独立有效步骤', 'No valid independent steps yet')}</Text>
+        <Text style={s.body}>{result.environment?.input === 'assistive' ? t(`读屏方式完成正式步骤 ${result.metrics.trials + result.metrics.assisted} 个，单独保留，不做正确率或能力判断。`, `${countCopy(locale, result.metrics.trials + result.metrics.assisted, 'formal screen reader step', 'formal screen reader steps', '个正式步骤')}, kept separately without an accuracy or ability rating.`) : result.metrics.trials ? t(`独立正确 ${result.metrics.correct} / ${result.metrics.trials} 个步骤`, `${result.metrics.correct} / ${countCopy(locale, result.metrics.trials, 'independent step', 'independent steps', '个步骤')} correct`) : t('尚无独立有效步骤', 'No valid independent steps yet')}</Text>
         <Text style={s.muted}>{t(`帮助 ${result.metrics.assisted} 次 · 中断 ${result.interruptions} 次`, `${result.metrics.assisted} assisted · ${result.interruptions} interrupted`)}</Text>
         <Text style={s.muted}>{result.historyOnly ? t('换设备前的独立记录 · 不计入课程', 'Previous-device record · Not counted in the course') : result.completed ? t('完整完成', 'Completed') : result.metrics.trials + result.metrics.assisted === 0 ? t('提前结束 · 尚无正式步骤', 'Stopped early · No formal step completed') : t('提前结束', 'Stopped early')}</Text>
       </View>)}
       {pager('sessions')}
-      <Text accessibilityRole="header" style={s.heading}>{report ? t(`生活观察 · 共 ${report.observationCount} 条`, `Everyday observations · ${report.observationCount} total`) : t('生活观察', 'Everyday observations')}</Text>
+      <Text accessibilityRole="header" style={s.heading}>{report ? t(`生活观察 · 共 ${report.observationCount} 条`, countCopy(locale, report.observationCount, 'everyday observation', 'everyday observations', '条生活观察')) : t('生活观察', 'Everyday observations')}</Text>
       {report?.observations.map(observation => <View key={observation.id} style={s.card}>
         <Text style={s.heading}>{contexts[observation.context]}</Text>
-        <Text style={s.body}>{t(`提醒 ${observation.prompts} 次`, `${observation.prompts} reminders`)} · {observation.child_choice ? t('孩子自己选择', 'Chosen by the child') : t('一起商量选择', 'Chosen together')}</Text>
+        <Text style={s.body}>{t(`提醒 ${observation.prompts} 次`, countCopy(locale, observation.prompts, 'reminder', 'reminders', '次提醒'))} · {observation.child_choice ? t('孩子自己选择', 'Chosen by the child') : t('一起商量选择', 'Chosen together')}</Text>
         <Text style={s.muted}>{new Date(observation.created_at).toLocaleDateString(locale)}</Text>
       </View>)}
       {pager('observations')}

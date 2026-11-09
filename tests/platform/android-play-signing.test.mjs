@@ -144,7 +144,7 @@ test('a source archive without git matches the tracked mobile sources and can na
   assert.equal(checkout.git, true);
   assert.match(checkout.commit, /^[a-f0-9]{40}$/);
   const packaged = await readVerifiedSourceFile(root, checkout, 'apps/family-mobile/package.json');
-  assert.match(packaged.toString('utf8'), /"version": "0.2.17"/);
+  assert.match(packaged.toString('utf8'), /"version": "0.2.18"/);
 });
 
 function zipArchive(entries) {

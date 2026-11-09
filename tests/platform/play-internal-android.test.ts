@@ -263,8 +263,8 @@ test('hosted preview copy tells adults that records leave the device and local c
 test('the mobile shell version is above the rejected Play candidate and local verification still requires the debug certificate', async () => {
   const identity = JSON.parse(await readFile(new URL('../../apps/family-mobile/build-identity.json', import.meta.url), 'utf8'));
   const mobile = JSON.parse(await readFile(new URL('../../apps/family-mobile/package.json', import.meta.url), 'utf8'));
-  assert.equal(mobile.version, '0.2.17');
-  assert.equal(identity.androidVersionCode, 18);
+  assert.equal(mobile.version, '0.2.18');
+  assert.equal(identity.androidVersionCode, 19);
   assert.ok(identity.androidVersionCode >= PLAY_INTERNAL_MIN_VERSION_CODE);
   const localVerifier = await readFile(new URL('../../scripts/verify-android-aab.mjs', import.meta.url), 'utf8');
   assert.match(localVerifier, /CN=Android Debug/);

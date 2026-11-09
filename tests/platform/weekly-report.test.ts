@@ -137,6 +137,18 @@ test('a practice-only early stop is disclosed as having no completed formal step
   assert.match(en.sections[0].items[0].lines[0], /1 attempt; 0 valid independent steps/);
   assert.match(zh.days[1].label, /已确认练习记录 1 条/);
   assert.match(en.days[1].label, /1 confirmed practice record · 0 observations/);
+  assert.match(zh.coverage, /完整练习 0 次/);
+  assert.equal(en.coverage.includes('1 completed practices'), false);
+  assert.match(en.coverage, /0 completed practices/);
+});
+
+test('one completed practice stays singular in English and keeps the Chinese classifier', () => {
+  const en = weeklyPresentation(build([row('2026-09-22T12:00:00Z')]), 'en');
+  const zh = weeklyPresentation(build([row('2026-09-22T12:00:00Z')]), 'zh-CN');
+  assert.match(en.coverage, /1 completed practice;/);
+  assert.equal(en.coverage.includes('1 completed practices'), false);
+  assert.match(zh.coverage, /完整练习 1 次/);
+  assert.equal(zh.coverage.includes('practices'), false);
 });
 
 test('previous-device records remain separate and suppress a misleading comparison in either week',()=>{

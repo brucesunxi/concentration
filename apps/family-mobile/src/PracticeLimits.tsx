@@ -21,7 +21,7 @@ export function PracticeLimits({ childId, parent, locale, client, onBack, onPare
     const listener = AppState.addEventListener('change', state => { if (state === 'active') void refresh(); });
     return () => listener.remove();
   }, [refresh]);
-  return <Page title={c.title} subtitle={c.intro}>
+  return <Page locale={locale} title={c.title} subtitle={c.intro}>
     <Notice>{state.error && (state.stale ? c.stale : c.error(state.error))}</Notice>{state.saved && <Notice>{c.saved}</Notice>}
     {state.busy && !data && <Text accessibilityLiveRegion="polite" style={s.body}>{c.loading}</Text>}
     {state.refreshing && data && <Text accessibilityLiveRegion="polite" style={s.body}>{c.loading}</Text>}

@@ -16,7 +16,7 @@ export function AccountSecurity({ familyId, familyName, locale, client, onBack, 
   function reset() { setCurrent(''); setNext(''); setRepeat(''); setTypedName(''); setAck(false); }
   const valid = !!current && ack && (action !== 'password' || (newPasswordSchema.safeParse(next).success && next === repeat)) && (action !== 'delete' || typedName === familyName);
   const outcome = state.outcome === 'password' ? c.changed : state.outcome === 'signout' ? c.signedOut : state.outcome === 'delete' ? c.deleted : state.outcome === 'delete-uncertain' ? c.deletionUncertain : state.outcome === 'uncertain' ? c.uncertain : c.ended;
-  return <Page title={c.title} subtitle={c.intro}>
+  return <Page locale={locale} title={c.title} subtitle={c.intro}>
     {state.outcome ? <><Notice>{outcome}</Notice><Button title={c.signin} onPress={() => onSignIn(outcome)} /></> : <>
       <Notice>{state.error && c.error(state.error)}</Notice>
       {!state.data ? <>{state.busy ? <Text accessibilityLiveRegion="polite" style={s.body}>{c.loading}</Text> : <Button title={c.retry} onPress={() => void reload()} />}</> : <>
