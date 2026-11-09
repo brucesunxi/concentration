@@ -1,7 +1,11 @@
 import test from 'node:test';
 import assert from 'node:assert/strict';
 import { readFileSync } from 'node:fs';
-import { readFile } from 'node:fs/promises';
+import { mkdir, mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { pathToFileURL } from 'node:url';
+import { createRequire } from 'node:module';
 import {
   PLAY_INTERNAL_APP_NAME,
   PLAY_INTERNAL_MIN_VERSION_CODE,
@@ -108,6 +112,8 @@ test('a protected redirect or non-preview health response cannot satisfy the Pla
   assert.equal(JSON.stringify(localBuild).includes(password), false);
   const middleware = readFileSync(new URL('../../middleware.ts', import.meta.url), 'utf8');
   assert.match(middleware, /playInternalEdgeDecision/);
+  assert.doesNotMatch(middleware, /from\s+['"][^'"]+\.ts['"]/);
+  assert.doesNotMatch(middleware, /packages\/mobile-release\/play-internal-android/);
   assert.doesNotMatch(middleware, /x-vercel-protection-bypass|protection-bypass|bypass token/i);
   const localStatus = familyPreviewStatus('0.46.0', 'local-development', {});
   assert.equal('audience' in localStatus, false);
@@ -153,6 +159,73 @@ test('API-only output is nonempty and the SPA rewrite still serves the ordinary 
   assert.deepEqual(website('/parent'), { layer: 'rewrite', destination: '/index.html' });
   assert.deepEqual(website('/studio'), { layer: 'rewrite', destination: '/index.html' });
   assert.deepEqual(website('/api/health'), { layer: 'rewrite', destination: '/api/index' });
+});
+
+test('compiled middleware runs without the TypeScript package path', async () => {
+  const source = readFileSync(new URL('../../middleware.ts', import.meta.url), 'utf8');
+  const typescript = createRequire(import.meta.url)('typescript') as {
+    transpileModule(input: string, options: { compilerOptions: { module: number; target: number }; fileName: string }): { outputText: string };
+    ModuleKind: { ESNext: number };
+    ScriptTarget: { ES2022: number };
+  };
+  const compiled = typescript.transpileModule(source, {
+    compilerOptions: { module: typescript.ModuleKind.ESNext, target: typescript.ScriptTarget.ES2022 },
+    fileName: 'middleware.ts',
+  }).outputText;
+  assert.doesNotMatch(compiled, /play-internal-android\.ts|\.ts['"]/);
+  assert.doesNotMatch(compiled, /from ['"]\./);
+  assert.match(compiled, /from '@vercel\/functions'/);
+  const directory = await mkdtemp(join(tmpdir(), 'focus-middleware-'));
+  const previous = {
+    enabled: process.env.FOCUS_PLAY_INTERNAL_API,
+    environment: process.env.VERCEL_ENV,
+  };
+  try {
+    await writeFile(join(directory, 'package.json'), '{"type":"module"}\n');
+    await mkdir(join(directory, 'node_modules', '@vercel', 'functions'), { recursive: true });
+    await writeFile(join(directory, 'node_modules', '@vercel', 'functions', 'package.json'), '{"type":"module","exports":"./index.js"}\n');
+    await writeFile(join(directory, 'node_modules', '@vercel', 'functions', 'index.js'), 'export function next(options){ return { type: "next", headers: options?.headers ?? null }; }\n');
+    await writeFile(join(directory, 'middleware.js'), compiled);
+    const loaded = await import(pathToFileURL(join(directory, 'middleware.js')).href) as {
+      playInternalEdgeDecision(input: { enabled: string | undefined; environment: string | undefined; pathname: string }): { action: string; apiOnly: boolean; code?: string };
+      default(request: Request): Promise<Response | { type: string; headers: Record<string, string> | null }>;
+    };
+    const paths = ['/', '/index.html', '/focus-sw.js', '/studio', '/admin', '/support', '/media/guide.mp3', '/api/health', '/api/ready', '/api/me', '/api/studio', '/api/admin', '/api/support', `/content-assets/${'ab'.repeat(32)}.png`, `/content-assets/${'cd'.repeat(32)}.mp3`, '/content-assets/short.png', `/${PLAY_INTERNAL_OUTPUT_FILE}`];
+    for (const environment of ['preview', 'production', undefined]) {
+      for (const enabled of ['1', undefined]) {
+        for (const pathname of paths) {
+          assert.deepEqual(
+            loaded.playInternalEdgeDecision({ enabled, environment, pathname }),
+            playInternalEdgeDecision({ enabled, environment, pathname }),
+            `${enabled ?? 'unset'}:${environment ?? 'unset'}:${pathname}`,
+          );
+        }
+      }
+    }
+    process.env.FOCUS_PLAY_INTERNAL_API = '1';
+    process.env.VERCEL_ENV = 'preview';
+    const denied = await loaded.default(new Request('https://preview.example/'));
+    assert(denied instanceof Response);
+    assert.equal(denied.status, 404);
+    assert.match(denied.headers.get('content-type') ?? '', /^application\/json/);
+    assert.equal(await denied.text(), '{"code":"PLAY_INTERNAL_API_ONLY"}');
+    const health = await loaded.default(new Request('https://preview.example/api/health'));
+    const ready = await loaded.default(new Request('https://preview.example/api/ready'));
+    assert.equal(health instanceof Response, false);
+    assert.equal(ready instanceof Response, false);
+    assert.deepEqual(health, { type: 'next', headers: { 'x-robots-tag': 'noindex' } });
+    assert.deepEqual(ready, { type: 'next', headers: { 'x-robots-tag': 'noindex' } });
+    delete process.env.FOCUS_PLAY_INTERNAL_API;
+    const website = await loaded.default(new Request('https://preview.example/'));
+    assert.equal(website instanceof Response, false);
+    assert.deepEqual(website, { type: 'next', headers: null });
+  } finally {
+    if (previous.enabled === undefined) delete process.env.FOCUS_PLAY_INTERNAL_API;
+    else process.env.FOCUS_PLAY_INTERNAL_API = previous.enabled;
+    if (previous.environment === undefined) delete process.env.VERCEL_ENV;
+    else process.env.VERCEL_ENV = previous.environment;
+    await rm(directory, { recursive: true, force: true });
+  }
 });
 
 test('Play internal artifact policy rejects the debug certificate, cleartext, localhost and the old version code', () => {
