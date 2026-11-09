@@ -1,12 +1,12 @@
 import type { ExpoConfig } from 'expo/config';
 import mobilePackage from './package.json';
 import buildIdentity from './build-identity.json';
-import { mobileApiOrigin } from '../../packages/contracts/mobile-api-origin.ts';
+import { androidAppIdentity } from '../../packages/mobile-release/play-internal-android.ts';
 
-if (process.env.APP_MODE === 'production') throw new Error('Mobile production release requires approved identity, markets and content.');
-const api = mobileApiOrigin(process.env.EXPO_PUBLIC_FOCUS_API_ORIGIN);
+const identity = androidAppIdentity(process.env);
+const api = { origin: identity.origin, local: identity.local };
 const config: ExpoConfig = {
-  name: 'Focus Island Dev', slug: 'focus-family-local', version: mobilePackage.version,
+  name: identity.name, slug: 'focus-family-local', version: mobilePackage.version,
   orientation: 'portrait', userInterfaceStyle: 'light', scheme: 'focus-family-local',
   ios: {
     bundleIdentifier: 'dev.focusisland.family', supportsTablet: true, buildNumber: buildIdentity.iosBuildNumber,

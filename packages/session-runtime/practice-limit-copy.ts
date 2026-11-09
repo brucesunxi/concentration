@@ -1,5 +1,6 @@
 import type { Locale } from '../task-engine/index.ts';
 import type { PracticeLimits } from '../contracts/practice-limits.ts';
+import { countCopy } from '../content/plural.ts';
 export function limitCopy(locale: Locale) {
   const t = (zh: string, en: string) => locale === 'zh-CN' ? zh : en;
   return {
@@ -12,7 +13,7 @@ export function limitCopy(locale: Locale) {
     scope: t('这里只计算任务中的有效练习时间，不包括说明、暂停和其他页面；它不是设备总屏幕时长。', 'This counts active task time, excluding instructions, pauses and other pages. It is not total device screen time.'),
     confirmed: t('已确认的练习用时', 'Confirmed practice time'), reserved: t('尚未结清的预留时间', 'Time held for unconfirmed practice'), remaining: t('今天可再安排', 'Available for more practice today'),
     duration: (ms: number) => { const sec = Math.ceil(ms / 1000); return t(`${Math.floor(sec / 60)} 分 ${sec % 60} 秒`, `${Math.floor(sec / 60)} min ${sec % 60} sec`); },
-    edit: t('调整后续安排', 'Adjust future practice'), ceiling: (n: number) => t(`可选择暂停或 1–${n} 分钟。当前年龄段的开发上限为 ${n} 分钟，不能通过多次开启增加。`, `Choose a pause or 1–${n} minutes. The preview ceiling for this age band is ${n} minutes; reopening practice does not add time.`),
+    edit: t('调整后续安排', 'Adjust future practice'), ceiling: (n: number) => t(`可选择暂停或 1–${n} 分钟。当前年龄段的开发上限为 ${n} 分钟，不能通过多次开启增加。`, n === 1 ? 'Choose a pause or 1 minute. The preview ceiling for this age band is 1 minute; reopening practice does not add time.' : `Choose a pause or 1–${n} minutes. The preview ceiling for this age band is ${countCopy(locale, n, 'minute', 'minutes', '分钟')}; reopening practice does not add time.`),
     timing: (day: string) => t(`修改从 ${day} 起生效。今天已准备的练习仍按原上限运行；孩子随时可以自行结束。`, `Changes take effect on ${day}. Practice prepared today keeps its original limit; your child can stop at any time.`),
     choice: t('新的每日上限', 'New daily maximum'), ack: t('我已了解生效日期，并会和孩子商量安排。', 'I understand the effective date and will discuss the plan with my child.'),
     pauseTodayTitle: t('今天先休息', 'Take today off'), pauseTodayDetail: (day: string, nextDay: string) => t(`确认后，${day} 不再开启新练习；已开始的练习不会被远程中断，记录仍可恢复或补传。${nextDay} 起按下方显示的安排继续。`, `After confirmation, no new practice can start on ${day}. Practice already underway will not be interrupted remotely, and its record can still be recovered or uploaded. The plan shown below continues from ${nextDay}.`),

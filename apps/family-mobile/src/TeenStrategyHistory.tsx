@@ -18,7 +18,7 @@ export function TeenStrategyHistory({ child, locale, client, onBack, onAccessEnd
     return () => { current.dispose(); history.current = null; };
   }, [child.id, client]);
   useEffect(() => { if (state.denied) onAccessEnded(); }, [state.denied]);
-  return <Page title={copy.title} subtitle={copy.introduction}>
+  return <Page locale={locale} title={copy.title} subtitle={copy.introduction}>
     <Button quiet title={copy.back} onPress={onBack} />
     <Text style={s.muted}>{copy.familyNote}</Text>
     {state.busy && <ActivityIndicator accessibilityLabel={copy.loading} color={colors.accent} />}

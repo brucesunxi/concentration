@@ -17,7 +17,7 @@ export function ParentGuide({ childId, locale, client, onBack, onLife, onLogin, 
   const request = useMemo<LifeRequest>(() => (path, method, data, headers) => client.request(path, method, data, headers), [client]);
   const { state, reload } = useParentGuide(childId, request), [chosen, setChosen] = useState<number | null>(null), [topics, setTopics] = useState(false);
   const { data, busy, error } = state, t = translate(locale), lesson = data?.lessons.find(item => item.stage === (chosen ?? data.recommended));
-  return <Page title={copy.title[locale]} subtitle={copy.subtitle[locale]}>
+  return <Page locale={locale} title={copy.title[locale]} subtitle={copy.subtitle[locale]}>
     <Button quiet title={t('返回家庭空间', 'Back to family space')} onPress={onBack} />
     {data&&<Notice>{contentLabel(data.content,locale)}</Notice>}<Text style={s.muted}>{copy.pace[locale]}</Text>
     <Notice>{guideError(error, locale)}</Notice>

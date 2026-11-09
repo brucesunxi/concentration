@@ -5,6 +5,7 @@ import type { WeeklyReport } from '../../../packages/reports/weekly.ts';
 import { weeklyPresentation } from '../../../packages/reports/presentation.ts';
 import { translate } from '../../../packages/content/copy.ts';
 import { MobileClient, MobileRequestError } from './client';
+import { weeklyDayLayout } from '../../../packages/session-runtime/weekly-day-layout.ts';
 import { Button, Notice, colors, s } from './ui';
 
 export function WeeklyReview({ childId, locale, revision, client, onRequireLogin }: { childId: string; locale: Locale; revision: number; client: MobileClient; onRequireLogin(): void }) {
@@ -32,7 +33,7 @@ export function WeeklyReview({ childId, locale, revision, client, onRequireLogin
     {error && <><Notice>{t('暂时无法读取周回顾，请稍后重试。', 'This weekly review is unavailable. Please retry.')}</Notice><Button quiet title={t('重试', 'Retry')} onPress={() => setRetry(value => value + 1)} /></>}
     {view && <>
       <Text style={s.body}>{view.range}</Text><Text style={s.muted}>{view.subtitle}</Text>
-      <View style={s.row}>{view.days.map(day => <View key={day.date} style={[s.field, { backgroundColor: colors.soft, borderRadius: 12, padding: 12 }]}><Text style={s.label}>{day.date}</Text><Text style={s.muted}>{day.label}</Text></View>)}</View>
+      <View style={weeklyDayLayout.row}>{view.days.map(day => <View key={day.date} style={[weeklyDayLayout.tile, { backgroundColor: colors.soft, borderRadius: 12, padding: 12 }]}><Text style={s.label}>{day.date}</Text><Text style={s.muted}>{day.label}</Text></View>)}</View>
       <Text style={s.body}>{view.coverage}</Text><Text style={s.muted}>{view.missing}</Text>
       {view.sections.map(section => <View key={section.key} style={s.field}><Text accessibilityRole="header" style={s.heading}>{section.title}</Text><Text style={s.muted}>{section.intro}</Text>
         {section.items.length ? section.items.map(item => <View key={item.key} style={[s.field, { borderTopWidth: 1, borderColor: colors.line, paddingVertical: 16 }]}><Text style={s.label}>{item.title}</Text>{item.lines.map((line, index) => <Text key={index} style={s.muted}>{line}</Text>)}{item.details && <><Button quiet title={expanded.includes(item.key) ? t('收起比较条件', 'Hide comparison conditions') : t('查看比较条件', 'View comparison conditions')} onPress={() => setExpanded(values => values.includes(item.key) ? values.filter(key => key !== item.key) : [...values, item.key])} />{expanded.includes(item.key) && item.details.map(line => <Text key={line} style={s.muted}>{line}</Text>)}</>}</View>) : <Text style={s.muted}>{section.empty}</Text>}

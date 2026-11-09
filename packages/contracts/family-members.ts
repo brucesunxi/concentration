@@ -12,5 +12,5 @@ export interface MemberIdentity { id: string; loginName: string; displayName: st
 export interface FamilyMembers {
   version: 'family-members-1'; familyId: string; viewerId: string; canManage: boolean;
   members: (MemberIdentity & { childIds: string[]; version: number; createdAt: string })[];
-  invitations: { id: string; childIds: string[]; state: 'open' | 'expired' | 'accepted' | 'cancelled'; expiresAt: string }[];
+  invitations: { id: string; childIds: string[]; state: 'open' | 'expired' | 'accepted' | 'cancelled'; expiresAt: string; acceptedAt: string | null }[];
 }

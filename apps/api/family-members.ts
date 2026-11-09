@@ -11,7 +11,7 @@ export interface MemberRow {
   id: string; family_id: string; login_name: string; display_name: string; role: MemberRole; state: MemberState;
   child_ids: string[]; version: number; password_hash: string; auth_failures: number; auth_locked_until: string | null; password_changed_at: string | null; created_at: string;
 }
-interface InviteRow { id: string; family_id: string; created_by: string; child_ids: string[]; expires_at: string; cancelled_at: string | null; accepted_by: string | null }
+interface InviteRow { id: string; family_id: string; created_by: string; child_ids: string[]; expires_at: string; cancelled_at: string | null; accepted_by: string | null; accepted_at: string | null }
 export const identity = (m: MemberRow): MemberIdentity => ({ id:m.id,loginName:m.login_name,displayName:m.display_name,role:m.role,state:m.state });
 export const memberContext = (p: Principal): DatabaseContext => ({mode:'family',familyId:p.family_id,childId:p.child_id,scope:p.scope,memberId:p.member_id,memberRole:p.member_role,memberState:p.member_state,childIds:p.allowed_children});
 const digest = (s:string) => createHash('sha256').update(s).digest('hex');
@@ -40,7 +40,7 @@ export function familyMembers(db:Database, hooks:{
       const invites=p.member_role==='owner' ? (await db.query<InviteRow>('SELECT * FROM family_invitations WHERE family_id=$1 ORDER BY created_at DESC,id DESC LIMIT 20',[p.family_id])).rows : [];
       return {version:'family-members-1',familyId:p.family_id,viewerId:p.member_id,canManage:p.member_role==='owner',
         members:rows.rows.map(m=>({...identity(m),childIds:p.member_state==='pending'?[]:m.child_ids,version:m.version,createdAt:new Date(m.created_at).toISOString()})),
-        invitations:invites.map(i=>({id:i.id,childIds:i.child_ids,expiresAt:new Date(i.expires_at).toISOString(),state:i.cancelled_at?'cancelled':i.accepted_by?'accepted':Date.parse(i.expires_at)<=now()?'expired':'open'}))};
+        invitations:invites.map(i=>({id:i.id,childIds:i.child_ids,expiresAt:new Date(i.expires_at).toISOString(),acceptedAt:i.accepted_at?new Date(i.accepted_at).toISOString():null,state:i.cancelled_at?'cancelled':i.accepted_by?'accepted':Date.parse(i.expires_at)<=now()?'expired':'open'}))};
     },
     async invite(p:Principal,raw:unknown,key:string) {
       hooks.owner(p);const input=inviteInput.parse(raw);

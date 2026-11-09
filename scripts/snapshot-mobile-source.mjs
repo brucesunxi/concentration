@@ -1,22 +1,15 @@
 import assert from 'node:assert/strict';
-import { execFileSync } from 'node:child_process';
 import { createHash } from 'node:crypto';
 import { lstat, mkdir, readFile, realpath, writeFile } from 'node:fs/promises';
 import { dirname, isAbsolute, join, relative, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { listPlayInternalSourceFiles } from '../packages/mobile-release/play-internal-source.mjs';
 
 const root = await realpath(fileURLToPath(new URL('../', import.meta.url)));
 assert(process.argv.length === 3, 'Usage: node scripts/snapshot-mobile-source.mjs <output.json>');
 const output = resolve(process.argv[2]);
 assert(output.startsWith(root + sep), 'Snapshot output must be inside the workspace');
-const sources = [
-  'package.json', 'package-lock.json', 'tsconfig.json', 'packages', 'scripts/mobile.mjs',
-  'apps/family-mobile/package.json', 'apps/family-mobile/build-identity.json',
-  'apps/family-mobile/app.config.ts', 'apps/family-mobile/metro.config.cjs',
-  'apps/family-mobile/tsconfig.json', 'apps/family-mobile/Gemfile',
-  'apps/family-mobile/Gemfile.lock', 'apps/family-mobile/index.ts', 'apps/family-mobile/src',
-];
-const entries = execFileSync('git', ['ls-files', '-z', '--', ...sources], { cwd: root }).toString('utf8').split('\0').filter(Boolean);
+const entries = await listPlayInternalSourceFiles(root);
 assert(entries.length > 100 && entries.includes('apps/family-mobile/src/App.tsx'), 'Mobile source list is incomplete');
 const sourceFiles = [];
 for (const path of entries) {

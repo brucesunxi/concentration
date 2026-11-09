@@ -24,6 +24,11 @@
     { "source": "/api/:path*", "destination": "/api/index" },
     { "source": "/content-assets/:path*", "destination": "/api/index" },
     { "source": "/media/:path*", "destination": "/api/index" },
+    { "source": "/index.html", "destination": "/api/index" },
+    { "source": "/focus-sw.js", "destination": "/api/index" },
+    { "source": "/offline-shell.json", "destination": "/api/index" },
+    { "source": "/budget.json", "destination": "/api/index" },
+    { "source": "/assets/:path*", "destination": "/api/index" },
     { "source": "/:path*", "destination": "/index.html" }
   ]
 }

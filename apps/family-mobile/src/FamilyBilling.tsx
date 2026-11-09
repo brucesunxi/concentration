@@ -35,7 +35,7 @@ export function FamilyBilling({ familyId, locale, client, onBack, onLogin }: { f
     return () => clearTimeout(timer);
   }, [busy, status, familyId, client]);
   const copy = familyBillingCopy(locale, status ?? undefined);
-  return <Page title={copy.title}>
+  return <Page locale={locale} title={copy.title}>
     <View style={s.card}>
       <Text accessibilityRole="header" style={s.heading}>{busy ? locale === 'en' ? 'Checking family access…' : '正在确认家庭使用状态…' : copy.heading}</Text>
       {!busy && <><Text style={s.body}>{copy.detail}</Text>{copy.until && <Text style={s.body}>{copy.until}</Text>}{copy.renewal && <Text style={s.muted}>{copy.renewal}</Text>}<Text style={s.muted}>{copy.rights}</Text></>}

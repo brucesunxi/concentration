@@ -151,6 +151,57 @@ Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 
 
 这只是连接配置，不会开放新市场或绕过服务端授权。当前 Vercel 预览受 Vercel Authentication 保护，原生 App 不能直接完成该网页登录；不要把预览绕过凭据编入 App。正式区域路由、可验证监护同意、真实设备联调和生产发布仍待完成，见[远端路由验收](qa/mobile-api-routing-v0.46-qa.md)。
 
+### Play 内部测试包
+
+`Android test packages` 工作流仍生成调试证书和 `http://localhost:4181` 明文包，不能上传 Google Play。Play 内部测试使用单独的手动工作流 `Android Play internal testing`。它不设置 `APP_MODE=production`，安装包名称是 Focus Island Preview，Android 版本码从被拒绝的 17 增到 19（应用版本 0.2.18）。本地开发构建不读取这组 Play 变量。Play 打包在 `FOCUS_ANDROID_DISTRIBUTION=play-internal` 时改用没有本地回退地址的源模块，安装包里的运行时代码不包含 `http://localhost:4181`，缺失或本机地址会在打包前拒绝。
+
+工作流在仓库变量和密钥不齐、上传证书不是已固定的公钥指纹、或测试 API 不可达时直接失败，不会退回调试证书。私钥只留在 GitHub Actions 密钥和家长自己的保管位置，不进入 Git、产物报告或日志。不要再生成第二把上传密钥。已登记的公钥指纹是 `8471406ac196ee358f777ee2574c86a94d6be86eea0d50fd4e1c242f8f4894fa`，别名必须是 `focus-island-upload`。
+
+需要的仓库变量：
+
+- `FOCUS_PLAY_INTERNAL_API_ORIGIN`：专用测试服务的公网 HTTPS 根地址，不能带账号、路径、查询或片段，也不能是 `https://concentration-two.vercel.app`。
+
+需要的仓库密钥：
+
+- `FOCUS_PLAY_UPLOAD_KEYSTORE_BASE64`
+- `FOCUS_PLAY_UPLOAD_STORE_PASSWORD`
+- `FOCUS_PLAY_UPLOAD_KEY_ALIAS`：精确等于 `focus-island-upload`。
+- `FOCUS_PLAY_UPLOAD_KEY_PASSWORD`
+
+现有项目 `concentration` 继续服务 `https://concentration-two.vercel.app`，`ssoProtection.deploymentType` 保持 `all`。不要关闭 Deployment Protection，不要把例外加到这个生产域名，也不要把 Vercel bypass token 放进安装包。Vercel 的保护例外按整个预览域名生效，不能只放开 `/api`。因此例外域名上的部署必须是 API-only：页面、静态文件、service worker、`/studio`、`/admin`、`/support` 和 `/media` 返回 JSON 404；`/api/*` 仍要登录；`/api/health` 与 `/api/ready` 匿名返回 `audience=play-internal`。练习素材仍只走 `/content-assets/<64位哈希>.png|mp3`。API-only 构建会在 `dist/web` 写入一个非页面文件 `play-internal-api-only.json`。Vercel 拒绝空输出目录，失败日志里的 Output Directory `"web"` 指的就是 `dist/web` 的最后一段。这个文件不是网页。Middleware 在文件系统和 `/:path*` → `/index.html` 之前拒绝页面请求。网站构建不设置 `FOCUS_PLAY_INTERNAL_API`，仍输出完整页面，SPA 回退保持最后一条重写。已发布的 `index.html`、`focus-sw.js` 和 `/assets/*` 由文件系统优先返回；这些文件不存在时，同名请求改写到函数并返回 JSON。
+
+只使用现有 Neon 项目 `steep-waterfall-35706280`、生产分支 `br-ancient-math-b5mufwu8`、端点 `ep-winter-rain-b51yahyp`、数据库 `neondb`。不要创建、克隆、迁移或重置数据库。运行账号仍是已授权的 `focus_family_runtime`。在 Vercel 的 Preview 环境（不是 Production）设置 `FOCUS_PLAY_INTERNAL_API=1`、现有池化运行连接 `DATABASE_URL`，以及一把新的 `FOCUS_SESSION_SIGNING_JWK`。Production 环境不要加这个标志，也不要替换原来的 JWK。然后把本分支部署为 Preview，把 Deployment Protection Exception 只加到该预览域名。例外按整个域名生效。分支别名由 `VERCEL_BRANCH_URL` 自动允许。如果例外域名不是 `VERCEL_URL` 或 `VERCEL_BRANCH_URL`，再在 Preview 设置 `FOCUS_PLAY_INTERNAL_PREVIEW_HOST` 为那个主机名，不要写协议或路径。`FOCUS_PLAY_INTERNAL_API=1` 在 Production，或服务主机是 `concentration-two.vercel.app` 时，会拒绝启动。
+
+新的会话公钥要追加到现有 `session_authorities`，不能使用 `npm run db:prepare`。在仓库外的私密目录执行：
+
+```sh
+node scripts/register-play-session-authority.ts --write-new-jwk --jwk-file /安全目录/play-internal-session.jwk.json
+```
+
+把该文件的完整 JSON 放进 Preview 的 `FOCUS_SESSION_SIGNING_JWK`。再用数据库所有者连接（不是 `focus_family_runtime`）执行：
+
+```sh
+DATABASE_MIGRATION_URL='所有者连接' node scripts/register-play-session-authority.ts --register --jwk-file /安全目录/play-internal-session.jwk.json
+```
+
+脚本只在 schema 已是 32 时插入一行公钥。旧行保留。它不打印私钥，也不创建角色。
+
+预览域名的未登录 `GET /api/health` 和 `GET /api/ready` 都是 HTTP 200、无跳转，且带 `audience=play-internal` 之后，在已经拥有上传 p12 的电脑上构建。不要再生成上传密钥。GitHub Actions 目前没有这些密钥，不能代替本机构建：
+
+```sh
+export FOCUS_ANDROID_DISTRIBUTION=play-internal
+export EXPO_PUBLIC_FOCUS_API_ORIGIN='https://已验证的预览域名'
+export FOCUS_UPLOAD_STORE_FILE='仓库外的 focus-island-upload.p12 绝对路径'
+export FOCUS_PLAY_UPLOAD_KEY_ALIAS=focus-island-upload
+export FOCUS_PLAY_UPLOAD_STORE_PASSWORD='本机已有的库密码'
+export FOCUS_PLAY_UPLOAD_KEY_PASSWORD='本机已有的密钥密码'
+export JAVA_HOME='现有 JDK'
+export ANDROID_HOME='现有 Android SDK'
+npm run mobile:play-internal
+```
+
+输入检查可用 `node scripts/build-play-internal-android.mjs --check`。它不编译，也不表示可以上传。完整命令会先请求 health 和 ready，再用这把 p12 打 release，并核对固定证书指纹。通过的报告不是公开上架、真实儿童使用或价格保存。从不含 `.git` 的源码包构建时，再设置 `FOCUS_PLAY_SOURCE_REF` 为修订清单中的 40 位提交号。普通 git 检出仍使用当前 `HEAD`。
+
 ### Android 开发包
 
 本批在隔离目录安装并校验 Temurin JDK 21.0.12.1、Android SDK/Build Tools 36、NDK 27.1.12297006、CMake 3.22.1，未替换系统 Java。依赖源与下载校验记录保留在构建目录的 `.native-tools/android-build/`。Gradle wrapper 9.3.1、AGP 8.12.0 由当前工程固定。

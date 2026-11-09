@@ -3,9 +3,12 @@ import type { ReactNode } from 'react';
 import { AccessibilityInfo, StyleSheet, Text, View, Pressable, TextInput, ScrollView } from 'react-native';
 import type { TextInputProps } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import type { Locale } from '../../../packages/task-engine/index.ts';
+import { pageBrand } from '../../../packages/content/brand.ts';
+import { checkboxA11y } from '../../../packages/session-runtime/checkbox-a11y.ts';
 
 export const colors = { ink: '#243D37', muted: '#536B63', background: '#F6F4ED', card: '#FFFFFF', accent: '#286650', line: '#D6DFD7', soft: '#E8F0E7', danger: '#953C39' };
-export function Page({ children, title, subtitle }: { children: ReactNode; title: string; subtitle?: string }) {
+export function Page({ children, title, subtitle, locale }: { children: ReactNode; title: string; subtitle?: string; locale?: Locale }) {
   useEffect(() => {
     let current = true;
     void AccessibilityInfo.isScreenReaderEnabled().then(enabled => {
@@ -13,7 +16,7 @@ export function Page({ children, title, subtitle }: { children: ReactNode; title
     }).catch(() => undefined);
     return () => { current = false; };
   }, [title]);
-  return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled"><Text style={s.brand}>FOCUS ISLAND</Text><Text accessibilityRole="header" style={s.title}>{title}</Text>{subtitle && <Text style={s.muted}>{subtitle}</Text>}{children}</ScrollView></SafeAreaView>;
+  return <SafeAreaView style={s.safe}><ScrollView contentContainerStyle={s.page} keyboardShouldPersistTaps="handled"><Text style={[s.brand, locale === 'zh-CN' && { letterSpacing: 1 }]}>{pageBrand(locale)}</Text><Text accessibilityRole="header" style={s.title}>{title}</Text>{subtitle && <Text style={s.muted}>{subtitle}</Text>}{children}</ScrollView></SafeAreaView>;
 }
 export function Button({ title, accessibilityContext, onPress, disabled = false, quiet = false, danger = false }: { title: string; accessibilityContext?: string; onPress(): void; disabled?: boolean; quiet?: boolean; danger?: boolean }) {
   return <Pressable accessible accessibilityRole="button" accessibilityLabel={accessibilityContext ? `${accessibilityContext} · ${title}` : title} accessibilityState={{ disabled }} disabled={disabled} onPress={onPress} style={({ pressed }) => [s.button, quiet && s.quiet, danger && { backgroundColor: colors.danger }, (pressed || disabled) && { opacity: disabled ? 0.45 : 0.75 }]}><Text style={[s.buttonText, quiet && !danger && { color: colors.ink }]}>{title}</Text></Pressable>;
@@ -26,7 +29,7 @@ export function Choice({ label, selected, onPress, disabled = false }: { label: 
   return <Pressable accessible accessibilityLabel={label} onPress={onPress} disabled={disabled} accessibilityRole="radio" accessibilityState={{ checked: selected, disabled }} style={[s.chip, selected && s.selected, disabled && { opacity: 0.5 }]}><Text style={[s.chipText, selected && { color: colors.accent, fontWeight: '700' }]}>{label}</Text></Pressable>;
 }
 export function CheckBox({ label, value, onChange, disabled = false }: { label: string; value: boolean; onChange(value: boolean): void; disabled?: boolean }) {
-  return <Pressable accessible accessibilityLabel={label} disabled={disabled} onPress={() => onChange(!value)} accessibilityRole="checkbox" accessibilityState={{ checked: value, disabled }} style={s.check}><Text accessible={false} maxFontSizeMultiplier={1} style={[s.label, { flex: 0, width: 28 }]}>{value ? '☑' : '☐'}</Text><Text style={[s.muted, { flex: 1 }]}>{label}</Text></Pressable>;
+  return <Pressable accessible accessibilityLabel={label} disabled={disabled} onPress={() => onChange(!value)} {...checkboxA11y(value, disabled)} style={s.check}><Text accessible={false} importantForAccessibility="no" maxFontSizeMultiplier={1} style={[s.label, { flex: 0, width: 28 }]}>{value ? '☑' : '☐'}</Text><Text accessible={false} importantForAccessibility="no" style={[s.muted, { flex: 1 }]}>{label}</Text></Pressable>;
 }
 export const s = StyleSheet.create({
   safe: { flex: 1, backgroundColor: colors.background }, page: { padding: 24, paddingBottom: 48, gap: 16, width: '100%', maxWidth: 760, alignSelf: 'center' },

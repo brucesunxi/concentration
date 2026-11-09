@@ -34,7 +34,16 @@ test('invitation secrets are one-use, expiring, hashed and absent from lists, ex
   const stored=(await db.query<{code_hash:string}>('SELECT code_hash FROM family_invitations WHERE id=$1',[f.invite.id])).rows[0];
   assert.equal(stored.code_hash,createHash('sha256').update(f.invite.code).digest('hex'));
   for(const value of [await api.familyMembers(f.owner),await api.exportChild(f.owner,f.a.id),(await db.query('SELECT * FROM family_member_audit WHERE family_id=$1',[f.owner.family_id])).rows])assert.ok(!JSON.stringify(value).includes(f.invite.code));
-  await joined(f,false);await assert.rejects(api.join({...memberInput(f.invite.code),loginName:'another'}),denied('INVITE_UNAVAILABLE'));
+  const open=(await api.familyMembers(f.owner)).invitations.find(item=>item.id===f.invite.id);
+  assert.equal(open?.state,'open');
+  assert.equal(open?.acceptedAt,null);
+  await joined(f,false);
+  const accepted=(await api.familyMembers(f.owner)).invitations.find(item=>item.id===f.invite.id);
+  const storedAt=(await db.query<{accepted_at:string;expires_at:string}>('SELECT accepted_at,expires_at FROM family_invitations WHERE id=$1',[f.invite.id])).rows[0];
+  assert.equal(accepted?.state,'accepted');
+  assert.equal(accepted?.acceptedAt,new Date(storedAt.accepted_at).toISOString());
+  assert.notEqual(new Date(storedAt.accepted_at).toISOString(),new Date(storedAt.expires_at).toISOString());
+  await assert.rejects(api.join({...memberInput(f.invite.code),loginName:'another'}),denied('INVITE_UNAVAILABLE'));
   const g=await fixture();at+=48*3600000;
   await assert.rejects(api.join(memberInput(g.invite.code)),denied('INVITE_UNAVAILABLE'));
 });
