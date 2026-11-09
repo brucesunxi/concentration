@@ -36,10 +36,10 @@ const authority = await createSessionAuthority(db, { dataDir: options.serverless
 const authRateSecret = process.env.FOCUS_SESSION_SIGNING_JWK || await readFile(resolve(dataDir, 'session-signing.jwk.json'), 'utf8');
 const api = service(db, Date.now, content, authority, localReleaseScope, undefined, databaseEntitlementReader());
 const port = Number(process.env.API_PORT || 4181);
-const allowedOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`, 'http://127.0.0.1:4180', 'http://localhost:4180']);
+const allowedOrigins = new Set([`http://127.0.0.1:${port}`, `http://localhost:${port}`, 'http://127.0.0.1:4180', 'http://localhost:4180', `http://192.168.31.190:${port}`, 'http://192.168.31.190:4180']);
 const vercelHosts = options.serverless ? [process.env.VERCEL_URL, process.env.VERCEL_PROJECT_PRODUCTION_URL].filter((host): host is string => !!host) : [];
 for (const host of vercelHosts) allowedOrigins.add(`https://${host}`);
-const allowedHosts = options.serverless ? vercelHosts : ['127.0.0.1', 'localhost'];
+const allowedHosts = options.serverless ? vercelHosts : ['127.0.0.1', 'localhost', '192.168.31.190', '0.0.0.0'];
 async function body(req: http.IncomingMessage) {
   const chunks: Buffer[] = []; let length = 0;
   if (!req.headers['content-type']?.startsWith('application/json')) throw new ApiError(415, 'JSON_REQUIRED', '请使用 JSON 请求。');
@@ -207,7 +207,7 @@ const studioDb = postgres && studioPort ? await openDatabase('memory://', proces
 if(postgres && studioPort) await verifyRuntimeRole(studioDb,'studio');
 const studioContent = postgres && studioPort ? await createLocalContent(studioDb,{readOnly:true,delegatedRecall:true}) : content;
 const studioServer=studioPort?await startStudioServer(studioDb,studioContent,dataDir,studioPort):null;
-if (!options.serverless) server.listen(port, '127.0.0.1', () => console.log(`专注岛家庭服务 http://127.0.0.1:${port} · 本地开发模式`));
+if (!options.serverless) server.listen(port, '0.0.0.0', () => console.log(`专注岛家庭服务 http://0.0.0.0:${port} · 本地开发模式（含局域网）`));
 let stopping=false;
 async function shutdown() { if(stopping)return;stopping=true;await Promise.all([server,studioServer].filter(Boolean).map(s=>new Promise<void>(resolve=>s!.close(()=>resolve()))));if(studioDb!==db)await studioDb.close();await db.close();process.exit(0); }
 if (!options.serverless) { process.on('SIGTERM', shutdown); process.on('SIGINT', shutdown); }

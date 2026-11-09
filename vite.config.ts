@@ -12,7 +12,7 @@ export default defineConfig({
   resolve: { dedupe: ['react', 'react-dom'] },
   optimizeDeps: { include: ['react', 'react-dom/client', 'lucide-react', 'zod'] },
   server: {
-    host: '127.0.0.1', port: 4180, strictPort: true,
+    host: '0.0.0.0', port: 4180, strictPort: true,
     proxy: { '/api': 'http://127.0.0.1:4181', '/media': 'http://127.0.0.1:4181', '/content-assets': 'http://127.0.0.1:4181' },
     fs: { allow: [import.meta.dirname] },
   },
