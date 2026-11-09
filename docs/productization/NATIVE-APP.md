@@ -153,7 +153,7 @@ Debug App 还需移动开发服务；源目录运行 `npm run dev` 提供家庭 
 
 ### Play 内部测试包
 
-`Android test packages` 工作流仍生成调试证书和 `http://localhost:4181` 明文包，不能上传 Google Play。Play 内部测试使用单独的手动工作流 `Android Play internal testing`。它不设置 `APP_MODE=production`，安装包名称是 Focus Island Preview，Android 版本码从被拒绝的 17 增到 18（应用版本 0.2.17）。本地开发构建不读取这组 Play 变量。
+`Android test packages` 工作流仍生成调试证书和 `http://localhost:4181` 明文包，不能上传 Google Play。Play 内部测试使用单独的手动工作流 `Android Play internal testing`。它不设置 `APP_MODE=production`，安装包名称是 Focus Island Preview，Android 版本码从被拒绝的 17 增到 18（应用版本 0.2.17）。本地开发构建不读取这组 Play 变量。Play 打包在 `FOCUS_ANDROID_DISTRIBUTION=play-internal` 时改用没有本地回退地址的源模块，安装包里的运行时代码不包含 `http://localhost:4181`，缺失或本机地址会在打包前拒绝。
 
 工作流在仓库变量和密钥不齐、上传证书不是已固定的公钥指纹、或测试 API 不可达时直接失败，不会退回调试证书。私钥只留在 GitHub Actions 密钥和家长自己的保管位置，不进入 Git、产物报告或日志。不要再生成第二把上传密钥。已登记的公钥指纹是 `8471406ac196ee358f777ee2574c86a94d6be86eea0d50fd4e1c242f8f4894fa`，别名必须是 `focus-island-upload`。
 
